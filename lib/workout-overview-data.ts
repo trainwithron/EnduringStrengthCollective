@@ -5,6 +5,7 @@ import { loadPlatformDemos } from "@/lib/platform-demos";
 import { DEFAULT_TRACKED_FIELDS, mapSetRow, SET_ROW_SELECT, type TrackedField } from "@/lib/exercise-fields";
 import { PRIOR_SETS_SELECT, suggestedWeightsFromHistory } from "@/lib/suggested-weights";
 import type { ExerciseSetTarget } from "@/lib/types";
+import { headersAbove, headersOfWorkouts } from "@/lib/section-headers";
 
 export interface WorkoutOverviewExercise {
   id: string;
@@ -30,6 +31,8 @@ export interface WorkoutOverviewData {
   workout: { id: string; title: string; notes: string | null; programId: string };
   exercises: WorkoutOverviewExercise[];
   dayNotes: { id: string; body: string }[];
+  // Section headers (B3) above the exercise they head, by exercise id; the headers are not day notes.
+  headersByExerciseId: Record<string, string[]>;
   lastTimeByExercise: Record<string, { weight: number; reps: number }>;
   videoUrlByExerciseId: Map<string, string>;
   goalByExerciseId: Map<string, { weight: number | null; reps: number | null; reason?: string }>;
@@ -53,6 +56,8 @@ export async function getWorkoutOverviewData(
   // result — so they fire as one round trip instead of three sequential
   // ones. This is the athlete's most-visited page; every query removed
   // from the critical path here is felt on every workout open.
+  // the day's section headers (B3), read on their own while the rest loads (none before step 219)
+  const headersRead = headersOfWorkouts(supabase, [workoutId]);
   const [{ data: workout }, { data: existingSessionRow }, { data: coachMembership }] =
     await Promise.all([
       supabase
@@ -263,10 +268,16 @@ export async function getWorkoutOverviewData(
     (priorSetsResult.data ?? []) as any[]
   )) as Map<string, number | null>;
 
+  const headers = (await headersRead).get(workout.id) ?? [];
+  const headerIds = new Set(headers.map((h) => h.id));
   const dayNotes = (workout.workout_notes ?? [])
+    .filter((n: any) => !headerIds.has(n.id))
     .slice()
     .sort((a: any, b: any) => a.position - b.position)
     .map((n: any) => ({ id: n.id, body: n.body }));
+  const above = headersAbove(exercises.map((e) => e.exerciseOrder), headers);
+  const headersByExerciseId: Record<string, string[]> = {};
+  above.forEach((hs, i) => (headersByExerciseId[exercises[i].id] = hs));
 
   return {
     workout: {
@@ -277,6 +288,7 @@ export async function getWorkoutOverviewData(
     },
     exercises,
     dayNotes,
+    headersByExerciseId,
     lastTimeByExercise,
     videoUrlByExerciseId,
     goalByExerciseId,

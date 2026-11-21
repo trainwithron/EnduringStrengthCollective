@@ -23,6 +23,7 @@ import type { AliasEntry } from "@/lib/exercise-matching";
 import { ExerciseBuilderCard, type MovementPatternOption } from "../exercise-builder-card";
 import type { RestTempoSuggestion } from "@/lib/training-intent";
 import { TextNoteCard } from "../text-note-card";
+import { SectionHeaderCard } from "../section-header-card";
 import { BulkEditDayPanel } from "./bulk-edit-day-panel";
 import { AddSlotForm, SlotCard } from "./slot-card";
 import { addStarterLadders } from "@/lib/starter-ladders-add";
@@ -290,7 +291,8 @@ export function DayCard({
     }
   }
 
-  async function handleAddNote() {
+  // A note, or a section header (B3: a note marked as a header, so it moves, renames and deletes the same way).
+  async function handleAddNote(header = false) {
     if (addItemBusy) return;
     setAddItemBusy(true);
     try {
@@ -307,16 +309,19 @@ export function DayCard({
           body: "",
           position: nextOrder,
           created_by: userData.user.id,
+          ...(header ? { is_header: true } : {}),
         })
         .select("id")
         .single();
 
       if (insertError || !newRow) {
-        flashSaveError("Couldn't add that note — try again.");
+        // before step 219 the database has no headers yet: say so rather than add a plain note
+        if (header && /is_header/.test(insertError?.message ?? "")) flashSaveError("Section headers aren't switched on yet. Try again soon.");
+        else flashSaveError(header ? "Couldn't add that header. Try again." : "Couldn't add that note — try again.");
         return;
       }
 
-      const newNote: BuilderNote = { kind: "note", id: newRow.id, order: nextOrder, body: "" };
+      const newNote: BuilderNote = { kind: "note", id: newRow.id, order: nextOrder, body: "", ...(header ? { header: true } : {}) };
       onItemsChange((prev) => [...prev, newNote]);
       flashSaved();
     } finally {
@@ -676,6 +681,13 @@ export function DayCard({
             return (
               <div className="divide-y divide-steel/15" data-testid="compact-day-list">
                 {sortedItems.map((item, index) => {
+                  if (item.kind === "note" && item.header) {
+                    return (
+                      <p key={item.id} className="pt-2.5 pb-1 px-1 font-display uppercase tracking-wide text-xs text-rust-ink truncate" title={item.body} data-section-header>
+                        {item.body || "Section header"}
+                      </p>
+                    );
+                  }
                   if (item.kind === "note") {
                     return (
                       <div key={item.id} className="py-1.5 px-1 flex items-center gap-1.5 min-w-0" title={item.body}>
@@ -783,6 +795,21 @@ export function DayCard({
                   )}
                   {item.kind === "exercise" ? (
                     renderExerciseCard(item, sortedItems, index)
+                  ) : item.header ? (
+                    <SectionHeaderCard
+                      noteId={item.id}
+                      initialBody={item.body}
+                      canMoveUp={index > 0}
+                      canMoveDown={index < sortedItems.length - 1}
+                      onMoveUp={() => moveItem(sortedItems, index, -1)}
+                      onMoveDown={() => moveItem(sortedItems, index, 1)}
+                      workoutId={day.id}
+                      groupId={groupId}
+                      order={item.order}
+                      onDeleted={() => onItemsChange((prev) => prev.filter((i) => i.id !== item.id))}
+                      onRestored={(note) => onItemsChange((prev) => (prev.some((i) => i.id === note.id) ? prev : [...prev, note]))}
+                      onBodyChange={(next) => onItemsChange((prev) => prev.map((i) => (i.id === item.id && i.kind === "note" ? { ...i, body: next } : i)))}
+                    />
                   ) : (
                     <TextNoteCard
                       noteId={item.id}
@@ -837,11 +864,19 @@ export function DayCard({
             </button>
             <button
               type="button"
-              onClick={handleAddNote}
+              onClick={() => void handleAddNote()}
               disabled={addItemBusy}
               className="h-9 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
             >
               + Note
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleAddNote(true)}
+              disabled={addItemBusy}
+              className="h-9 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
+            >
+              + Header
             </button>
             {canAddSlot && (
             <button

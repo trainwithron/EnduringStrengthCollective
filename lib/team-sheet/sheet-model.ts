@@ -30,6 +30,8 @@ export interface SheetExercise {
   repsOnly?: boolean;
   /** a percent of each athlete's max (wave 2 T3): 75 for 75%; each athlete's own weight is in SheetModel.targets */
   pct?: number | null;
+  /** the coach's section header above this exercise in the workout ("Warm-up"; B3), printed above its name on the paper sheet */
+  section?: string;
 }
 
 export interface SheetDay {

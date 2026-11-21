@@ -5,6 +5,8 @@ import { BuilderDemoThumb } from "@/components/coach/builder-demo-thumb";
 import { builderDemoFor } from "@/lib/builder-demo";
 import { summarizeSets } from "@/lib/exercise-summary";
 import { renderNoteBody } from "@/lib/text-note-format";
+import { headersAbove } from "@/lib/section-headers";
+import { SectionHeaderLines } from "@/components/shared/section-header-line";
 import type { DemoRow } from "@/lib/exercise-demo";
 import type { BuilderDay, BuilderExercise, BuilderNote } from "@/lib/types";
 import { anotherModalIsOpen, releaseScrollLock } from "@/lib/modal-stack";
@@ -53,7 +55,12 @@ export function ClientPreviewSheet({ days, heading, demoLibrary, onClose }: { da
 function PreviewDay({ day, showTitle, demoLibrary }: { day: BuilderDay; showTitle: boolean; demoLibrary: DemoRow[] }) {
   const sorted = [...day.items].sort((a, b) => a.order - b.order);
   const exercises = sorted.filter((i): i is BuilderExercise => i.kind === "exercise" && !i.slot);
-  const notes = sorted.filter((i): i is BuilderNote => i.kind === "note" && i.body.trim() !== "");
+  const notes = sorted.filter((i): i is BuilderNote => i.kind === "note" && !i.header && i.body.trim() !== "");
+  // section headers (B3) sit above the exercise they head, as the client sees them
+  const above = headersAbove(
+    exercises.map((e) => e.order),
+    sorted.filter((i): i is BuilderNote => i.kind === "note" && !!i.header && i.body.trim() !== "").map((h) => ({ position: h.order, body: h.body.trim() }))
+  );
   return (
     <section className="mb-4 last:mb-0">
       {showTitle && <h3 className="font-display uppercase text-sm tracking-wide text-steel mb-2">{day.title || `Day ${day.dayIndex + 1}`}</h3>}
@@ -67,8 +74,11 @@ function PreviewDay({ day, showTitle, demoLibrary }: { day: BuilderDay; showTitl
         <p className="font-body text-sm text-steel py-3">No exercises on this day yet.</p>
       ) : (
         <div className="divide-y divide-steel/15">
-          {exercises.map((ex) => (
-            <PreviewRow key={ex.id} exercise={ex} demoLibrary={demoLibrary} />
+          {exercises.map((ex, i) => (
+            <div key={ex.id}>
+              <SectionHeaderLines headers={above.get(i)} />
+              <PreviewRow exercise={ex} demoLibrary={demoLibrary} />
+            </div>
           ))}
         </div>
       )}

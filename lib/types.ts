@@ -116,6 +116,8 @@ export interface SessionExerciseEntry {
   supersetNext?: boolean;
   // Its place in that block, worked out by the logger: "2a", and the line said under the name ("Superset with Row: one set of each, then rest.").
   superset?: { label: string; line: string } | null;
+  // The coach's section headers just above this exercise in the program ("Warm-up"; B3). Never on one the client added.
+  sectionHeaders?: string[];
   // How many sets the coach prescribed for this exercise (the program's own count), so the Sets stepper can say "Prescribed 4" when the athlete did 3.
   // Optional/undefined for an exercise with no program behind it (one the athlete added) and on any render path that does not compute it.
   prescribedSetCount?: number | null;
@@ -196,6 +198,8 @@ export interface BuilderNote {
   id: string;
   order: number;
   body: string;
+  // A section header ("Warm-up", "Strength") instead of a note: workout_notes.is_header, step 219 (lib/section-headers.ts).
+  header?: boolean;
 }
 
 export type BuilderItem = BuilderExercise | BuilderNote;

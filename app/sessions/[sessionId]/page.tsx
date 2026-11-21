@@ -1,4 +1,5 @@
 import { linkedExercisesAmong } from "@/lib/superset-links";
+import { headersAbove, headersOfWorkouts } from "@/lib/section-headers";
 import { isTeamSportGroup } from "@/lib/team-sport";
 import { maxByLift, setWeightFor } from "@/lib/pct-of-max";
 import { COACH_HOME_HREF } from "@/lib/start-group";
@@ -203,7 +204,15 @@ export default async function SessionPage(
     .filter((id: string | null): id is string => id != null);
 
   // Supersets (B1): which of the program's exercises the coach linked with the next one. A failed read (or a database before step 210) means no links, never a broken workout.
-  const linkedTemplateIds = await linkedExercisesAmong(supabase, templateExerciseIds);
+  // Section headers (B3) read alongside, the same way (none before step 219). Each heads the first programmed exercise after it; an exercise the client added has none.
+  const [linkedTemplateIds, headersByWorkout] = await Promise.all([
+    linkedExercisesAmong(supabase, templateExerciseIds),
+    session.workout_id ? headersOfWorkouts(supabase, [session.workout_id]) : Promise.resolve(new Map()),
+  ]);
+  const programmed = ((sessionExercises ?? []) as any[]).filter((se) => se.group_workout_exercise_id && !se.is_added);
+  const headersAboveIndex = headersAbove(programmed.map((se) => se.exercise_order as number), (session.workout_id ? headersByWorkout.get(session.workout_id) : null) ?? []);
+  const headersBySessionExercise = new Map<string, string[]>();
+  headersAboveIndex.forEach((hs, i) => headersBySessionExercise.set(programmed[i].id, hs));
 
   const prescribedSetCountByExercise = new Map<string, number>();
   const targetsByExerciseAndOrder = new Map<
@@ -410,6 +419,7 @@ export default async function SessionPage(
         athleteNote: se.athlete_note ?? null,
         prescribedSetCount: se.group_workout_exercise_id ? prescribedSetCountByExercise.get(se.group_workout_exercise_id) ?? null : null,
         supersetNext: !!se.group_workout_exercise_id && linkedTemplateIds.has(se.group_workout_exercise_id),
+        ...(headersBySessionExercise.has(se.id) ? { sectionHeaders: headersBySessionExercise.get(se.id) } : {}),
         volumeHistory: volumeHistoryByExerciseName.get(se.exercise_name) ?? [],
         sets: (se.set_logs ?? [])
           .slice()

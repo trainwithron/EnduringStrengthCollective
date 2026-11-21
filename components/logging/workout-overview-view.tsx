@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { StartWorkoutButton } from "@/components/logging/start-workout-button";
 import { PreStartExerciseRow } from "@/components/logging/pre-start-exercise-row";
+import { SectionHeaderLines } from "@/components/shared/section-header-line";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
 import { RefreshOnBfcacheRestore } from "@/components/logging/refresh-on-bfcache-restore";
@@ -39,7 +40,7 @@ export async function WorkoutOverviewView({
   actingAs?: { fullName: string; groupId: string };
   sessionTypes?: { id: string; name: string }[];
 }) {
-  const { workout, exercises, dayNotes, lastTimeByExercise, videoUrlByExerciseId, goalByExerciseId, existingSession } =
+  const { workout, exercises, dayNotes, headersByExerciseId, lastTimeByExercise, videoUrlByExerciseId, goalByExerciseId, existingSession } =
     data;
 
   // Coach logging a session on a client's behalf sees no tab bar (they
@@ -85,15 +86,17 @@ export async function WorkoutOverviewView({
         </h2>
         <div className="divide-y divide-steel/15">
           {exercises.map((ex) => (
-            <PreStartExerciseRow
-              key={ex.id}
-              exercise={ex}
-              athleteId={athleteId}
-              groupId={groupId}
-              videoUrl={videoUrlByExerciseId.get(ex.id)}
-              lastTime={lastTimeByExercise[ex.exerciseName]}
-              goal={goalByExerciseId.get(ex.id)}
-            />
+            <div key={ex.id}>
+              <SectionHeaderLines headers={headersByExerciseId?.[ex.id]} />
+              <PreStartExerciseRow
+                exercise={ex}
+                athleteId={athleteId}
+                groupId={groupId}
+                videoUrl={videoUrlByExerciseId.get(ex.id)}
+                lastTime={lastTimeByExercise[ex.exerciseName]}
+                goal={goalByExerciseId.get(ex.id)}
+              />
+            </div>
           ))}
         </div>
       </section>

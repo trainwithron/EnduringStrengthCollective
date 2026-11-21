@@ -319,6 +319,12 @@ export function ExerciseCard({
 
   return (
     <div>
+      {/* The coach's section header above this exercise (B3: "Warm-up", "Strength"), so the client sees where a part of the workout starts. */}
+      {exercise.sectionHeaders && exercise.sectionHeaders.length > 0 && (
+        <p className="font-display uppercase tracking-wide text-sm text-rust-ink mb-2" data-section-header>
+          {exercise.sectionHeaders.join(" · ")}
+        </p>
+      )}
       {/* The demo, big, at the top of the exercise (Look Refresh, client step): a tap plays it full screen. A client can turn demos off in Settings. */}
       {demo && !demosHidden && (
         <DemoHero
