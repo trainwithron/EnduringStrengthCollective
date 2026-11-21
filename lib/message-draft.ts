@@ -1,43 +1,37 @@
 // A drafted message that opens in a conversation's box ("Message Sam" with a check-in already written). The draft names the client and their sessions, so it never rides in the address
-// (addresses reach server logs; review of the desktop audit, Nov 21): the link carries only an opaque key (?draft=md-…), the words are kept in this tab's sessionStorage under that key when the
-// link is pressed (components/messages/draft-message-link.tsx), and the conversation reads them back into its box. Nothing stored: the box opens empty.
-// An older link whose ?draft= is the words themselves still opens with them (a panel not moved over yet).
+// (addresses reach server logs; review of the desktop audit, Nov 21). The link itself is the plain conversation; when it is pressed, a RANDOM key is made right then, the words are kept in
+// this tab's sessionStorage under it, and the conversation opens with ?draft=<that key> and reads the words back into its box (components/messages/draft-message-link.tsx). The key says
+// nothing about the words and cannot be worked back to them. Opened in a new tab, or with nothing kept, the box opens empty.
+// An older link whose ?draft= is the words themselves still opens with them.
 
 const PREFIX = "spotlight:draft:";
-const KEY_RE = /^md-[0-9a-f]{16}$/;
-
-// FNV-1a, twice with different seeds: the same draft always gets the same key, so a page can render the link on the server and the browser agrees (no mismatch), and the key says nothing
-// about the words.
-function fnv(text: string, seed: number): string {
-  let h = seed >>> 0;
-  for (let i = 0; i < text.length; i++) {
-    h ^= text.charCodeAt(i);
-    h = Math.imul(h, 0x01000193) >>> 0;
-  }
-  return h.toString(16).padStart(8, "0");
-}
-
-export function draftKey(text: string): string {
-  return `md-${fnv(text, 0x811c9dc5)}${fnv(text, 0x050c5d1f)}`;
-}
+const KEY_RE = /^md-[0-9a-f]{32}$/;
 
 export function isDraftKey(value: string | null | undefined): boolean {
   return !!value && KEY_RE.test(value);
 }
 
-/** The conversation's address with the draft's key: `/groups/g/messages/a?draft=md-…`. */
-export function draftThreadHref(threadHref: string, text: string): string {
-  return `${threadHref}${threadHref.includes("?") ? "&" : "?"}draft=${draftKey(text)}`;
+/** A new random key (128 bits). */
+export function newDraftKey(): string {
+  const bytes = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(bytes);
+  return `md-${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
 }
 
-/** Keeps the words for the key (this tab only). False when the browser would not keep them. */
-export function stashDraft(text: string): boolean {
+/** Keeps the words in this tab under a new random key and returns the key, or null when the browser would not keep them. */
+export function stashDraft(text: string): string | null {
   try {
-    window.sessionStorage.setItem(PREFIX + draftKey(text), text);
-    return true;
+    const key = newDraftKey();
+    window.sessionStorage.setItem(PREFIX + key, text);
+    return key;
   } catch {
-    return false;
+    return null;
   }
+}
+
+/** The conversation's address with a key: `/groups/g/messages/a?draft=md-…`. */
+export function withDraftKey(threadHref: string, key: string): string {
+  return `${threadHref}${threadHref.includes("?") ? "&" : "?"}draft=${key}`;
 }
 
 /** The words for a key, or "" when there are none (another tab, storage blocked, a stale link). */

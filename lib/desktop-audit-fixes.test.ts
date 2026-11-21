@@ -1,5 +1,5 @@
 // The coach desktop audit (Nov 21): buttons that scrolled instead of opening, opened the wrong page, or dead-ended. One test per item, by its audit number.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createElement } from "react";
@@ -17,7 +17,8 @@ import { AVAILABILITY_HREF, PUBLIC_PAGE_ANCHOR } from "@/lib/my-page-qr";
 import { PULSE_ATTENTION_HREF } from "@/lib/home-greeting";
 import { failedCardDraft } from "@/components/coach/payment-problems-section";
 import type { AttentionItem } from "@/lib/your-day";
-import { draftKey } from "@/lib/message-draft";
+// a drafted-message link opens the conversation through the app's router
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
 
 const ROOT = join(__dirname, "..");
 const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8").replace(/\r\n/g, "\n");
@@ -86,7 +87,7 @@ describe("Needs you on Home", () => {
     // the words go with the item (kept in the tab on press); the address carries only their key
     expect(e.draft?.threadHref).toBe("/groups/g1/messages/a1");
     expect(e.draft?.text).toContain("Hi Sam, I noticed you have 4 sessions left");
-    expect(e.href).toBe(`/groups/g1/messages/a1?draft=${draftKey(e.draft!.text)}`);
+    expect(e.href).toBe("/groups/g1/messages/a1");
     expect(e.href).not.toMatch(/Sam|sessions/);
     expect(e.href).not.toContain("#expiring");
   });
@@ -98,7 +99,7 @@ describe("Needs you on Home", () => {
     );
     const q = items.find((i) => i.kind === "quiet_strong")!;
     expect(q.draft?.text).toMatch(/^Hey Ann, haven't seen you in a bit/);
-    expect(q.href).toBe(`/groups/g1/messages/a1?draft=${draftKey(q.draft!.text)}`);
+    expect(q.href).toBe("/groups/g1/messages/a1");
     expect(q.href).not.toContain("Ann");
     expect(q.profileHref).toBe("/groups/g1/athletes/a1");
   });

@@ -37,6 +37,31 @@ export function parseJoinLinkToken(token: unknown): string | null {
 
 export const joinLinkUrl = (origin: string, id: string) => `${origin.replace(/\/+$/, "")}/join-coach/${joinLinkToken(id)}`;
 
+// The link the Invite coach form's Copy link hands out when the email did not go (desktop audit D24, review Nov 21): /coach-invite/<id>.<signature>, the SAME shape whether <id> is a new address's
+// join link or an existing account's in-app invitation, so the link says nothing about which kind of address it was. The page (app/coach-invite/[token]) works out which on the server and sends
+// only the person it is for on to the right place. Its own signature (a different purpose string), so a join-link token is not one of these and the other way round.
+const inviteMac = (id: string) => createHmac("sha256", secret()).update(`coach-invite-link:v1:${id.toLowerCase()}`).digest("base64url");
+export function inviteLinkToken(id: string): string {
+  return `${id.toLowerCase()}.${inviteMac(id)}`;
+}
+export const inviteLinkUrl = (origin: string, id: string) => `${origin.replace(/\/+$/, "")}/coach-invite/${inviteLinkToken(id)}`;
+/** The id inside a /coach-invite/ token when its signature is right; otherwise null. */
+export function parseInviteLinkToken(token: unknown): string | null {
+  if (typeof token !== "string" || token.length > 200) return null;
+  const dot = token.indexOf(".");
+  if (dot !== 36) return null;
+  const id = token.slice(0, dot);
+  if (!UUID.test(id)) return null;
+  try {
+    const expected = Buffer.from(inviteMac(id));
+    const given = Buffer.from(token.slice(dot + 1));
+    if (expected.length !== given.length || !timingSafeEqual(expected, given)) return null;
+  } catch {
+    return null;
+  }
+  return id.toLowerCase();
+}
+
 export interface JoinLinkRow {
   id: string;
   organization_id: string;

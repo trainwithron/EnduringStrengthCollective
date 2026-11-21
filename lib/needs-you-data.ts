@@ -16,7 +16,6 @@ import { GOAL_SHEET_ANCHOR, goalReviewCutoffIso, goalReviewDue } from "@/lib/goa
 import { SIGN_IN_OPTIONS_ANCHOR } from "@/lib/get-started-checklist";
 import { getQuietClientNudgeTemplates } from "@/lib/quiet-client-nudge-templates";
 import { loadQuietInChat, quietChatSentence } from "@/lib/quiet-chat";
-import { draftThreadHref } from "@/lib/message-draft";
 
 // A weekly check-in older than this is not news for Home's strip (the Check-ins page keeps the same window).
 const CHECKIN_REVIEW_DAYS = 56;
@@ -42,11 +41,11 @@ export interface NeedsYouHomeInputs {
 export const SESSION_SOON_MINUTES = 120;
 
 const clientPath = (groupId: string, athleteId: string) => `/groups/${groupId}/athletes/${athleteId}`;
-// A message thread with a drafted note in its box (the coach edits it before sending). The address carries only the draft's key; the words go with the item and are kept in the tab when the
-// button is pressed (lib/message-draft.ts), so a client's name and sessions never reach a server log.
+// A message thread with a drafted note in its box (the coach edits it before sending). The address is the plain conversation; the words go with the item and are kept in the tab under a
+// random key when the button is pressed (lib/message-draft.ts), so a client's name and sessions never reach a server log.
 const withDraft = (groupId: string, athleteId: string, text: string) => {
   const threadHref = `/groups/${groupId}/messages/${athleteId}`;
-  return { href: draftThreadHref(threadHref, text), draft: { threadHref, text } };
+  return { href: threadHref, draft: { threadHref, text } };
 };
 // A first name for a button or a draft; "" when the name could not be read.
 const firstOf = (name: string) => (name === "A client" ? "" : name.trim().split(/\s+/)[0] ?? "");

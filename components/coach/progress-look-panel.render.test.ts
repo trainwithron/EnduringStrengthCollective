@@ -9,6 +9,8 @@ vi.mock("@/lib/supabase/client", () => ({
 
 import { ProgressCardView, ProgressLookPanel } from "./progress-look-panel";
 import type { ProgressCardData } from "@/lib/progress-look-gather";
+// a drafted-message link opens the conversation through the app's router
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
 
 const look = { exerciseName: "Back Squat", isMain: true, sessions: 4, weight: 225, reps: 5, spanDays: 21, effort: "falling" as const, rpes: [8, 7, 7], overTargetHint: false };
 const card = (over: Partial<ProgressCardData> = {}): ProgressCardData => ({
@@ -52,7 +54,8 @@ describe("a time-to-progress card", () => {
   it("offers an optional note, a time, and the question, all as links the coach chooses; nothing is sent by itself", () => {
     const html = render(card());
     expect(html).toContain("Draft a note to Sam");
-    expect(html).toContain("/groups/g1/messages/a1?draft=");
+    // the conversation, with the note kept in the tab when the link is pressed (never in the address: review, Nov 21)
+    expect(html).toContain('data-message-draft="true" href="/groups/g1/messages/a1"');
     expect(html).toContain("Suggest a time");
     expect(html).toContain("/groups/g1/calendar?client=a1&amp;scheduleFor=a1");
     expect(html).toContain("Ask what they need most help with");

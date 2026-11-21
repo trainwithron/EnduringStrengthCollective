@@ -4,14 +4,15 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { rateLimitAllows, rateLimitResponse } from "@/lib/rate-limit";
 import { appOrigin } from "@/lib/app-url";
 import { inviteEmail, sendAuthMail } from "@/lib/auth-mail";
-import { ensureJoinLink, joinLinkUrl } from "@/lib/coach-join-link";
+import { ensureJoinLink, inviteLinkUrl, joinLinkUrl } from "@/lib/coach-join-link";
 import { authorizeInviteManager, loadInviteTarget, markSent } from "@/lib/coach-invite-server";
 import { notifyAndEmail } from "@/lib/invite-notify";
 
 // Send again / Copy link for an invitation whose email did not go out, right from the Invite coach form (desktop audit, Nov 21). The invite route hands back one id (`unsentId`) whatever kind
 // of address it was: a new address (the person waiting to accept, by their id) or one that already had an account (their in-app invitation, by its id). This ONE route works out which on the
 // server and answers in exactly the same shape either way, so nothing the inviter can see (the address called, the status, the keys) tells whether the address had an account.
-// Only an owner or admin of the organization; the same per-person limits as the Invitations list's own buttons, plus a limit per invitation.
+// Only an owner or admin of the organization; 30 calls an hour per person, and one resend per invitation every ten minutes (the Invitations list's own rule). Copy link hands out ONE shape of link
+// for both kinds (/coach-invite/<id>.<signature>, lib/coach-join-link.ts), whose page works out where it goes.
 const NOT_OPEN = "That invitation is not open any more. Check Invitations on the Team page.";
 const SEND_FAILED = "Couldn't send it again. Try again in a few minutes.";
 const LINK_FAILED = "Couldn't get the link. Try again in a few minutes.";
@@ -45,18 +46,19 @@ export async function POST(request: Request) {
   if (!openInvite && !person?.ok) return NextResponse.json({ error: NOT_OPEN }, { status: 404 });
 
   if (action === "link") {
+    // the same shape for both kinds: the in-app invitation's id, or the new address's join link id, signed
     let link: string | null = null;
-    if (openInvite) link = `${origin}/org-invite/${openInvite.id}`;
+    if (openInvite) link = inviteLinkUrl(origin, openInvite.id);
     else {
       const made = await ensureJoinLink(db, { organizationId, profileId: unsentId, kind: "invite", createdBy: user.id, extend: false });
-      link = made.ok ? joinLinkUrl(origin, made.row.id) : null;
+      link = made.ok ? inviteLinkUrl(origin, made.row.id) : null;
     }
     if (!link) return NextResponse.json({ error: LINK_FAILED }, { status: 502 });
     return NextResponse.json({ ok: true, link }, { headers: { "cache-control": "no-store" } });
   }
 
-  // Sending again: a few times per invitation per ten minutes, the same for both kinds.
-  if (!(await rateLimitAllows(`coach-invite-retry:${unsentId}`, 3, 600))) return NextResponse.json({ error: "It was just sent. Give it a few minutes." }, { status: 429 });
+  // Sending again: once per invitation every ten minutes, the same for both kinds.
+  if (!(await rateLimitAllows(`coach-invite-retry:${unsentId}`, 1, 600))) return NextResponse.json({ error: "It was just sent. Give it a few minutes." }, { status: 429 });
   const { data: org } = await db.from("organizations").select("name").eq("id", organizationId).maybeSingle();
   const orgName = (org as { name?: string } | null)?.name ?? "An organization";
   let emailed = false;

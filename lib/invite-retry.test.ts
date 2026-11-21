@@ -29,11 +29,17 @@ const db = {
 
 vi.mock("@/lib/supabase/server", () => ({ createServerClient: async () => db }));
 vi.mock("@/lib/supabase/service-role", () => ({ createServiceRoleClient: () => db }));
-vi.mock("@/lib/rate-limit", () => ({ rateLimitResponse: async () => null, rateLimitAllows: async () => true }));
+const rl = vi.hoisted(() => ({ allows: vi.fn(async (_key: string, _max: number, _seconds: number) => true) }));
+vi.mock("@/lib/rate-limit", () => ({ rateLimitResponse: async () => null, rateLimitAllows: rl.allows }));
 vi.mock("@/lib/app-url", () => ({ appOrigin: () => "https://app.test" }));
 vi.mock("@/lib/auth-mail", () => ({ inviteEmail: () => ({ subject: "s", html: "h" }), sendAuthMail: vi.fn(async () => true) }));
 vi.mock("@/lib/invite-notify", () => ({ notifyAndEmail: vi.fn(async () => ({ notified: true, emailed: true })) }));
-vi.mock("@/lib/coach-join-link", () => ({ ensureJoinLink: async () => ({ ok: true, row: { id: "join-9", expires_at: "x" } }), joinLinkUrl: (o: string, id: string) => `${o}/join/${id}` }));
+vi.mock("@/lib/coach-join-link", () => ({
+  ensureJoinLink: async () => ({ ok: true, row: { id: "join-9", expires_at: "x" } }),
+  joinLinkUrl: (o: string, id: string) => `${o}/join-coach/${id}.sig`,
+  inviteLinkUrl: (o: string, id: string) => `${o}/coach-invite/${id}.sig`,
+}));
+
 vi.mock("@/lib/coach-invite-server", () => ({
   authorizeInviteManager: async () => ({ ok: true, manager: { organizationId: "org-1", callerName: "Ron" } }),
   // "p-new" is a person waiting to accept (a new address); anything else is not
@@ -67,8 +73,17 @@ describe("one route for both kinds", () => {
     const invite = await call("inv-1", "link");
     expect(person.status).toBe(invite.status);
     expect(Object.keys(person.body).sort()).toEqual(Object.keys(invite.body).sort());
-    expect(person.body).toEqual({ ok: true, link: "https://app.test/join/join-9" });
-    expect(invite.body).toEqual({ ok: true, link: "https://app.test/org-invite/inv-1" });
+    // ONE shape of link for both (review, Nov 21: /org-invite/ against /join-coach/ told which kind it was); its page works out where it goes
+    expect(person.body).toEqual({ ok: true, link: "https://app.test/coach-invite/join-9.sig" });
+    expect(invite.body).toEqual({ ok: true, link: "https://app.test/coach-invite/inv-1.sig" });
+    const shape = (l: unknown) => String(l).replace(/\/coach-invite\/[^/]+$/, "/coach-invite/X");
+    expect(shape(person.body.link)).toBe(shape(invite.body.link));
+  });
+  it("a resend is allowed once per invitation every ten minutes, for both kinds", async () => {
+    await call("p-new", "resend");
+    await call("inv-1", "resend");
+    expect(rl.allows).toHaveBeenCalledWith("coach-invite-retry:p-new", 1, 600);
+    expect(rl.allows).toHaveBeenCalledWith("coach-invite-retry:inv-1", 1, 600);
   });
   it("an id that is neither gets one plain answer", async () => {
     const r = await call("nobody", "resend");
