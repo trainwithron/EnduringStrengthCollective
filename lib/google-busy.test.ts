@@ -36,7 +36,8 @@ describe("where it is used", () => {
     const src = read("lib/google-busy.ts");
     expect(src).not.toContain("google_calendar_personal_events");
     expect(src).not.toContain("listPersonalCalendarEvents");
-    expect(src).toContain("AbortSignal.timeout(GOOGLE_BUSY_TIMEOUT_MS)");
+    expect(src).toContain("AbortSignal.timeout(budgetMs)");
+    expect(src).toContain("return await Promise.race([askGoogle(coachId, fromIso, toIso, budgetMs), outOfTime]);");
     expect(src).toMatch(/catch \{\s*return \[\];\s*\}/);
     const lib = read("lib/google-calendar.ts");
     expect(lib).toContain("`${GOOGLE_CALENDAR_API_BASE}/freeBusy`");

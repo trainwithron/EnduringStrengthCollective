@@ -1,6 +1,6 @@
 -- UNDO: step 214. Puts the cancel function and the two training-max estimate writers back exactly as they were live on Nov 20 (copies in scripts/sql-tests/fixtures), removes the
 -- give-back, late-cancel and tested-max functions and the four columns. A tested max a coach typed stays as the athlete's training max, unlocked, so the estimates take over again.
--- The day-before reminder simply stops (the job skips it without the column).
+-- The day-before reminder simply stops (the job skips it without the column), and the weekly sessions-to-mark line sends nothing without its record.
 
 begin;
 
@@ -252,6 +252,7 @@ drop function if exists public.set_tested_max(uuid, text, numeric);
 drop function if exists public.unlock_tested_max(uuid, text);
 alter table public.bookings drop column if exists day_before_reminded_for, drop column if exists late_charge_auto;
 alter table public.coach_booking_policies drop column if exists late_cancel_takes_session;
+drop table if exists public.coach_nudges;
 alter table public.athlete_training_maxes drop column if exists locked, drop column if exists tested_by, drop column if exists tested_at;
 
 commit;

@@ -8,6 +8,8 @@ export const TO_MARK_AFTER_HOURS = 24;
 // Older than this is not news any more (and a pre-launch test session from months ago should not nag forever).
 export const TO_MARK_LOOK_BACK_DAYS = 60;
 export const COACH_CALENDAR_PATH = "/calendar";
+// At most one line per coach in this many days (only a delivered line counts, app/api/cron/sessions-to-mark).
+export const NUDGE_EVERY_DAYS = 6;
 
 export function toMarkMessage(count: number): { title: string; body: string } {
   const what = count === 1 ? "1 past session is" : `${count} past sessions are`;

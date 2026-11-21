@@ -15,6 +15,14 @@ describe("what the coach types", () => {
     expect(parseTestedMax("Bench", "2001").ok).toBe(false);
     expect(parseTestedMax("Bench", "lots").ok).toBe(false);
   });
+  it("a kilogram coach types kilograms; it is stored in pounds (Code Chat's review of 3234005a)", () => {
+    expect(parseTestedMax("Bench", "100", "kg")).toEqual({ ok: true, name: "Bench", weight: 220.5 });
+    expect(parseTestedMax("Bench", "908", "kg").ok).toBe(false);
+    expect(read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx")).toContain("liftUnit={coachLiftUnit}");
+    const control = read("components/coach/progress/tested-max-control.tsx");
+    expect(control).toContain("parseTestedMax(name, draft, unit)");
+    expect(control).toContain("formatLift(tested.weight, unit)");
+  });
 });
 
 describe("what the cards show", () => {
@@ -29,7 +37,7 @@ describe("what the cards show", () => {
   it("a tested max shows instead of the estimate, and a coach of the client (not on their own page) can set or unlock it", () => {
     const cards = read("components/coach/progress/training-max-cards.tsx");
     expect(cards).toContain("{Math.round((c.tested?.weight ?? c.bestE1rm) as number)}");
-    expect(cards).toContain("<TestedMaxControl athleteId={athleteId} exerciseName=\"\" tested={null} askName />");
+    expect(cards).toContain("<TestedMaxControl athleteId={athleteId} exerciseName=\"\" tested={null} askName unit={liftUnit} />");
     const page = read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx");
     expect(page).toContain("canEditTested={!selfView && !testedRead.error}");
     const control = read("components/coach/progress/tested-max-control.tsx");

@@ -1,6 +1,6 @@
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { slotConflict } from "@/lib/booking-slots";
-import { googleBusyRanges } from "@/lib/google-busy";
+import { googleBusyRanges, withoutOwnCopies } from "@/lib/google-busy";
 
 // Only the open times on a client's day page (Ron, Nov 3: "it needs to only present the open times, the available times, and not all times"). A client can read only their own
 // sessions, so every other client's session was invisible to their screen and its hour was offered, then refused ("That slot was just taken"). The coach's busy times for the day
@@ -19,7 +19,8 @@ export async function coachBusyRanges(coachId: string, fromIso: string, toIso: s
     ]);
     const rows = (r: { data: unknown; error: unknown }, prefix: string) =>
       r.error ? [] : ((r.data ?? []) as { id: string; start_at: string; end_at: string }[]).map((b) => ({ id: `${prefix}${b.id}`, start: new Date(b.start_at), end: new Date(b.end_at) }));
-    return [...rows(sessions, ""), ...rows(calls, "discovery:"), ...google];
+    const own = [...rows(sessions, ""), ...rows(calls, "discovery:")];
+    return [...own, ...withoutOwnCopies(google, own)];
   } catch {
     return [];
   }

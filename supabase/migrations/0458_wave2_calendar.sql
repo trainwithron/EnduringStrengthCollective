@@ -4,6 +4,17 @@
 -- session moved to a new time gets a fresh one and nothing else has to reset it.
 alter table public.bookings add column if not exists day_before_reminded_for timestamptz;
 
+-- C6: the weekly "sessions to mark" line. When a coach was last actually reached (a phone or an email), so they get at most one in six days and a run that could not reach
+-- them tries again next time. Only the server reads or writes it (row security on, no rules).
+create table if not exists public.coach_nudges (
+  coach_id uuid not null references public.profiles(id) on delete cascade,
+  kind text not null,
+  sent_at timestamptz not null default now(),
+  primary key (coach_id, kind)
+);
+alter table public.coach_nudges enable row level security;
+revoke all on public.coach_nudges from anon, authenticated;
+
 -- C5: a late cancel can take the session by itself, a PER-COACH setting, OFF by default (Ron, Nov 20: "as a per-coach setting"). Sessions only, never money. With it on, a client
 -- cancelling inside the window loses the session at once (the same one session Charge takes), the coach is told, and one tap on Requests gives it back. With it off, nothing
 -- changes: the late cancel is flagged and the coach picks Charge or Waive (Ron, Oct 6).

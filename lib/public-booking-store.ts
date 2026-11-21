@@ -3,7 +3,7 @@ import { placeholderEmailFor } from "@/lib/client-claim";
 import { rateLimitAllows } from "@/lib/rate-limit";
 import { mirrorBookingToGoogleCalendar } from "@/lib/google-calendar-mirror-server";
 import { supabaseSeriesStore } from "@/lib/series-store";
-import { googleBusyRanges } from "@/lib/google-busy";
+import { googleBusyRanges, withoutOwnCopies } from "@/lib/google-busy";
 import type { ManagedBooking, PublicBookingStore, PublicCoachContext } from "@/lib/public-booking-engine";
 import type { PublicSessionTypeRow } from "@/lib/public-booking";
 
@@ -88,7 +88,7 @@ export function publicBookingStore(db: any): PublicBookingStore {
     // The same list is checked again when the visitor books, so a time that became busy in between is refused.
     async busy(coachId, from, to) {
       const [own, google] = await Promise.all([series.busy(coachId, from, to), googleBusyRanges(coachId, from.toISOString(), to.toISOString())]);
-      return [...own, ...google.map((g) => ({ start: g.start, end: g.end }))];
+      return [...own, ...withoutOwnCopies(google, own).map((g) => ({ start: g.start, end: g.end }))];
     },
 
     async hasUpcomingPublicBooking(coachId, email, now) {

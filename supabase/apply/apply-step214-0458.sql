@@ -1,4 +1,4 @@
--- PASTE: step 214 (wave 2 calendar and team: the day-before reminder, the late-cancel setting with give-back, and the coach's locked tested max). Paste all of it into the Supabase SQL editor and run. Last result: one row, all true.
+-- PASTE: step 214 (wave 2 calendar and team: the day-before reminder, the weekly sessions-to-mark record, the late-cancel setting with give-back, and the coach's locked tested max). Paste all of it into the Supabase SQL editor and run. Last result: one row, all true.
 
 begin;
 
@@ -7,6 +7,17 @@ begin;
 -- C2: the day-before reminder, timed to the coach's cancel window (app/api/cron/session-reminder, lib/day-before-reminder.ts). The start time it was sent for, so a
 -- session moved to a new time gets a fresh one and nothing else has to reset it.
 alter table public.bookings add column if not exists day_before_reminded_for timestamptz;
+
+-- C6: the weekly "sessions to mark" line. When a coach was last actually reached (a phone or an email), so they get at most one in six days and a run that could not reach
+-- them tries again next time. Only the server reads or writes it (row security on, no rules).
+create table if not exists public.coach_nudges (
+  coach_id uuid not null references public.profiles(id) on delete cascade,
+  kind text not null,
+  sent_at timestamptz not null default now(),
+  primary key (coach_id, kind)
+);
+alter table public.coach_nudges enable row level security;
+revoke all on public.coach_nudges from anon, authenticated;
 
 -- C5: a late cancel can take the session by itself, a PER-COACH setting, OFF by default (Ron, Nov 20: "as a per-coach setting"). Sessions only, never money. With it on, a client
 -- cancelling inside the window loses the session at once (the same one session Charge takes), the coach is told, and one tap on Requests gives it back. With it off, nothing
@@ -207,6 +218,7 @@ commit;
 -- Check: one row, all true.
 select
   exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'bookings' and column_name = 'day_before_reminded_for') as day_before_reminder_ready,
+  (select relrowsecurity from pg_class where oid = 'public.coach_nudges'::regclass) and not has_table_privilege('authenticated', 'public.coach_nudges', 'select') as nudge_record_server_only,
   (select column_default = 'false' from information_schema.columns where table_schema = 'public' and table_name = 'coach_booking_policies' and column_name = 'late_cancel_takes_session') as late_cancel_setting_off_by_default,
   position('take_late_cancel_session' in (select prosrc from pg_proc where oid = 'public.cancel_booking_and_refund_credit(uuid)'::regprocedure)) > 0 as cancel_uses_the_setting,
   not has_function_privilege('authenticated', 'public.take_late_cancel_session(uuid)', 'execute') as only_the_cancel_takes_a_session,

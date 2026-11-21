@@ -13,8 +13,29 @@ export type GoogleBusy = { id: string; start: Date; end: Date };
 // Google is asked for no more than this long; past it the screen goes on without Google's times.
 export const GOOGLE_BUSY_TIMEOUT_MS = 2500;
 
-export async function googleBusyRanges(coachId: string, fromIso: string, toIso: string): Promise<GoogleBusy[]> {
+// A Google busy time that is exactly one of the coach's own sessions or calls is a copy of it (a coach who also keeps their sessions on their own calendar): it is dropped, so it
+// can never block that client moving their own session (the session itself is already counted, and left out when it is the one being moved).
+export function withoutOwnCopies<T extends { start: Date; end: Date }>(google: T[], own: { start: Date; end: Date }[]): T[] {
+  const ownKeys = new Set(own.map((o) => `${o.start.getTime()}-${o.end.getTime()}`));
+  return google.filter((g) => !ownKeys.has(`${g.start.getTime()}-${g.end.getTime()}`));
+}
+
+// The WHOLE ask (reading the connection, renewing a token, Google's answer) has one time budget: past it the screen goes on without Google's times, and whatever was still
+// running is left to finish on its own (a renewed token is still kept).
+export async function googleBusyRanges(coachId: string, fromIso: string, toIso: string, budgetMs: number = GOOGLE_BUSY_TIMEOUT_MS): Promise<GoogleBusy[]> {
   if (!isGoogleCalendarConfigured()) return [];
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const outOfTime = new Promise<GoogleBusy[]>((resolve) => {
+    timer = setTimeout(() => resolve([]), budgetMs);
+  });
+  try {
+    return await Promise.race([askGoogle(coachId, fromIso, toIso, budgetMs), outOfTime]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function askGoogle(coachId: string, fromIso: string, toIso: string, budgetMs: number): Promise<GoogleBusy[]> {
   try {
     const db = createServiceRoleClient();
     const { data: connection } = await db
@@ -39,7 +60,7 @@ export async function googleBusyRanges(coachId: string, fromIso: string, toIso: 
         .update({ ...sealedTokenColumns(refreshed, owner), expires_at: refreshed.expiresAt, updated_at: new Date().toISOString() })
         .eq("connection_id", (connection as { id: string }).id);
     }
-    const busy = await fetchFreeBusy(accessToken, fromIso, toIso, AbortSignal.timeout(GOOGLE_BUSY_TIMEOUT_MS));
+    const busy = await fetchFreeBusy(accessToken, fromIso, toIso, AbortSignal.timeout(budgetMs));
     return busy.map((b, i) => ({ id: `google:${i}:${b.start}`, start: new Date(b.start), end: new Date(b.end) }));
   } catch {
     return [];

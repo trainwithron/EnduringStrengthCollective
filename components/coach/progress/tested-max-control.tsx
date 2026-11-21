@@ -5,30 +5,35 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { parseTestedMax } from "@/lib/tested-max";
+import { formatLift, liftDisplayValue, liftUnitLabel } from "@/lib/lift-weight";
+import type { WeightUnit } from "@/lib/units";
 
 // A coach-typed tested max for one lift (Ron, Nov 20, wave 2 T2). Saving locks it: the estimates from logged sets never overwrite it, and every program rule that works from a max
-// (a percent of max, the wave rules) uses it. "Use the estimate instead" unlocks it. Pounds, as the cards beside it show.
+// (a percent of max, the wave rules) uses it. "Use the estimate instead" unlocks it. Typed and shown in the coach's own unit (kg or lb), stored in pounds.
 export function TestedMaxControl({
   athleteId,
   exerciseName,
   tested,
   askName = false,
+  unit = "lb",
 }: {
   athleteId: string;
   exerciseName: string;
   tested: { weight: number; at: string | null } | null;
   // the "another lift" form: the coach names the lift too
   askName?: boolean;
+  // the coach's own unit
+  unit?: WeightUnit;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(askName);
   const [name, setName] = useState(exerciseName);
-  const [draft, setDraft] = useState(tested ? String(Math.round(tested.weight)) : "");
+  const [draft, setDraft] = useState(tested ? String(liftDisplayValue(tested.weight, unit)) : "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function save() {
-    const parsed = parseTestedMax(name, draft);
+    const parsed = parseTestedMax(name, draft, unit);
     if (!parsed.ok) {
       setError(parsed.message);
       return;
@@ -67,7 +72,7 @@ export function TestedMaxControl({
     <div className="mt-3 flex flex-col gap-2" data-tested-max>
       {!editing && tested && (
         <p className="font-body text-sm text-chalk">
-          Tested max <b>{Math.round(tested.weight)} lbs</b>
+          Tested max <b>{formatLift(tested.weight, unit)}</b>
           <span className="text-steel"> · locked{tested.at ? ` · set ${new Date(tested.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}</span>
         </p>
       )}
@@ -77,9 +82,9 @@ export function TestedMaxControl({
             <input aria-label="Lift" placeholder="Lift, e.g. Back Squat" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} className={`${field} w-48`} />
           )}
           <input
-            aria-label={`Tested max for ${askName ? "the lift" : exerciseName}, in pounds`}
+            aria-label={`Tested max for ${askName ? "the lift" : exerciseName}, in ${unit === "kg" ? "kilograms" : "pounds"}`}
             inputMode="decimal"
-            placeholder="lbs"
+            placeholder={liftUnitLabel(unit)}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {

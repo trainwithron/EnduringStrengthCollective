@@ -198,7 +198,7 @@ const leftover = (await db.query(`select count(*)::int n from pg_proc where pron
 expect("undo: the new functions are gone", leftover === 0);
 const results = await db.exec(paste);
 const checkRow = results[results.length - 1].rows[0];
-expect(`paste: the check row is all true (${JSON.stringify(checkRow)})`, Object.values(checkRow).length === 7 && Object.values(checkRow).every((v) => v === true));
+expect(`paste: the check row is all true (${JSON.stringify(checkRow)})`, Object.values(checkRow).length === 8 && Object.values(checkRow).every((v) => v === true));
 
 if (failures.length) {
   console.error("FAILED:\n- " + failures.join("\n- "));

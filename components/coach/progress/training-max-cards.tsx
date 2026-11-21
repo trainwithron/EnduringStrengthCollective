@@ -60,6 +60,7 @@ export function TrainingMaxCards({
   canPin,
   canEditTested = false,
   testedOnly = [],
+  liftUnit = "lb",
 }: {
   cards: CardData[];
   visible: number;
@@ -74,6 +75,8 @@ export function TrainingMaxCards({
   canEditTested?: boolean;
   // Tested maxes for lifts with no card (never logged here): listed under the cards.
   testedOnly?: { name: string; weight: number; at: string | null }[];
+  // the coach's own unit, for typing and reading a tested max
+  liftUnit?: "lb" | "kg";
 }) {
   const router = useRouter();
   const [view, setView] = useState<"cards" | "list">(initialView);
@@ -244,7 +247,7 @@ export function TrainingMaxCards({
             emptyLabel={expanded.sessions === 0 ? "Nothing logged for this exercise yet." : "Only logged once so far. A second workout will draw the chart."}
           />
           <p className="font-body text-xs text-steel">{metric === "weight" ? "Heaviest weight each day." : "Total weight lifted (weight times reps) each day."}</p>
-          {canEditTested && <TestedMaxControl key={expanded.name} athleteId={athleteId} exerciseName={expanded.name} tested={expanded.tested ?? null} />}
+          {canEditTested && <TestedMaxControl key={expanded.name} athleteId={athleteId} exerciseName={expanded.name} tested={expanded.tested ?? null} unit={liftUnit} />}
         </div>
       )}
 
@@ -255,10 +258,10 @@ export function TrainingMaxCards({
           {testedOnly.map((t) => (
             <div key={t.name} className="mt-2">
               <p className="font-body text-sm text-chalk">{t.name}</p>
-              <TestedMaxControl athleteId={athleteId} exerciseName={t.name} tested={{ weight: t.weight, at: t.at }} />
+              <TestedMaxControl athleteId={athleteId} exerciseName={t.name} tested={{ weight: t.weight, at: t.at }} unit={liftUnit} />
             </div>
           ))}
-          <TestedMaxControl athleteId={athleteId} exerciseName="" tested={null} askName />
+          <TestedMaxControl athleteId={athleteId} exerciseName="" tested={null} askName unit={liftUnit} />
         </div>
       )}
 

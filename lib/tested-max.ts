@@ -1,14 +1,18 @@
 // A coach-typed tested max (Ron, Nov 20, wave 2 T2): the lift's name and a weight in pounds, checked the way the database checks them (set_tested_max) so the coach is told
-// before anything is sent.
+// before anything is sent. The coach types it in their own unit (kg or lb); it is stored in pounds like every lifted weight (lib/lift-weight.ts).
+import { liftStoredFromInput, liftUnitLabel } from "@/lib/lift-weight";
+import type { WeightUnit } from "@/lib/units";
 
 export const TESTED_MAX_LIMIT_LB = 2000;
 
-export function parseTestedMax(name: string, weight: string): { ok: true; name: string; weight: number } | { ok: false; message: string } {
+export function parseTestedMax(name: string, weight: string, unit: WeightUnit = "lb"): { ok: true; name: string; weight: number } | { ok: false; message: string } {
   const lift = name.trim();
   if (!lift) return { ok: false, message: "Name the lift." };
   if (lift.length > 120) return { ok: false, message: "That lift name is too long." };
-  const w = Number(weight.trim().replace(",", "."));
-  if (!Number.isFinite(w) || w <= 0 || w > TESTED_MAX_LIMIT_LB) return { ok: false, message: `Type the tested max in pounds, from 1 to ${TESTED_MAX_LIMIT_LB}.` };
+  const typed = Number(weight.trim().replace(",", "."));
+  const w = Number.isFinite(typed) ? liftStoredFromInput(typed, unit) : NaN;
+  const limit = unit === "kg" ? 907 : TESTED_MAX_LIMIT_LB;
+  if (!Number.isFinite(w) || w <= 0 || w > TESTED_MAX_LIMIT_LB) return { ok: false, message: `Type the tested max in ${liftUnitLabel(unit)}, from 1 to ${limit}.` };
   return { ok: true, name: lift, weight: Math.round(w * 10) / 10 };
 }
 

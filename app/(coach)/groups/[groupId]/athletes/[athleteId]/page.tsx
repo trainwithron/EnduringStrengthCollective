@@ -5,6 +5,7 @@ import { hindsightPrs, importedWorkouts, parseRollup } from "@/lib/imported-prs"
 import { ProgressStats } from "@/components/coach/progress/progress-stats";
 import { TrainingMaxCards } from "@/components/coach/progress/training-max-cards";
 import { testedByName, type TestedMaxRow } from "@/lib/tested-max";
+import { loadLiftUnit } from "@/lib/lift-unit-server";
 import { BodyOverlayChart } from "@/components/coach/progress/body-overlay-chart";
 import { LoggedSearch } from "@/components/coach/progress/logged-search";
 import { MakePrCountButton } from "@/components/coach/progress/make-pr-count-button";
@@ -561,6 +562,7 @@ export default async function AthleteProfilePage(
     { data: mainLiftExerciseRows },
     seriesReads,
     testedRead,
+    coachLiftUnit,
   ] = await Promise.all([
     activeProgram
       ? supabase.from("programs").select("training_days").eq("id", activeProgram.id).maybeSingle()
@@ -677,6 +679,8 @@ export default async function AthleteProfilePage(
     })(),
     // Tested maxes the coach typed and locked (wave 2 T2): read on their own, so a database without them yet still shows the estimates.
     supabase.from("athlete_training_maxes").select("exercise_name, estimated_max, locked, tested_at").eq("athlete_id", params.athleteId).eq("locked", true),
+    // the coach's own unit, for typing and reading a tested max
+    loadLiftUnit(supabase, user.id),
   ]);
   // A teen not yet let in (no signed permission and no coach tick): the checkbox is shown first, above the tabs.
   const guardianWaiting = isTeen && !!guardianStateRow && (guardianStateRow as GuardianStateInfo).state !== "signed";
@@ -1393,6 +1397,7 @@ export default async function AthleteProfilePage(
             canPin={!selfView}
             canEditTested={!selfView && !testedRead.error}
             testedOnly={testedOnly}
+            liftUnit={coachLiftUnit}
           />
           </div>
 
