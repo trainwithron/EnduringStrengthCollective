@@ -14,9 +14,10 @@ import { Smartphone, X, Copy, Check } from "lucide-react";
 // and once they're logged in there, they automatically land on the same
 // athlete-style mobile experience as any client, per the PWA-detection
 // routing already built.
+// Hidden on a phone (up to 767px wide) or inside the installed app; a tablet still offers it (Ron uses a Tab S9 FE: part A review, Nov 21).
 export function isPhoneOrInstalled(w: Pick<Window, "matchMedia">): boolean {
   try {
-    return w.matchMedia("(display-mode: standalone)").matches || w.matchMedia("(pointer: coarse) and (max-width: 1024px)").matches;
+    return w.matchMedia("(display-mode: standalone)").matches || w.matchMedia("(max-width: 767px)").matches;
   } catch {
     return false;
   }

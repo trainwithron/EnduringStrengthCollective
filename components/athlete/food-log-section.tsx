@@ -170,7 +170,6 @@ export function FoodLogSection({
           meals={meals}
           initialEntries={initialEntries}
           onEntryLogged={handleMealEntryLogged}
-          selfCoached={selfCoached}
         />
       ) : null}
 

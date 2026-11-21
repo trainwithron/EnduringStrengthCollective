@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { barcodeBasisLabel, scaleBarcodeResult, type BarcodeLookupResult } from "./open-food-facts";
 import { copyRows } from "./food-entry";
-import { noTargetLine, NO_TARGET_LINE, SELF_NO_CHECKIN_LINE, SELF_NO_TARGET_LINE } from "./nutrition-tracking";
+import { noTargetLine, NO_TARGET_LINE, SELF_NO_TARGET_LINE } from "./nutrition-tracking";
 import type { FoodLogEntry } from "@/components/athlete/meal-checkoff-list";
 
 // FIX_NUTRITION_PHONE (Oct 20): the food log on a phone. Source-level guards plus the pure pieces.
@@ -147,7 +147,6 @@ describe("a coach in their own personal space", () => {
     expect(page).toContain("selfCoached={selfCoached}");
     // with no plan and no target change there is nothing to say at all now (CL3, Nov 21), so no "your coach" line either
     expect(read("components/athlete/meal-checkoff-list.tsx")).not.toContain("still setting up");
-    expect(SELF_NO_CHECKIN_LINE).toBe("No change to your target yet.");
     expect(page).not.toContain("Your coach hasn&apos;t changed your target yet");
   });
   it("on another day than today the copy button says Copy the day before", () => {

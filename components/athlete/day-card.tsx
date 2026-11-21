@@ -387,7 +387,7 @@ function WorkoutSection({
   return (
     <TodayFrame dateLabel={dateLabel} program={program} readinessChip={readinessChip}>
       <p className="font-display font-semibold text-[28px] leading-tight mt-1 break-words">{workout.title}</p>
-      {/* With one program the name opens the whole program (CL5, Nov 21: the separate "Your program" card shows only with two or more). */}
+      {/* With one program the name opens the whole program (CL5, Nov 21); on a day without this card (rest, done) Home shows the "Your program" card instead (lib/today-card-program-link.ts). */}
       {programLine &&
         (program && programs.length === 1 ? (
           <Link href={`/groups/${groupId}/programs/${program.id}`} className="inline-flex items-center min-h-11 -my-2 font-body text-sm text-steel underline underline-offset-2 decoration-steel/40 break-words" data-today-program-link>

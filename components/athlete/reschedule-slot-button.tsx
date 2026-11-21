@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
 import { bookingRefusalMessage } from "@/lib/booking-refusal-copy";
+import { confirmDialog } from "@/components/shared/confirm-dialog";
+import { MOVE_POLICY_LINE } from "@/lib/reschedule-line";
 
 // How long the "Sent" line stays before the calendar comes back: a moment, or long enough to read the coach's quiet-hours line when it shows.
 export const BACK_AFTER_MS = 2500;
@@ -64,6 +66,8 @@ export function RescheduleSlotButton({
   }
 
   async function handleMove() {
+    // The cancellation-window detail is said here, in the step that moves it (CL16, Nov 21); asking to move needs no confirm (the coach confirms, and the Sent line says so).
+    if (!(await confirmDialog({ message: `Move your session to this time? ${MOVE_POLICY_LINE}`, confirmLabel: "Move here", cancelLabel: "Keep it" }))) return;
     setSubmitting(true);
     setError(null);
     const supabase = createBrowserClient();

@@ -119,13 +119,26 @@ export function ExerciseCard({
   // Swap, Remove and Change what I log behind one "⋯" on the exercise (CL18, Nov 21: seven or eight small controls per exercise mid-set).
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  // The fields pop-up, opened from the menu's "Change what I log": brought into view with its first chip focused, so a keyboard or screen-reader user lands in it.
+  const fieldsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!fieldsOpen) return;
+    const el = fieldsRef.current;
+    if (!el) return;
+    el.scrollIntoView({ block: "nearest" });
+    el.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus({ preventScroll: true });
+  }, [fieldsOpen]);
   useEffect(() => {
     if (!menuOpen) return;
     const away = (e: PointerEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
     };
+    // Escape closes it and puts focus back on the "⋯" that opened it.
     const esc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMenuOpen(false);
+      if (e.key !== "Escape") return;
+      setMenuOpen(false);
+      menuButtonRef.current?.focus();
     };
     document.addEventListener("pointerdown", away);
     document.addEventListener("keydown", esc);
@@ -461,9 +474,9 @@ export function ExerciseCard({
             {!readOnly && (
               <div ref={menuRef} className="relative shrink-0" data-exercise-menu>
                 <button
+                  ref={menuButtonRef}
                   type="button"
                   aria-label="More for this exercise"
-                  aria-haspopup="menu"
                   aria-expanded={menuOpen}
                   onClick={() => setMenuOpen((v) => !v)}
                   className="min-w-11 min-h-11 -mr-2 flex items-center justify-center rounded-full font-body text-lg leading-none text-steel active:bg-surface-2"
@@ -471,10 +484,9 @@ export function ExerciseCard({
                   &#8943;
                 </button>
                 {menuOpen && (
-              <div role="menu" className="absolute right-0 top-full z-20 mt-1 w-56 rounded-card bg-surface-2 border border-steel/30 py-1 shadow-lg flex flex-col">
+              <div className="absolute right-0 top-full z-20 mt-1 w-56 rounded-card bg-surface-2 border border-steel/30 py-1 shadow-lg flex flex-col">
                 <button
                   type="button"
-                  role="menuitem"
                   onClick={() => {
                     setMenuOpen(false);
                     setNameDraft("");
@@ -491,7 +503,6 @@ export function ExerciseCard({
                   // never counted as missed.
                   <button
                     type="button"
-                    role="menuitem"
                     onClick={async () => {
                       setMenuOpen(false);
                       if (
@@ -514,7 +525,6 @@ export function ExerciseCard({
                 )}
                 <button
                   type="button"
-                  role="menuitem"
                   onClick={() => {
                     setMenuOpen(false);
                     setFieldsOpen(true);
@@ -677,7 +687,7 @@ export function ExerciseCard({
               )}
               {rowAction && <span className="ml-auto">{rowAction}</span>}
               {fieldsOpen && (
-                <div className="absolute z-10 right-0 bottom-full mb-1 bg-surface border border-steel/30 p-2 w-56 whitespace-normal">
+                <div ref={fieldsRef} className="absolute z-10 right-0 bottom-full mb-1 bg-surface border border-steel/30 p-2 w-56 whitespace-normal" data-fields-popup>
                   {exercise.trackedFields.length > 0 && (
                     <div className="flex flex-wrap gap-1 mb-1.5">
                       {exercise.trackedFields.map((f) => (

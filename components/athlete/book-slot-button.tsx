@@ -70,7 +70,7 @@ export function BookSlotButton({
   }
 
   if (everyWeek && weekly) {
-    return <RecurringBookingButton coachId={coachId} athleteId={athleteId} groupId={groupId} startAt={startAt} durationMinutes={weekly.durationMinutes} startOpen onCancel={() => setEveryWeek(false)} />;
+    return <RecurringBookingButton coachId={coachId} athleteId={athleteId} groupId={groupId} startAt={startAt} durationMinutes={weekly.durationMinutes} onCancel={() => setEveryWeek(false)} />;
   }
 
   // Booking spends a session credit, so a second tap confirms it.

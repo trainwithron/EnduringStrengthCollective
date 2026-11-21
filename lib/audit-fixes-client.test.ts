@@ -20,7 +20,6 @@ import { OneRepMaxCalculator } from "@/components/tools/one-rep-max-calculator";
 import { percentageTable } from "@/lib/one-rep-max";
 import { cameFromThisApp } from "@/components/shared/back-or-home-link";
 import { mySpaceTarget, placeParams } from "@/lib/my-space-target";
-import { SELF_NO_CHECKIN_LINE } from "@/lib/nutrition-tracking";
 
 // The audit of buttons that scroll, mislink or dead-end (Ron, Nov 21: "yes fix all of them, tiles first on spotlight"): the client app (C) and the Spotlight / phone coach shell (P).
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
@@ -171,7 +170,6 @@ describe("C10 / C11 Nutrition", () => {
     const page = read("app/(coach)/groups/[groupId]/nutrition/page.tsx");
     expect(page).toContain("Why your target is what it is");
     expect(page).not.toContain("hasn&apos;t run a weekly check-in");
-    expect(SELF_NO_CHECKIN_LINE).toBe("No change to your target yet.");
   });
 });
 

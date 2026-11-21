@@ -35,7 +35,8 @@ describe("Home", () => {
   it("CL5: the progress line no longer repeats the program; 'Your program' only with two or more; one program's name opens it", () => {
     const lines = buildHomeThread({ goal: null, program: { name: "Main", unscheduled: true, startDate: null, scheduledDates: [], totalWorkouts: 10, doneWorkouts: 3, pickup: null }, logDates: [], today: new Date("2026-11-21T12:00:00Z") });
     expect(lines.some((l) => l.startsWith("Main"))).toBe(false);
-    expect(read(HOME)).toContain("homePrograms.length > 1 ? <MyProgramsBlock");
+    // with one, only on a day the Today card does not link it (part A review, Nov 21)
+    expect(read(HOME)).toContain("showProgramsBlock(homePrograms.length, dayWorkout, daySessions, isToday) ? <MyProgramsBlock");
     const program = { id: "p1", name: "Strength", week: 2, weeks: 8, done: 5, total: 24 };
     const html = renderToStaticMarkup(createElement(DayCard, { ...day, workout: { status: "planned", workoutId: "w1", title: "Day 3" }, sessions: [{ status: "planned", workoutId: "w1", title: "Day 3", programId: "p1", heading: "Strength" }], programs: [program] } as never));
     expect(html).toContain('href="/groups/g/programs/p1"');
@@ -108,7 +109,9 @@ describe("Settings", () => {
   it("PH23: the get-the-app button is not shown on a phone or in the installed app", () => {
     const mm = (hits: string[]) => ({ matchMedia: (q: string) => ({ matches: hits.includes(q) }) }) as unknown as Window;
     expect(isPhoneOrInstalled(mm(["(display-mode: standalone)"]))).toBe(true);
-    expect(isPhoneOrInstalled(mm(["(pointer: coarse) and (max-width: 1024px)"]))).toBe(true);
+    expect(isPhoneOrInstalled(mm(["(max-width: 767px)"]))).toBe(true);
+    // a tablet (wider than a phone, not the installed app) still shows it
+    expect(isPhoneOrInstalled(mm(["(pointer: coarse)"]))).toBe(false);
     expect(isPhoneOrInstalled(mm([]))).toBe(false);
   });
 });

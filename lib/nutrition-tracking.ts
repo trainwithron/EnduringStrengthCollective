@@ -10,9 +10,6 @@ export const COACH_CAN_SEE_LINE = "Your coach can see what you log here.";
 export const FOOD_TRACKING_OFF_LINE = "Your coach has turned off food tracking for you, so there is nothing to log here. If you'd like it back, ask your coach.";
 // A coach in their own personal space is their own coach: nothing is waiting on "your coach".
 export const SELF_NO_TARGET_LINE = "No target yet. You can still track what you eat.";
-export const SELF_NO_MEAL_PLAN_LINE = "No meal plan yet.";
-// Under "Why your target is what it is" (audit C11, Nov 21: it was headed "Weekly check-in", which is the client's own weekly check-in elsewhere).
-export const SELF_NO_CHECKIN_LINE = "No change to your target yet.";
 export const noTargetLine = (coachProgramming: boolean, selfCoached = false): string =>
   coachProgramming ? (selfCoached ? SELF_NO_TARGET_LINE : NO_TARGET_LINE) : GROUP_TIER_NO_TARGET_LINE;
 

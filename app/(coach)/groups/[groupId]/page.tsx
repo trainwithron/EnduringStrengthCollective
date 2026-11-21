@@ -21,6 +21,7 @@ import type { WellnessCheckinValues } from "@/components/athlete/wellness-checki
 import { DayCard } from "@/components/athlete/day-card";
 import { PaymentFailedNotice } from "@/components/athlete/payment-failed-notice";
 import { MyProgramsBlock } from "@/components/athlete/my-programs-block";
+import { showProgramsBlock } from "@/lib/today-card-program-link";
 import { homeProgramCards, programPickups } from "@/lib/home-programs";
 import { loadDoneAt, weekOf } from "@/lib/program-pickup";
 import { readRowsByIds } from "@/lib/read-by-ids";
@@ -284,6 +285,8 @@ export default async function GroupHubPage(
   // have no manual cover photo — same "skip what won't render" guard as
   // the coach's own Programs grid.
   const coachId = roster.find((m) => m.role === "coach")?.profileId;
+  // The coach a client sees named on Home ("Message <coach>", the weekly check-in, the greeting): never one still to accept their invitation (part A review, Nov 21).
+  const clientsCoachName = roster.find((m) => m.role === "coach" && m.profileId !== athleteId && !pendingCoaches.has(m.profileId))?.fullName ?? null;
   // In a one-on-one space a program with no client on it is the coach's template, not the client's: only programs made for the client are listed.
   const shownPrograms = (programs ?? []).filter((p: any) => (group as { group_kind?: string } | null)?.group_kind !== "one_on_one" || p.athlete_id !== null);
   const homeProgramInputs = shownPrograms.map((p: any) => ({ id: p.id as string, name: p.name as string, created_at: p.created_at as string | null }));
@@ -787,8 +790,21 @@ export default async function GroupHubPage(
       ).target;
 
       // Today's log: what is eaten so far (the Nutrition card shows eaten / target, CL22, Nov 21; the same sum as the Nutrition page's ring), and the meals checked off when there is
-      // a meal plan. Any failure just leaves them out.
+      // a meal plan. Any failure just leaves them out. With the coach's food tracking off for this client there is no "Eaten today": the card shows the targets only (read on its own,
+      // as the Nutrition page does, so a database without the column reads as on).
       if (isToday && macrosEnabled) {
+        let foodTrackingOn = true;
+        try {
+          const { data: trackingRow } = await supabase
+            .from("group_memberships")
+            .select("food_tracking_enabled")
+            .eq("group_id", params.groupId)
+            .eq("profile_id", athleteId)
+            .maybeSingle();
+          foodTrackingOn = (trackingRow as { food_tracking_enabled?: boolean | null } | null)?.food_tracking_enabled !== false;
+        } catch {
+          foodTrackingOn = true;
+        }
         try {
           const { data: loggedMeals, error: loggedError } = await supabase
             .from("food_log_entries")
@@ -796,7 +812,7 @@ export default async function GroupHubPage(
             .eq("athlete_id", athleteId)
             .eq("log_date", targetDateKey);
           if (!loggedError) {
-            dayEaten = sumLoggedFood(((loggedMeals ?? []) as any[]).map((l) => ({ status: l.status, calories: l.calories, proteinG: l.protein_g, carbsG: l.carbs_g, fatG: l.fat_g })));
+            if (foodTrackingOn) dayEaten = sumLoggedFood(((loggedMeals ?? []) as any[]).map((l) => ({ status: l.status, calories: l.calories, proteinG: l.protein_g, carbsG: l.carbs_g, fatG: l.fat_g })));
             if (Array.isArray(mealPlanResult.data?.meals)) {
               mealLine = mealProgressLine(
                 mealProgress(
@@ -940,7 +956,7 @@ export default async function GroupHubPage(
           showMobileView && athleteId
             ? clientGreeting({
                 clientName: roster.find((m) => m.profileId === athleteId)?.fullName,
-                coachName: roster.find((m) => m.role === "coach" && m.profileId !== athleteId)?.fullName,
+                coachName: clientsCoachName,
                 now: new Date(),
                 timeZone: timezone,
               })
@@ -1025,13 +1041,13 @@ export default async function GroupHubPage(
                   ) : null
                 }
                 // "Your program" only with two or more programs: with one, the Today card's program name opens it (CL5, Nov 21)
-                afterWorkout={programsBlockReady && homePrograms.length > 1 ? <MyProgramsBlock groupId={params.groupId} programs={homePrograms} /> : null}
+                afterWorkout={programsBlockReady && showProgramsBlock(homePrograms.length, dayWorkout, daySessions, isToday) ? <MyProgramsBlock groupId={params.groupId} programs={homePrograms} /> : null}
                 resume={openOwnSession && openIsTodays && openWorkoutId ? { sessionId: (openOwnSession as { id: string }).id, workoutId: openWorkoutId } : null}
                 // The week's asks right under the workout and the tiles (CL8, Nov 21: they sat below the fold)
                 asks={
                   isToday && (checkinCard || goalReview) ? (
                     <>
-                      {checkinCard && <WeeklyCheckinCard groupId={params.groupId} coachName={roster.find((m) => m.role === "coach" && m.profileId !== athleteId)?.fullName ?? null} sent={checkinCard === "sent"} />}
+                      {checkinCard && <WeeklyCheckinCard groupId={params.groupId} coachName={clientsCoachName} sent={checkinCard === "sent"} />}
                       {goalReview && <GoalReviewCard groupId={params.groupId} athleteId={athleteId} goalText={goalReview.text} />}
                     </>
                   ) : null
@@ -1040,7 +1056,7 @@ export default async function GroupHubPage(
               {/* Reaching the coach, one tap, right under today (CL11, Nov 21: it floated mid-page, and a coach list at the bottom did nothing when tapped). */}
               {isToday && !isCoach && !isActingAsOther && (
                 <Link href={`/groups/${params.groupId}/messages`} className="flex items-center justify-between min-h-11 bg-surface rounded-card px-4 font-body text-sm text-chalk" data-message-coach>
-                  <span>{messageCoachLabel(roster.find((m) => m.role === "coach" && m.profileId !== athleteId)?.fullName ?? null)}</span>
+                  <span>{messageCoachLabel(clientsCoachName)}</span>
                   <span aria-hidden="true" className="text-steel">&rarr;</span>
                 </Link>
               )}

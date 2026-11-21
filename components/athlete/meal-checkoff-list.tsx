@@ -39,7 +39,6 @@ export function MealCheckoffList({
   meals,
   initialEntries,
   onEntryLogged,
-  selfCoached = false,
 }: {
   athleteId: string;
   groupId: string;
@@ -51,8 +50,6 @@ export function MealCheckoffList({
   // component owns its own per-meal display state, but isn't the source
   // of truth for anything aggregated across the whole day.
   onEntryLogged?: (entry: FoodLogEntry) => void;
-  // A coach in their own personal space (their own coach). (With no plan the list draws nothing at all now, so it needs no wording of its own; CL3, Nov 21.)
-  selfCoached?: boolean;
 }) {
   const [entries, setEntries] = useState(initialEntries);
   const [savingSlot, setSavingSlot] = useState<string | null>(null);

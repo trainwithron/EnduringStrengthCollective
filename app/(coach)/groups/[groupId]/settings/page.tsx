@@ -320,24 +320,6 @@ export default async function SettingsPage(
                 Coach home →
               </Link>
             )}
-            {/* These three change only this group: it is named, so a switch is never flipped on the wrong group without knowing (DK16, Nov 21). */}
-            <p className="mt-4 pt-4 border-t border-steel/15 font-body text-xs text-steel uppercase tracking-wide" data-group-switches>
-              For {(group as { name?: string } | null)?.name ?? "this group"} only
-            </p>
-            {(group as { group_kind?: string } | null)?.group_kind !== "one_on_one" && (
-              <div className="mt-3">
-                <TeamSportToggle groupId={params.groupId} initialEnabled={(group as { team_mode?: boolean | null } | null)?.team_mode === true} />
-              </div>
-            )}
-            <div className="mt-4 pt-4 border-t border-steel/15">
-              <PostWorkoutCardsToggle groupId={params.groupId} initialEnabled={postWorkoutCards} />
-            </div>
-            <div className="mt-4 pt-4 border-t border-steel/15">
-              <GamificationToggle
-                groupId={params.groupId}
-                initialEnabled={group?.gamification_enabled ?? true}
-              />
-            </div>
             <div className="mt-4 pt-4 border-t border-steel/15">
               <GoogleCalendarConnection
                 groupId={params.groupId}
@@ -361,6 +343,24 @@ export default async function SettingsPage(
                 />
               </div>
             )}
+            {/* These three change only this group: it is named, so a switch is never flipped on the wrong group without knowing (DK16, Nov 21). */}
+            <p className="mt-4 pt-4 border-t border-steel/15 font-body text-xs text-steel uppercase tracking-wide" data-group-switches>
+              For {(group as { name?: string } | null)?.name ?? "this group"} only
+            </p>
+            {(group as { group_kind?: string } | null)?.group_kind !== "one_on_one" && (
+              <div className="mt-3">
+                <TeamSportToggle groupId={params.groupId} initialEnabled={(group as { team_mode?: boolean | null } | null)?.team_mode === true} />
+              </div>
+            )}
+            <div className="mt-4 pt-4 border-t border-steel/15">
+              <PostWorkoutCardsToggle groupId={params.groupId} initialEnabled={postWorkoutCards} />
+            </div>
+            <div className="mt-4 pt-4 border-t border-steel/15">
+              <GamificationToggle
+                groupId={params.groupId}
+                initialEnabled={group?.gamification_enabled ?? true}
+              />
+            </div>
           </SettingsGroup>
   ) : null;
   const terminologyGroup = isCoach && !inPersonalSpace ? (
