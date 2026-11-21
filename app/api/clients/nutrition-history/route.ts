@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { isOwnPersonalSpace } from "@/lib/own-personal-space";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { daysBetweenKeys } from "@/lib/date-key";
@@ -26,7 +27,9 @@ async function checkCaller(groupId: string, athleteId: string) {
   if (caller?.role !== "coach") return { error: NextResponse.json({ error: "Only this client's coach can do that." }, { status: 403 }) };
   const serviceRole = createServiceRoleClient();
   const { data: member } = await serviceRole.from("group_memberships").select("role").eq("group_id", groupId).eq("profile_id", athleteId).maybeSingle();
-  if (member?.role !== "athlete") return { error: NextResponse.json({ error: "That person isn't a client in this group." }, { status: 404 }) };
+  // An athlete of this group, or the coach themselves in their OWN personal space (Ron, Nov 21: their own nutrition lives there). Never a coach importing for anyone else.
+  const ownSpace = member?.role !== "athlete" && athleteId === user.id && (await isOwnPersonalSpace(serviceRole, user.id, groupId));
+  if (member?.role !== "athlete" && !ownSpace) return { error: NextResponse.json({ error: "That person isn't a client in this group." }, { status: 404 }) };
   return { supabase, serviceRole, user };
 }
 
