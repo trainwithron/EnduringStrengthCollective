@@ -8,14 +8,15 @@ export interface RepTarget {
 }
 
 const RANGE = /^(\d{1,3})\s*(?:-|–|—|to)\s*(\d{1,3})$/i;
-const PLAIN = /^\d{1,3}$/;
+// a plain number, a decimal too ("8.5" rounds to 9, as the old reading did)
+const PLAIN = /^\d{1,3}(?:\.\d+)?$/;
 
 export function parseRepTarget(text: string | number | null | undefined): RepTarget {
   if (typeof text === "number") return Number.isFinite(text) && text > 0 ? { value: Math.round(text), hint: String(Math.round(text)) } : { value: null, hint: null };
   const t = (text ?? "").trim();
   if (!t) return { value: null, hint: null };
   if (PLAIN.test(t)) {
-    const n = Number(t);
+    const n = Math.round(Number(t));
     return n > 0 ? { value: n, hint: String(n) } : { value: null, hint: null };
   }
   const range = RANGE.exec(t);

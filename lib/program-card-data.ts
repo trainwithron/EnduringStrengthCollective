@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { repTargetValue } from "./rep-target";
 import {
-  parseNumericReps,
   computeWeeklyVolumeSeries,
   bucketCategorySplit,
   type WeeklyVolumePoint,
@@ -94,7 +94,8 @@ export async function computeProgramCardVisuals(
     const programId = programByWorkoutId.get(workoutId);
     const week = weekByWorkoutId.get(workoutId);
     if (!programId || !week) continue;
-    const reps = parseNumericReps(s.target_reps);
+    // a range ("12-15") counts as its low end, the same as the logger (lib/rep-target.ts)
+    const reps = repTargetValue(s.target_reps);
     if (reps) {
       const repsMap = plannedRepsByProgram.get(programId) ?? new Map<number, number>();
       repsMap.set(week, (repsMap.get(week) ?? 0) + reps);
