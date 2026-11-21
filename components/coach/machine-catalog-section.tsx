@@ -61,6 +61,7 @@ export function MachineCatalogSection({
   library,
   onAdded,
   curateOnly = false,
+  onListChanged,
 }: {
   coachId: string;
   orgId: string | null;
@@ -72,6 +73,8 @@ export function MachineCatalogSection({
   onAdded: (machine: MachineRow, newLibraryRows: LibraryExerciseRow[]) => void;
   // On the platform admin's own page (/admin/machine-catalog): the list is curated there, so there is no "Add to my gym" and no link back to the review (clutter audit DK1, Nov 21).
   curateOnly?: boolean;
+  // Told after anything is sent or changed here, so a page showing the same list another way can refresh (the admin page's review, above it).
+  onListChanged?: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -118,6 +121,7 @@ export function MachineCatalogSection({
   async function sent(text: string) {
     setMessage(text);
     await Promise.all([reload(), loadRequests()]);
+    onListChanged?.();
   }
 
   return (
@@ -195,7 +199,10 @@ export function MachineCatalogSection({
                     library={library}
                     onSent={sent}
                     onSuggestMore={() => setSuggesting({ brand: m.brand, model: m.model })}
-                    onChanged={reload}
+                    onChanged={async () => {
+                      await reload();
+                      onListChanged?.();
+                    }}
                   />
                 )}
               </li>

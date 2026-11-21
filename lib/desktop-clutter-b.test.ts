@@ -18,13 +18,27 @@ describe("DK1: a coach's Exercise library never shows the shared machine list's 
   it("the admin page curates the list directly, under the review, with the admin's powers and no Add to my gym (review of 6027ef5d)", () => {
     const admin = read("app/admin/machine-catalog/page.tsx");
     // its own admin check comes before anything is drawn
-    expect(admin.indexOf("if (!me?.is_platform_admin) return <NoAccess>")).toBeLessThan(admin.indexOf("<MachineCatalogCurate adminId={user.id} />"));
-    expect(admin.indexOf("<MachineCatalogReview requests={list} />")).toBeLessThan(admin.indexOf("<MachineCatalogCurate adminId={user.id} />"));
+    const curateAt = admin.indexOf("<MachineCatalogCurate key=");
+    expect(curateAt).toBeGreaterThan(-1);
+    expect(admin.indexOf("if (!me?.is_platform_admin) return <NoAccess>")).toBeLessThan(admin.indexOf('.from("exercise_library")'));
+    expect(admin.indexOf("<MachineCatalogReview requests={list} />")).toBeLessThan(curateAt);
     const curate = read("components/admin/machine-catalog-curate.tsx");
-    expect(curate).toContain("<MachineCatalogSection coachId={adminId} orgId={null} isAdmin curateOnly catalog={catalog} reload={reload} machines={[]} library={[]} onAdded={() => {}} />");
+    for (const prop of ["isAdmin", "curateOnly", "machines={[]}", "orgId={null}"]) expect(curate, prop).toContain(prop);
     const section = read("components/coach/machine-catalog-section.tsx");
     expect(section).toContain("{curateOnly ? null : inGym.has(m.id) ? (");
     expect(section).toContain("{isAdmin && !curateOnly && (");
+  });
+  it("the admin's own demos are offered there ('Or use one of my demos'), and the review and the list refresh each other (re-review of 8026dee8)", () => {
+    const admin = read("app/admin/machine-catalog/page.tsx");
+    expect(admin).toContain('.select("id, name, video_path, youtube_url").eq("created_by", user.id)');
+    expect(admin).toContain('<MachineCatalogCurate key={list.map((r) => r.id).join(",")} adminId={user.id} library={myLibrary} />');
+    const curate = read("components/admin/machine-catalog-curate.tsx");
+    expect(curate).not.toContain("library={[]}");
+    expect(curate).toContain("library={library}");
+    expect(curate).toContain("onListChanged={() => router.refresh()}");
+    const section = read("components/coach/machine-catalog-section.tsx");
+    expect(section).toContain("await Promise.all([reload(), loadRequests()]);\n    onListChanged?.();");
+    expect(section).toContain("await reload();\n                      onListChanged?.();");
   });
 });
 
