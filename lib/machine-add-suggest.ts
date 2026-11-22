@@ -40,7 +40,8 @@ export function matchLibraryExercises<T extends SuggestRow>(library: T[], phrase
   return [...byName.values()].sort((a, b) => tidy(a.name).localeCompare(tidy(b.name)));
 }
 
-// The suggestions shown in the add-machine form: only for the platform admin on the admin page (a coach's form sends a request and is unchanged).
+// The suggestions shown in the add-machine form: only for the platform admin on the admin page (a coach's form sends a request and is unchanged). Once the machine's name has 3 or
+// more characters only names holding it are listed ("Hammer Strength" + "Iso Row" lists the Iso Row, not the brand's Chest Press); until then, the brand's.
 export function machineSuggestions<T extends SuggestRow>({
   show,
   library,
@@ -55,7 +56,19 @@ export function machineSuggestions<T extends SuggestRow>({
   skipNames?: Iterable<string>;
 }): T[] {
   if (!show) return [];
-  return matchLibraryExercises(library, [brand, model], skipNames);
+  return matchLibraryExercises(library, [tidy(model).length >= SUGGEST_MIN_CHARS ? model : brand], skipNames);
+}
+
+// The shared list's cap shown before saving: ticked plus typed over 30 (null when it fits, or when nothing is ticked: then the form's own error says it, as before).
+export function capLine(ticked: number, typed: number, max: number): string | null {
+  if (ticked === 0 || ticked + typed <= max) return null;
+  return `${ticked} ticked + ${typed} typed: a machine holds up to ${max}. Untick some.`;
+}
+
+// The names on the machine as the list has it right now (read just before saving), so a ticked exercise already there, even one added in another tab, is not sent or given a demo.
+export function notOnMachine<T extends SuggestRow>(ticked: T[], machineItems: { name: string }[]): T[] {
+  const there = new Set(machineItems.map((i) => key(i.name)));
+  return ticked.filter((r) => !there.has(key(r.name)));
 }
 
 // Every match starts ticked: the form keeps the ones he unticked, so a match that appears while he types is ticked without anything to do.

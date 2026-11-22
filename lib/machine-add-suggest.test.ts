@@ -3,12 +3,14 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   allTicked,
+  capLine,
   demoFailedLine,
   demoTicksNeeded,
   machineSuggestions,
   matchLibraryExercises,
   matchesLine,
   mergeMachineExercises,
+  notOnMachine,
   planDemoCarry,
   sameMachine,
   tickedRows,
@@ -28,12 +30,13 @@ const library: SuggestRow[] = [
   row("4", "Barbell Row"),
   row("5", "Hammer Curl"),
   row("6", "Bolt Viking Press"),
+  row("7", "Hammer Strength Shoulder Press"),
 ];
 
 describe("matching Ron's own exercises", () => {
   it("finds every exercise holding the whole phrase, any case or spacing, by name", () => {
-    expect(matchLibraryExercises(library, ["hammer strength"]).map((r) => r.id)).toEqual(["2", "1", "3"]);
-    expect(matchLibraryExercises(library, ["HAMMER STRENGTH  "]).map((r) => r.id)).toEqual(["2", "1", "3"]);
+    expect(matchLibraryExercises(library, ["hammer strength"]).map((r) => r.id)).toEqual(["2", "1", "3", "7"]);
+    expect(matchLibraryExercises(library, ["HAMMER STRENGTH  "]).map((r) => r.id)).toEqual(["2", "1", "3", "7"]);
     // the whole phrase, not each word: Hammer Curl is not a Hammer Strength exercise
     expect(matchLibraryExercises(library, ["hammer strength"]).some((r) => r.name === "Hammer Curl")).toBe(false);
   });
@@ -41,18 +44,24 @@ describe("matching Ron's own exercises", () => {
   it("starts at 3 characters", () => {
     expect(matchLibraryExercises(library, ["ha"])).toEqual([]);
     expect(matchLibraryExercises(library, ["  "])).toEqual([]);
-    expect(matchLibraryExercises(library, ["ham"]).map((r) => r.id)).toEqual(["5", "2", "1", "3"]);
+    expect(matchLibraryExercises(library, ["ham"]).map((r) => r.id)).toEqual(["5", "2", "1", "3", "7"]);
   });
 
-  it("matches the brand or the machine's name, once each", () => {
-    const m = machineSuggestions({ show: true, library, brand: "Bolt", model: "Viking Press" });
-    expect(m.map((r) => r.id)).toEqual(["6"]);
-    const both = machineSuggestions({ show: true, library, brand: "Hammer Strength", model: "Row" });
-    expect(both.map((r) => r.id)).toEqual(["4", "2", "1", "3"]);
+  it("brand alone lists all the brand's exercises", () => {
+    expect(machineSuggestions({ show: true, library, brand: "Hammer Strength", model: "" }).map((r) => r.id)).toEqual(["2", "1", "3", "7"]);
+    // the machine's name still under 3 characters: the brand's
+    expect(machineSuggestions({ show: true, library, brand: "Hammer Strength", model: "Is" }).map((r) => r.id)).toEqual(["2", "1", "3", "7"]);
+  });
+
+  it("brand + machine lists only the machine's exercises, never the brand's other machines", () => {
+    expect(machineSuggestions({ show: true, library, brand: "Hammer Strength", model: "Iso Row" }).map((r) => r.id)).toEqual(["1"]);
+    expect(machineSuggestions({ show: true, library, brand: "Bolt", model: "Viking Press" }).map((r) => r.id)).toEqual(["6"]);
+    // the machine's name alone, whatever the brand box says
+    expect(machineSuggestions({ show: true, library, brand: "", model: "row" }).map((r) => r.id)).toEqual(["4", "1"]);
   });
 
   it("skips names already on the machine or already typed in the form", () => {
-    expect(matchLibraryExercises(library, ["hammer strength"], ["HAMMER STRENGTH ISO ROW"]).map((r) => r.id)).toEqual(["2", "3"]);
+    expect(matchLibraryExercises(library, ["hammer strength"], ["HAMMER STRENGTH ISO ROW"]).map((r) => r.id)).toEqual(["2", "3", "7"]);
   });
 
   it("keeps one row a name, the one with a demo", () => {
@@ -70,7 +79,7 @@ describe("ticked by default", () => {
   it("every match starts ticked, and one unticked stays out", () => {
     expect(tickedRows(matches, new Set())).toEqual(matches);
     expect(allTicked(matches, new Set())).toBe(true);
-    expect(tickedRows(matches, new Set(["1"])).map((r) => r.id)).toEqual(["2", "3"]);
+    expect(tickedRows(matches, new Set(["1"])).map((r) => r.id)).toEqual(["2", "3", "7"]);
     expect(allTicked(matches, new Set(["1"]))).toBe(false);
   });
   it("Untick all, then Tick all", () => {
@@ -111,10 +120,35 @@ describe("saving the machine with the ticked exercises", () => {
     expect(merged).toEqual([
       { name: "hammer strength chest press", catalogId: null },
       { name: "Hammer Strength Iso Row", catalogId: "cat-row" },
+      { name: "Hammer Strength Shoulder Press", catalogId: null },
       { name: "Shrug", catalogId: null },
     ]);
     const cleaned = cleanMachineRequest({ brand: "Hammer Strength", model: "Iso Row", exercises: merged });
-    expect(cleaned.ok && cleaned.exercises.length).toBe(3);
+    expect(cleaned.ok && cleaned.exercises.length).toBe(4);
+  });
+
+  it("shows the 30 cap before saving, and the save stops with the same line", () => {
+    expect(capLine(20, 10, 30)).toBeNull();
+    expect(capLine(25, 6, 30)).toBe("25 ticked + 6 typed: a machine holds up to 30. Untick some.");
+    // nothing ticked: the form's own error, as before
+    expect(capLine(0, 31, 30)).toBeNull();
+    const s = read("components/coach/machine-catalog-section.tsx");
+    expect(s).toContain("const overCap = capLine(ticked.length, typedCount, REQUEST_EXERCISES_MAX);");
+    expect(s).toContain("{overCap}");
+    expect(s).toContain("const tooMany = capLine(ticked.length, typedCount, REQUEST_EXERCISES_MAX);\n    if (tooMany) return setError(tooMany);");
+  });
+
+  it("what is already on the machine right now (another tab included) is not sent again and gets no demo", () => {
+    expect(notOnMachine(ticked, [{ name: "HAMMER STRENGTH ISO ROW" }]).map((r) => r.id)).toEqual(["2", "7"]);
+    expect(notOnMachine(ticked, [])).toEqual(ticked);
+    const s = read("components/coach/machine-catalog-section.tsx");
+    const send = s.slice(s.indexOf("  async function send() {"), s.indexOf("  function tickBox("));
+    // read fresh just before the machine is sent, with the same read as after it
+    expect(send.indexOf("const now = await readSharedList();")).toBeLessThan(send.indexOf('sendRequest({ kind: "machine"'));
+    expect(send).toContain("priorItemIds = there.map((i) => i.id);");
+    expect(send).toContain("toSend = notOnMachine(ticked, there);");
+    expect(send).toContain("(await readSharedList())?.find((m) => sameMachine(m, cleaned))");
+    expect(send).not.toContain("catalog.find(");
   });
 
   it("the ticked exercises alone are enough for a machine; none ticked and none typed is not", () => {
@@ -154,8 +188,9 @@ describe("saving the machine with the ticked exercises", () => {
     const s = read("components/coach/machine-catalog-section.tsx");
     const send = s.slice(s.indexOf("  async function send() {"), s.indexOf("  function tickBox("));
     expect(send).toContain("exercises: mergeMachineExercises(ticked, exercises, names)");
+    expect(send).toContain("exercises: mergeMachineExercises(toSend, exercises, names)");
     expect(send.indexOf('sendRequest({ kind: "machine"')).toBeLessThan(send.indexOf("sendMyDemo({ coachId, isAdmin, itemId, row })"));
-    expect(send).toContain("planDemoCarry(ticked, saved?.items ?? null, priorItemIds)");
+    expect(send).toContain("planDemoCarry(toSend, saved?.items ?? null, priorItemIds)");
     expect(send).toContain("demoFailedLine(failed)");
     // one failed demo never stops the others or the machine
     expect(send).toContain("if (!d.ok) failed.push(row.name);");

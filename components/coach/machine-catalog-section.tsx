@@ -15,6 +15,7 @@ import { MACHINE_NAME_MAX, type MachineRow } from "@/lib/gym-machines";
 import {
   CATALOG_SELECT,
   MACHINE_DEMOS_BUCKET,
+  REQUEST_EXERCISES_MAX,
   REQUEST_SELECT,
   catalogDemo,
   catalogFromRows,
@@ -32,12 +33,14 @@ import {
 } from "@/lib/machine-catalog";
 import {
   allTicked,
+  capLine,
   demoFailedLine,
   demoTicksNeeded,
   hasDemo,
   machineSuggestions,
   matchesLine,
   mergeMachineExercises,
+  notOnMachine,
   planDemoCarry,
   sameMachine,
   tickedRows,
@@ -388,6 +391,12 @@ function CatalogThumb({ videoUrl, youtubeThumb }: { videoUrl: string | null; you
   );
 }
 
+// The shared list read fresh (the same read the section opens with); null when it couldn't be read.
+async function readSharedList(): Promise<CatalogMachine[] | null> {
+  const { data, error } = await createBrowserClient().from("catalog_machines").select(CATALOG_SELECT).order("brand").order("model").limit(1000);
+  return error ? null : catalogFromRows((data ?? []) as never);
+}
+
 // A request goes in; the platform admin's is approved at once (the same server-checked review, so it is on the list straight away).
 async function sendRequest(row: Record<string, unknown>, isAdmin: boolean): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = createBrowserClient();
@@ -727,6 +736,9 @@ function MachineRequestForm({
   const ticked = tickedRows(matches, unticked);
   const ticksNeeded = demoTicksNeeded(ticked);
   const everyTicked = allTicked(matches, unticked);
+  // Typed names that aren't also ticked (the list skips typed names, so this is every typed one), for the 30-a-machine line.
+  const typedCount = mergeMachineExercises(ticked, exercises, []).length - ticked.length;
+  const overCap = capLine(ticked.length, typedCount, REQUEST_EXERCISES_MAX);
 
   useEffect(() => {
     void createBrowserClient()
@@ -752,15 +764,35 @@ function MachineRequestForm({
 
   async function send() {
     // The ticked exercises (shown only on the admin page; none anywhere else) come first, then the typed ones.
-    const cleaned = cleanMachineRequest({ brand, model, exercises: mergeMachineExercises(ticked, exercises, names) });
-    if (!cleaned.ok) return setError(cleaned.error);
+    const tooMany = capLine(ticked.length, typedCount, REQUEST_EXERCISES_MAX);
+    if (tooMany) return setError(tooMany);
+    const first = cleanMachineRequest({ brand, model, exercises: mergeMachineExercises(ticked, exercises, names) });
+    if (!first.ok) return setError(first.error);
     // Their demos ask for the same ticks "use one of my demos" does.
     if (ticksNeeded.video && !rights) return setError(`Tick "${RIGHTS_LABEL}" first, or untick the exercises with a video.`);
     if (ticksNeeded.video && !consent) return setError(`Tick "${CONSENT_LABEL}" first, or untick the exercises with a video.`);
     if (ticksNeeded.link && !linkRights) return setError(`Tick "${LINK_RIGHTS_LABEL}" first, or untick the exercises with a YouTube link.`);
-    const priorItemIds = catalog.find((m) => sameMachine(m, cleaned))?.items.map((i) => i.id) ?? [];
     setBusy(true);
     setError(null);
+    // With ticked exercises, the machine as the list has it right now (not as the page loaded it, another tab may have added to it): what is already on it is not sent again and
+    // never gets a demo. A coach's form, with nothing ticked, reads nothing here, as before.
+    let toSend = ticked;
+    let priorItemIds: string[] = [];
+    if (ticked.length > 0) {
+      const now = await readSharedList();
+      if (!now) {
+        setBusy(false);
+        return setError("Couldn't check the shared list. Try again.");
+      }
+      const there = now.find((m) => sameMachine(m, first))?.items ?? [];
+      priorItemIds = there.map((i) => i.id);
+      toSend = notOnMachine(ticked, there);
+    }
+    const cleaned = toSend === ticked ? first : cleanMachineRequest({ brand, model, exercises: mergeMachineExercises(toSend, exercises, names) });
+    if (!cleaned.ok) {
+      setBusy(false);
+      return setError(cleaned.error);
+    }
     const r = await sendRequest({ kind: "machine", brand: cleaned.brand, model: cleaned.model, exercises: cleaned.exercises }, isAdmin);
     if (!r.ok) {
       setBusy(false);
@@ -769,10 +801,9 @@ function MachineRequestForm({
     const label = `${cleaned.brand} ${cleaned.model}`;
     // The machine is on the list now. Each ticked demo goes onto its new exercise there, the same way "use one of my demos" does; one that fails is named, the rest stay.
     const failed: string[] = [];
-    if (isAdmin && ticked.some(hasDemo)) {
-      const { data, error: readError } = await createBrowserClient().from("catalog_machines").select(CATALOG_SELECT).order("brand").order("model").limit(1000);
-      const saved = readError ? null : catalogFromRows((data ?? []) as never).find((m) => sameMachine(m, cleaned));
-      const plan = planDemoCarry(ticked, saved?.items ?? null, priorItemIds);
+    if (isAdmin && toSend.some(hasDemo)) {
+      const saved = (await readSharedList())?.find((m) => sameMachine(m, cleaned)) ?? null;
+      const plan = planDemoCarry(toSend, saved?.items ?? null, priorItemIds);
       for (const row of plan.missing) failed.push(row.name);
       for (const { itemId, row } of plan.carry) {
         const d = await sendMyDemo({ coachId, isAdmin, itemId, row });
@@ -855,6 +886,11 @@ function MachineRequestForm({
               </li>
             ))}
           </ul>
+          {overCap && (
+            <p className="font-body text-xs text-rust-ink" data-machine-cap>
+              {overCap}
+            </p>
+          )}
           {ticksNeeded.video && (
             <>
               {tickBox(rights, setRights, RIGHTS_LABEL)}
