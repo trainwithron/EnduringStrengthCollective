@@ -99,7 +99,7 @@ export default async function FeedPage(
       .eq("profile_id", user?.id ?? "")
       .maybeSingle(),
     user ? getEffectiveAthlete(params.groupId, user.id) : Promise.resolve(null),
-    supabase.from("groups").select("name, group_kind, organization_id").eq("id", params.groupId).maybeSingle(),
+    supabase.from("groups").select("name, group_kind, organization_id, team_mode").eq("id", params.groupId).maybeSingle(),
   ]);
 
   const isCoach = membership?.role === "coach";
@@ -193,10 +193,13 @@ export default async function FeedPage(
     );
   }
 
-  // A team-sport group keeps its own Team Chat; any other group talks in General, which shows Team Chat's posts too (CL17, Nov 21).
+  // A team-sport group keeps its own Team Chat; any other group talks in General, which shows Team Chat's posts too (CL17, Nov 21). The page's own group was read above; only
+  // another group's feed (a coach in their own space, a one-on-one client in their shared group) needs a read of its own.
   const { data: feedGroupRow } = noSharedGroup
     ? { data: null as { team_mode: boolean | null } | null }
-    : await supabase.from("groups").select("team_mode").eq("id", feedGroupId).maybeSingle();
+    : feedGroupId === params.groupId
+      ? { data: group as { team_mode: boolean | null } | null }
+      : await supabase.from("groups").select("team_mode").eq("id", feedGroupId).maybeSingle();
   const teamSport = isTeamSportGroup(feedGroupRow?.team_mode);
   const channel = openedChannel(searchParams.channel, teamSport);
 
@@ -307,7 +310,7 @@ export default async function FeedPage(
         <div className="max-w-[640px] @4xl:max-w-none @4xl:grid @4xl:grid-cols-[minmax(0,40rem)_minmax(0,22rem)] @4xl:gap-x-8 @4xl:items-start">
           <div className="flex items-center justify-between @4xl:col-start-1 @4xl:row-start-1">
             <ChannelTabs basePath={`/groups/${params.groupId}/feed`} active={channel} channels={tabs.shown} more={tabs.more} />
-            <ClearChannelButton groupId={params.groupId} channel={channel} />
+            <ClearChannelButton groupId={params.groupId} channel={channel} channels={channelsRead(channel, teamSport)} />
           </div>
           <div className="pt-6 @4xl:pt-0 @4xl:col-start-2 @4xl:row-start-1 @4xl:row-span-2 min-w-0">
             <ReportedContentPanel groupId={params.groupId} />
@@ -359,7 +362,7 @@ export default async function FeedPage(
             {feedTitle(teamSport)}
           </h1>
           <div className="flex items-center">
-            {!selfView && <ClearChannelButton groupId={params.groupId} channel={channel} />}
+            {!selfView && <ClearChannelButton groupId={params.groupId} channel={channel} channels={channelsRead(channel, teamSport)} />}
             {athleteId && <FeedSettingsButton initialLevel={feedBroadcastLevel} profileId={athleteId} />}
           </div>
         </div>

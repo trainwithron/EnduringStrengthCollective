@@ -11,7 +11,9 @@ import { FEED_CHANNEL_LABELS as CHANNEL_LABELS, type FeedChannel } from "@/lib/t
 // scoped to one channel at a time rather than "delete everything across
 // every channel in one click" — clearing General shouldn't also silently
 // erase Announcements or the PR Board.
-export function ClearChannelButton({ groupId, channel }: { groupId: string; channel: FeedChannel }) {
+// `channels`: the channels the open tab lists (default: `channel` alone). Outside a team-sport group General also lists Team Chat's posts, so clearing General clears both
+// (CL17, Nov 21: lib/feed-channels.ts channelsRead); every other channel is still cleared on its own.
+export function ClearChannelButton({ groupId, channel, channels }: { groupId: string; channel: FeedChannel; channels?: FeedChannel[] }) {
   const router = useRouter();
   const [canClear, setCanClear] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -74,7 +76,7 @@ export function ClearChannelButton({ groupId, channel }: { groupId: string; chan
       .from("posts")
       .delete()
       .eq("group_id", groupId)
-      .eq("channel", channel);
+      .in("channel", channels ?? [channel]);
     setClearing(false);
     if (deleteError) {
       setError("Couldn't clear the channel — try again.");

@@ -87,6 +87,24 @@ describe("CL17: the feed", () => {
     expect(list).toContain("}, [groupId, viewerId, listenKey]);");
     expect(read(FEED).split("listensTo={channelsRead(channel, teamSport)}").length - 1).toBe(2);
   });
+  it("clearing the merged General clears Team Chat's posts too (every other channel on its own)", () => {
+    const btn = read("components/feed/clear-channel-button.tsx");
+    expect(btn).toContain('.in("channel", channels ?? [channel]);');
+    expect(btn).not.toContain('.eq("channel", channel)');
+    expect(read(FEED).split("<ClearChannelButton groupId={params.groupId} channel={channel} channels={channelsRead(channel, teamSport)} />").length - 1).toBe(2);
+  });
+  it("the page's own group gives team_mode in its first read; only another group's feed reads it again", () => {
+    const page = read(FEED);
+    expect(page).toContain('.select("name, group_kind, organization_id, team_mode").eq("id", params.groupId)');
+    expect(page).toContain("feedGroupId === params.groupId\n      ? { data: group as { team_mode: boolean | null } | null }");
+  });
+  it("step 222's index is only for speed: the feed's reads never name it, and the paste and undo hold the migration", () => {
+    const sql = read("supabase/migrations/0466_posts_group_channel_index.sql");
+    expect(sql).toContain("create index if not exists posts_group_channel_created on public.posts (group_id, channel, created_at desc);");
+    expect(read("supabase/apply/apply-step222-0466.sql")).toContain(sql.trimEnd());
+    expect(read("supabase/apply/undo-step222-0466.sql")).toContain("drop index if exists public.posts_group_channel_created;");
+    for (const f of [FEED, "lib/feed-channels.ts", "components/feed/feed-list.tsx"]) expect(read(f), f).not.toContain("posts_group_channel_created");
+  });
   it("is titled Feed, and Team feed only for a team-sport group", () => {
     expect(feedTitle(false)).toBe("Feed");
     expect(feedTitle(true)).toBe("Team feed");
