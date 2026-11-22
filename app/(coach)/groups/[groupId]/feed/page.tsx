@@ -26,11 +26,13 @@ import { FeedGroupPicker } from "@/components/feed/feed-group-picker";
 import { FeedViewSwitch, ClientWorkoutsList } from "@/components/feed/client-workouts-view";
 import { clientWorkoutsLimit, loadClientWorkouts, showClientWorkouts } from "@/lib/client-workouts";
 import { sharedFeedGroupFor } from "@/lib/shared-group-join";
-import type { FeedChannel, FeedPost } from "@/lib/types";
+import type { FeedPost } from "@/lib/types";
+import { channelsRead, channelsWithPosts, feedTabs, feedTitle, openedChannel } from "@/lib/feed-channels";
+import { isTeamSportGroup } from "@/lib/team-sport";
+import { formatInTimezone } from "@/lib/format-in-timezone";
+import { MarkAnnouncementSeen, PinnedAnnouncement } from "@/components/feed/pinned-announcement";
 
 export const metadata = { title: "Feed" };
-
-const VALID_CHANNELS: FeedChannel[] = ["announcements", "form_checks", "pr_board", "general", "team_chat"];
 
 function mapPostRow(p: any, groupId: string, viewerId: string | null): FeedPost {
   return {
@@ -97,7 +99,7 @@ export default async function FeedPage(
       .eq("profile_id", user?.id ?? "")
       .maybeSingle(),
     user ? getEffectiveAthlete(params.groupId, user.id) : Promise.resolve(null),
-    supabase.from("groups").select("name, group_kind, organization_id").eq("id", params.groupId).maybeSingle(),
+    supabase.from("groups").select("name, group_kind, organization_id, team_mode").eq("id", params.groupId).maybeSingle(),
   ]);
 
   const isCoach = membership?.role === "coach";
@@ -191,9 +193,15 @@ export default async function FeedPage(
     );
   }
 
-  const channel: FeedChannel = VALID_CHANNELS.includes(searchParams.channel as FeedChannel)
-    ? (searchParams.channel as FeedChannel)
-    : "general";
+  // A team-sport group keeps its own Team Chat; any other group talks in General, which shows Team Chat's posts too (CL17, Nov 21). The page's own group was read above; only
+  // another group's feed (a coach in their own space, a one-on-one client in their shared group) needs a read of its own.
+  const { data: feedGroupRow } = noSharedGroup
+    ? { data: null as { team_mode: boolean | null } | null }
+    : feedGroupId === params.groupId
+      ? { data: group as { team_mode: boolean | null } | null }
+      : await supabase.from("groups").select("team_mode").eq("id", feedGroupId).maybeSingle();
+  const teamSport = isTeamSportGroup(feedGroupRow?.team_mode);
+  const channel = openedChannel(searchParams.channel, teamSport);
 
   // Independent of each other — viewerProfile/posts only need
   // athleteId/groupId/channel (all already resolved); the leaderboard and
@@ -203,21 +211,31 @@ export default async function FeedPage(
   // already fetched above, before the redirect check — no need to fetch
   // it a second time here.
   // Members who are not confirmed adults are shown on the leaderboard as first name and last initial (looked up on the server for the people actually on the board).
-  const [{ data: viewerProfile }, { data: posts }, teamModeResult, leaderboard] = await Promise.all([
+  const [{ data: viewerProfile }, { data: posts }, withPosts, { data: newestAnnouncement }, leaderboard] = await Promise.all([
     athleteId
-      ? supabase.from("profiles").select("full_name, feed_broadcast_level").eq("id", athleteId).maybeSingle()
-      : Promise.resolve({ data: null as { full_name: string; feed_broadcast_level: string } | null }),
+      ? supabase.from("profiles").select("full_name, feed_broadcast_level, timezone").eq("id", athleteId).maybeSingle()
+      : Promise.resolve({ data: null as { full_name: string; feed_broadcast_level: string; timezone: string | null } | null }),
     supabase
       .from("posts")
       .select(POST_SELECT)
       .eq("group_id", feedGroupId)
-      .eq("channel", channel)
+      .in("channel", channelsRead(channel, teamSport))
       .order("pinned_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })
       .limit(30),
-    channel === "general"
-      ? supabase.from("groups").select("team_mode").eq("id", feedGroupId).maybeSingle()
-      : Promise.resolve({ data: null as { team_mode: boolean } | null }),
+    // which channels have posts: only those are tabs (CL17)
+    noSharedGroup ? Promise.resolve(new Set<FeedPost["channel"]>()) : channelsWithPosts(supabase, feedGroupId),
+    // the coach's newest announcement, pinned above the list until it is read (CL17)
+    noSharedGroup
+      ? Promise.resolve({ data: null })
+      : supabase
+          .from("posts")
+          .select("id, body, created_at, author_id, profiles!posts_author_id_fkey ( full_name )")
+          .eq("group_id", feedGroupId)
+          .eq("channel", "announcements")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
     // Leaderboard now lives at the top of General instead of its own nav
     // tab — every post is a reminder it's there, per the ask ("every time
     // anything gets posted, everyone can see the leaderboard").
@@ -256,7 +274,7 @@ export default async function FeedPage(
   // already fetched in the wave-2 batch above (teamModeResult), same
   // "general channel only" gate the leaderboard itself uses.
   let positionGroups: Awaited<ReturnType<typeof getPositionLeaderboardRankings>> | null = null;
-  if (leaderboard && teamModeResult.data?.team_mode) {
+  if (leaderboard && teamSport) {
     positionGroups = await getPositionLeaderboardRankings(supabase, feedGroupId, loadNameProtectedIds);
   }
   const leaderboardCard = leaderboard && (
@@ -271,6 +289,9 @@ export default async function FeedPage(
     </div>
   );
 
+  // Only the channels with posts are tabs; the empty ones are behind "More" (CL17).
+  const tabs = feedTabs({ withPosts, active: channel, teamSport, isCoach: isActingAsOther ? false : isCoach });
+
   if (isCoach && !showMobileView) {
     return (
       <CoachDesktopShell
@@ -279,7 +300,7 @@ export default async function FeedPage(
         active="feed"
       >
         <div className="pb-6 border-b border-steel/20 mb-6">
-          <h1 className="font-display font-bold text-3xl uppercase leading-none">Team Feed</h1>
+          <h1 className="font-display font-bold text-3xl uppercase leading-none">{feedTitle(teamSport)}</h1>
           <div className="max-w-[720px] mt-5">
             <FeedViewSwitch basePath={feedBase} active="group" />
           </div>
@@ -288,8 +309,8 @@ export default async function FeedPage(
         {/* With room (@4xl): the feed on the left, reported posts and the leaderboard on the right. Narrower, one 640px column in the same order as always (layout audit #14). */}
         <div className="max-w-[640px] @4xl:max-w-none @4xl:grid @4xl:grid-cols-[minmax(0,40rem)_minmax(0,22rem)] @4xl:gap-x-8 @4xl:items-start">
           <div className="flex items-center justify-between @4xl:col-start-1 @4xl:row-start-1">
-            <ChannelTabs basePath={`/groups/${params.groupId}/feed`} active={channel} />
-            <ClearChannelButton groupId={params.groupId} channel={channel} />
+            <ChannelTabs basePath={`/groups/${params.groupId}/feed`} active={channel} channels={tabs.shown} more={tabs.more} />
+            <ClearChannelButton groupId={params.groupId} channel={channel} channels={channelsRead(channel, teamSport)} />
           </div>
           <div className="pt-6 @4xl:pt-0 @4xl:col-start-2 @4xl:row-start-1 @4xl:row-span-2 min-w-0">
             <ReportedContentPanel groupId={params.groupId} />
@@ -310,12 +331,19 @@ export default async function FeedPage(
               isCoach={isCoach}
               highlightPostId={highlightPostId}
               blockedIds={blockedIds}
+              listensTo={channelsRead(channel, teamSport)}
             />
           </div>
         </div>
       </CoachDesktopShell>
     );
   }
+
+  const channelBase = selfView ? `/groups/${params.groupId}/feed?group=${feedGroupId}` : `/groups/${params.groupId}/feed`;
+  const ann = newestAnnouncement as { id: string; body: string | null; created_at: string; profiles?: { full_name?: string | null } | null } | null;
+  const pinned = ann && ann.body?.trim()
+    ? { id: ann.id, body: ann.body, authorName: ann.profiles?.full_name ?? "Your coach", when: formatInTimezone(new Date(ann.created_at), viewerProfile?.timezone || "America/New_York", "date") }
+    : null;
 
   // A coach viewing this as the impersonated client never sees coach-only
   // controls (Pin, Announcements posting) — those belong to the client's
@@ -331,10 +359,10 @@ export default async function FeedPage(
       <header className="px-5 pt-8 pb-4 border-b border-steel/20">
         <div className="flex items-center justify-between">
           <h1 className="font-display font-bold text-3xl uppercase leading-none">
-            Team feed
+            {feedTitle(teamSport)}
           </h1>
           <div className="flex items-center">
-            {!selfView && <ClearChannelButton groupId={params.groupId} channel={channel} />}
+            {!selfView && <ClearChannelButton groupId={params.groupId} channel={channel} channels={channelsRead(channel, teamSport)} />}
             {athleteId && <FeedSettingsButton initialLevel={feedBroadcastLevel} profileId={athleteId} />}
           </div>
         </div>
@@ -351,7 +379,15 @@ export default async function FeedPage(
         <p className="px-5 pt-6 font-body text-sm text-steel">Your groups&apos; feed shows here once you coach a team or a group. A client&apos;s own space has no feed.</p>
       )}
 
-      <ChannelTabs basePath={selfView ? `/groups/${params.groupId}/feed?group=${feedGroupId}` : `/groups/${params.groupId}/feed`} active={channel} />
+      <ChannelTabs basePath={channelBase} active={channel} channels={tabs.shown} more={tabs.more} />
+
+      {/* The newest announcement above the list until it is read; on the Announcements tab itself it counts as read (CL17). */}
+      {pinned && channel !== "announcements" && (
+        <div className="px-5 pt-4">
+          <PinnedAnnouncement groupId={feedGroupId} post={pinned} announcementsHref={`${channelBase}${channelBase.includes("?") ? "&" : "?"}channel=announcements`} />
+        </div>
+      )}
+      {pinned && channel === "announcements" && <MarkAnnouncementSeen groupId={feedGroupId} postId={pinned.id} />}
 
       {renderAsCoach && !noSharedGroup && !isActingAsOther && (
         <div className="px-5">
@@ -370,6 +406,7 @@ export default async function FeedPage(
         isCoach={renderAsCoach}
         highlightPostId={highlightPostId}
         blockedIds={blockedIds}
+        listensTo={channelsRead(channel, teamSport)}
       />
       {!noSharedGroup && (
       <NewPostComposer

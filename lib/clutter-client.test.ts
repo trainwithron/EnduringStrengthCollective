@@ -25,9 +25,9 @@ const NUTRITION = "app/(coach)/groups/[groupId]/nutrition/page.tsx";
 const day = { groupId: "g", athleteId: "a", dateKey: "2026-11-21", dateLabel: "Today", isToday: true, macros: null, habits: [], weightLogs: [], canBook: false };
 
 describe("Home", () => {
-  it("CL1: one way to log weight and one to InBody; the Check in tile steps aside while the check-in card shows", () => {
+  it("CL1: one way to log weight; InBody is on My progress (CL10: not on Home); the How I Feel tile steps aside while the check-in card shows", () => {
     expect(read("components/athlete/weight-log-widget.tsx")).toContain("{!opensFromTile && (");
-    expect(read("components/athlete/day-card.tsx")).toContain("<InbodyEntry athleteId={athleteId} groupId={groupId} sheetOnly />");
+    expect(read("components/athlete/day-card.tsx")).not.toContain("<InbodyEntry");
     expect(read("app/(coach)/groups/[groupId]/progress/page.tsx")).toContain("<InbodyEntry athleteId={athleteId} groupId={params.groupId} />");
     expect(read("components/athlete/today-tiles.tsx")).toContain("const showCheckin = allowCheckin && !cardShown;");
     expect(read("components/athlete/wellness-checkin-popup.tsx")).toContain("setWellnessCardShown(cardInPage);");

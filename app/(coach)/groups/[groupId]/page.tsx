@@ -22,6 +22,7 @@ import { DayCard } from "@/components/athlete/day-card";
 import { PaymentFailedNotice } from "@/components/athlete/payment-failed-notice";
 import { MyProgramsBlock } from "@/components/athlete/my-programs-block";
 import { showProgramsBlock } from "@/lib/today-card-program-link";
+import { COACH_TODAY_HREF, loadCoachTodayLine } from "@/lib/coach-today-line";
 import { homeProgramCards, programPickups } from "@/lib/home-programs";
 import { loadDoneAt, weekOf } from "@/lib/program-pickup";
 import { readRowsByIds } from "@/lib/read-by-ids";
@@ -286,6 +287,8 @@ export default async function GroupHubPage(
   // the coach's own Programs grid.
   const coachId = roster.find((m) => m.role === "coach")?.profileId;
   // The coach a client sees named on Home ("Message <coach>", the weekly check-in, the greeting): never one still to accept their invitation (part A review, Nov 21).
+  // On a coach's phone Home (their own account), one line about today's coaching under the greeting (PH25, Nov 21). Read alongside the rest; null for anyone who coaches no one.
+  const coachTodayRead = prefersPhoneView && isActingAsOther && !!user && athleteId === user.id && view === "day" && isToday ? loadCoachTodayLine(supabase, user.id) : Promise.resolve(null);
   const clientsCoachName = roster.find((m) => m.role === "coach" && m.profileId !== athleteId && !pendingCoaches.has(m.profileId))?.fullName ?? null;
   // In a one-on-one space a program with no client on it is the coach's template, not the client's: only programs made for the client are listed.
   const shownPrograms = (programs ?? []).filter((p: any) => (group as { group_kind?: string } | null)?.group_kind !== "one_on_one" || p.athlete_id !== null);
@@ -619,6 +622,8 @@ export default async function GroupHubPage(
   let homeThreadLines: string[] = [];
   let mealLine: string | null = null;
   let dayEaten: FoodTotals | null = null;
+  // The coach's food tracking switch for this client (on unless turned off): the Nutrition card's "Eaten today" and the Log food tile (CL10) need it on.
+  let foodTrackingOn = true;
   let weekDays: HomeDaySummary[] = [];
   let monthSummaryByDateKey = new Map<string, HomeDaySummary>();
   let weekRangeStart = targetDate;
@@ -791,9 +796,9 @@ export default async function GroupHubPage(
 
       // Today's log: what is eaten so far (the Nutrition card shows eaten / target, CL22, Nov 21; the same sum as the Nutrition page's ring), and the meals checked off when there is
       // a meal plan. Any failure just leaves them out. With the coach's food tracking off for this client there is no "Eaten today": the card shows the targets only (read on its own,
-      // as the Nutrition page does, so a database without the column reads as on).
-      if (isToday && macrosEnabled) {
-        let foodTrackingOn = true;
+      // as the Nutrition page does, so a database without the column reads as on). It is read for every tier: the Log food tile follows the Nutrition page, where anyone with
+      // tracking on logs food (Commander, Nov 21).
+      if (isToday) {
         try {
           const { data: trackingRow } = await supabase
             .from("group_memberships")
@@ -805,6 +810,8 @@ export default async function GroupHubPage(
         } catch {
           foodTrackingOn = true;
         }
+      }
+      if (isToday && macrosEnabled) {
         try {
           const { data: loggedMeals, error: loggedError } = await supabase
             .from("food_log_entries")
@@ -922,6 +929,7 @@ export default async function GroupHubPage(
   const openIsTodays =
     !!openWorkoutId && isToday && (daySessions.some((s) => s.workoutId === openWorkoutId && s.status === "planned") || (dayWorkout.workoutId === openWorkoutId && dayWorkout.status === "planned"));
 
+  const coachToday = await coachTodayRead;
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
       {isActingAsOther && (
@@ -972,6 +980,15 @@ export default async function GroupHubPage(
           groupId: params.groupId,
         }))}
       />
+
+      {/* Today's coaching, one quiet line under the greeting; it opens the Calendar's Today list (PH25). Nothing on a day with no sessions. */}
+      {coachToday && (
+        <div className="px-5 pt-1">
+          <Link href={COACH_TODAY_HREF} prefetch={false} className="inline-flex items-center min-h-11 font-body text-sm text-steel active:text-chalk" data-coach-today-line>
+            {coachToday} &rarr;
+          </Link>
+        </div>
+      )}
 
       {/* First-run guide: shown to the client themselves (never to a coach acting as them) once the
           intake waiver is done, until both steps are finished or they say "Not now". After that, a
@@ -1024,6 +1041,8 @@ export default async function GroupHubPage(
                 wellnessCheckin={wellnessCheckin}
                 mealLine={mealLine}
                 eaten={dayEaten}
+                // Log food (CL10): today, for anyone who can log food on Nutrition (food tracking on), whatever their tier
+                foodTile={isToday && foodTrackingOn}
                 sessionsLeft={sessionsLeft}
                 bookHref={bookHref}
                 doneSessionByWorkout={doneSessionByWorkout}

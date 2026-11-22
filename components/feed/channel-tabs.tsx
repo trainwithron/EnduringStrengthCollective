@@ -1,22 +1,26 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { FEED_CHANNEL_LABELS, type FeedChannel } from "@/lib/types";
+import { ALL_FEED_CHANNELS } from "@/lib/feed-channels";
 
-// Team Chat is more conversational/casual than the other 4 by design, not just in
-// copy — same channel machinery underneath, so it sits last, past the
-// more purposeful channels. The labels are the app's one set (lib/types.ts).
-const CHANNELS: FeedChannel[] = ["announcements", "form_checks", "pr_board", "general", "team_chat"];
-
+// The feed's channel tabs. Which ones show is lib/feed-channels.ts (CL17, Nov 21): the channels with posts, the open one, General and, for a coach, Announcements; the empty ones
+// are behind "More". Team Chat is more conversational than the others by design, so where it shows (a team-sport group) it sits last. The labels are the app's one set (lib/types.ts).
 export function ChannelTabs({
   basePath,
   active,
+  channels,
+  more = [],
 }: {
   basePath: string;
   active: FeedChannel;
+  channels: FeedChannel[];
+  more?: FeedChannel[];
 }) {
   const row = useRef<HTMLDivElement>(null);
+  const [showMore, setShowMore] = useState(false);
+  const shown = showMore ? [...channels, ...more].sort((a, b) => order(a) - order(b)) : channels;
 
   // The row scrolls sideways on a phone; the selected tab is brought into the middle so it is never off the right edge with nothing lit.
   useEffect(() => {
@@ -27,8 +31,8 @@ export function ChannelTabs({
   }, [active]);
 
   return (
-    <div ref={row} className="flex items-center gap-1 border-b border-steel/20 overflow-x-auto">
-      {CHANNELS.map((key) => (
+    <div ref={row} className="flex items-center gap-1 border-b border-steel/20 overflow-x-auto" data-channel-tabs>
+      {shown.map((key) => (
         <Link
           key={key}
           href={`${basePath}${basePath.includes("?") ? "&" : "?"}channel=${key}`}
@@ -42,6 +46,13 @@ export function ChannelTabs({
           {FEED_CHANNEL_LABELS[key]}
         </Link>
       ))}
+      {!showMore && more.length > 0 && (
+        <button type="button" onClick={() => setShowMore(true)} className="h-11 px-3 flex items-center font-body text-sm text-steel whitespace-nowrap shrink-0 active:text-chalk" data-more-channels>
+          More
+        </button>
+      )}
     </div>
   );
 }
+
+const order = (c: FeedChannel) => ALL_FEED_CHANNELS.indexOf(c);
