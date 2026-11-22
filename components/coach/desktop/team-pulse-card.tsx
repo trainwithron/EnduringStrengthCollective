@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { TeamPulseResult } from "@/lib/dashboard-data";
+import { membersHref } from "@/lib/coach-clients-nav";
 
 function pulseColor(pulse: number): string {
   if (pulse >= 70) return "text-positive";
@@ -15,7 +16,8 @@ function pulseColor(pulse: number): string {
 export function TeamPulseCard({ team }: { team: TeamPulseResult }) {
   return (
     <Link prefetch={false}
-      href={`/groups/${team.groupId}/dashboard`}
+      // the team's own roster (clutter audit DK11, Nov 21: no group dashboard in the navigation)
+      href={membersHref(team.groupId)}
       className="flex items-center justify-between border border-steel/30 bg-surface p-4 hover:border-rust/50 transition-colors"
     >
       <div>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { membersHref } from "@/lib/coach-clients-nav";
 
 export interface HomeGroupCardData {
   id: string;
@@ -13,12 +14,11 @@ export interface HomeGroupCardData {
 
 // Team/social groups keep their own identity front and center (unlike
 // 1-on-1 clients) — the group itself, not one member, is the thing being
-// navigated to. Lands on the same /dashboard destination the sidebar's
-// own "Dashboard" nav item already uses once inside a group.
+// navigated to. Opens the group's own roster (clutter audit DK11, Nov 21: there is no group dashboard in the navigation).
 export function HomeGroupCard({ group }: { group: HomeGroupCardData }) {
   return (
     <Link prefetch={false}
-      href={`/groups/${group.id}/dashboard`}
+      href={membersHref(group.id)}
       className="relative flex flex-col gap-1 border border-steel/30 bg-surface p-3 hover:border-rust/50 transition-colors"
     >
       {group.hasUnseenActivity && (

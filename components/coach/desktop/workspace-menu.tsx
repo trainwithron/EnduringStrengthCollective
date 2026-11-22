@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, ChevronDown, Plus } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { membersHref } from "@/lib/coach-clients-nav";
 
 interface WorkspaceGroup {
   id: string;
@@ -131,7 +132,8 @@ export function WorkspaceMenu({ groupId, orgName, large = false }: { groupId: st
     }
     setBusy(false);
     setOpen(false);
-    router.push(`/groups/${made.id}/dashboard`);
+    // the new group's own roster, not a third dashboard (clutter audit DK11, Nov 21)
+    router.push(membersHref(made.id));
   }
 
   const itemClass = "flex items-center h-10 px-3 font-body text-sm text-chalk hover:bg-surface active:text-rust-ink w-full text-left";
@@ -167,7 +169,7 @@ export function WorkspaceMenu({ groupId, orgName, large = false }: { groupId: st
               {groups.map((g) => (
                 <Link
                   key={g.id}
-                  href={`/groups/${g.id}/dashboard`}
+                  href={membersHref(g.id)}
                   role="menuitem"
                   onClick={() => setOpen(false)}
                   className={`${itemClass} justify-between`}

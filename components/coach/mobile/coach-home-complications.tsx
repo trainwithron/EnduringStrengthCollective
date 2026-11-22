@@ -50,8 +50,9 @@ export function CoachHomeComplications({
     <div className="flex overflow-x-auto snap-x snap-mandatory gap-2 pb-1">
       <QuickViewBubble
         title="Needs Attention"
-        deeperHref={`/groups/${groupId}/dashboard`}
-        deeperLabel="Open full Dashboard"
+        // a summary across the coach's clients: its full view is the coach's own Home (clutter audit DK11, Nov 21: no group dashboard)
+        deeperHref="/dashboard"
+        deeperLabel="Open Home"
         trigger={<Tile label="Needs attention" value={String(needsAttentionItems.length)} />}
       >
         {() =>

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
 import { ChevronDown, Plus, Search, Pencil } from "lucide-react";
+import { membersHref } from "@/lib/coach-clients-nav";
 
 type GroupKind = "one_on_one" | "social" | "team";
 
@@ -229,7 +230,8 @@ export function GroupSwitcher({
       }
     }
 
-    router.push(`/groups/${targetGroupId}/dashboard`);
+    // the group's own roster, not a third dashboard (clutter audit DK11, Nov 21; a one-on-one group's address opens the client list)
+    router.push(membersHref(targetGroupId));
   }
 
   async function handleCreateGroup() {
@@ -273,7 +275,7 @@ export function GroupSwitcher({
       return;
     }
 
-    router.push(`/groups/${made.id}/dashboard`);
+    router.push(membersHref(made.id));
   }
 
   const initials = groupName

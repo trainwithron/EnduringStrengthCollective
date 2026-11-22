@@ -189,3 +189,21 @@ describe("DK11 (round 2, Ron Nov 21): the group dashboard is out of the navigati
     expect(read("app/(coach)/groups/[groupId]/dashboard/page.tsx")).toContain("export default async function");
   });
 });
+
+describe("DK11: nothing lands on a group dashboard", () => {
+  it("picking or creating a group, and the group cards on Home, open the group's own roster; the needs-attention bubble's full view is Home", () => {
+    const sw = read("components/coach/desktop/group-switcher.tsx");
+    expect(sw).toContain("router.push(membersHref(targetGroupId));");
+    expect(sw).toContain("router.push(membersHref(made.id));");
+    const menu = read("components/coach/desktop/workspace-menu.tsx");
+    expect(menu).toContain("router.push(membersHref(made.id));");
+    expect(menu).toContain("href={membersHref(g.id)}");
+    expect(menu).toContain('<Link href="/dashboard" role="menuitem"');
+    expect(read("components/coach/desktop/home-group-card.tsx")).toContain("href={membersHref(group.id)}");
+    expect(read("components/coach/desktop/team-pulse-card.tsx")).toContain("href={membersHref(team.groupId)}");
+    expect(read("components/coach/mobile/coach-home-complications.tsx")).toContain('deeperHref="/dashboard"');
+    for (const f of ["components/coach/desktop/group-switcher.tsx", "components/coach/desktop/workspace-menu.tsx", "components/coach/desktop/home-group-card.tsx", "components/coach/desktop/team-pulse-card.tsx", "components/coach/mobile/coach-home-complications.tsx"]) {
+      expect(read(f), f).not.toMatch(/\/groups\/\$\{[^}]+\}\/dashboard/);
+    }
+  });
+});
