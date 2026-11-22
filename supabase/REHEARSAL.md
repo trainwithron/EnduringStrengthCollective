@@ -207,3 +207,32 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0331 | yes | yes | 10 | 0331 a payment event and its sessions are recorded in one step |
 | 0329 | yes | yes | 12 | 0329 every session costs exactly 1 credit; the waitlist offer uses the coach's time zone |
 | 0330 | yes | yes | 9 | 0330 only a real coach can have a public page |
+| 0422 | yes | yes | 58 | 0422 Request to train with me |
+| 0439 | yes | applies only | 0 | - |
+| 0440 | yes | applies only | 0 | - |
+| 0441 | yes | applies only | 0 | - |
+| 0442 | yes | applies only | 0 | - |
+| 0443 | yes | applies only | 0 | - |
+| 0444 | yes | applies only | 0 | - |
+| 0445 | yes | applies only | 0 | - |
+| 0446 | yes | applies only | 0 | - |
+| 0447 | yes | applies only | 0 | - |
+| 0448 | yes | applies only | 0 | - |
+| 0449 | yes | applies only | 0 | - |
+| 0450 | yes | applies only | 0 | - |
+| 0451 | yes | applies only | 0 | - |
+| 0452 | yes | applies only | 0 | - |
+| 0453 | yes | applies only | 0 | - |
+| 0454 | yes | applies only | 0 | - |
+| 0455 | yes | applies only | 0 | - |
+| 0456 | yes | applies only | 0 | - |
+| 0457 | yes | applies only | 0 | - |
+| 0458 | yes | applies only | 0 | - |
+| 0459 | yes | applies only | 0 | - |
+| 0460 | yes | applies only | 0 | - |
+| 0461 | yes | applies only | 0 | - |
+| 0462 | yes | applies only | 0 | - |
+| 0463 | yes | applies only | 0 | - |
+| 0464 | yes | applies only | 0 | - |
+| 0465 | yes | applies only | 0 | - |
+| 0466 | yes | applies only | 0 | - |
