@@ -207,3 +207,23 @@ describe("DK11: nothing lands on a group dashboard", () => {
     }
   });
 });
+
+describe("DK11 review: a coach with no Availability tab still has Suggestion settings; no empty column", () => {
+  it("Settings > Account shows them exactly where Availability is hidden: a team coach, a team-sport group, a team-only organization", () => {
+    const block = read("components/coach/desktop/suggestion-settings-no-availability.tsx");
+    expect(block).toContain('if (!force && !hiddenForCoach(navFacts, "availability")) return null;');
+    expect(block).toContain("<SuggestionSettings");
+    const settings = read("app/(coach)/groups/[groupId]/settings/page.tsx");
+    expect(settings).toContain('supabase.from("coach_preferences").select("suggestion_mode, suggestion_lead_days, suggestion_lead_mode, suggestion_lead_weekday").eq("coach_id", user.id).maybeSingle()');
+    expect(settings).toContain("suggestionForce = moneyHiddenFor({ coachLevel: false, groupIsTeamSport: isTeamSportGroup(");
+    expect(settings).toContain("{suggestionPrefs && <SuggestionSettingsWhereNoAvailability coachId={user.id} force={suggestionForce} prefs={suggestionPrefs} />}");
+    // the same rule the menus use to hide Availability
+    expect(read("lib/team-coach.ts")).toContain('"availability"');
+    expect(read("lib/desktop-coach-homes.ts")).toContain('const MONEY_TABS = new Set(["business", "leads", "waiver", "session-ledger", "packages", "availability",');
+  });
+  it("the group dashboard has a second column only with ?scope=all", () => {
+    const dash = read("app/(coach)/groups/[groupId]/dashboard/page.tsx");
+    expect(dash).toContain('${scopeAll ? "@4xl:grid @4xl:grid-cols-[minmax(0,1fr)_22rem] @4xl:gap-8 @4xl:items-start" : ""}');
+    expect(dash).toMatch(/\{scopeAll && \(\s*<div className="contents @4xl:block @4xl:col-start-2/);
+  });
+});

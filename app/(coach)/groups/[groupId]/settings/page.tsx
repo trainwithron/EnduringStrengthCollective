@@ -55,6 +55,8 @@ import { ReadDuringRestToggle } from "@/components/athlete/read-during-rest-togg
 import { ReadDuringRestSettings } from "@/components/coach/read-during-rest-settings";
 import { FAITH_PACK } from "@/lib/read-content";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
+import { SuggestionSettingsWhereNoAvailability, type SuggestionPrefs } from "@/components/coach/desktop/suggestion-settings-no-availability";
+import { isTeamSportGroup, moneyHiddenFor, orgIsTeamOnly } from "@/lib/team-sport";
 
 export const metadata = { title: "Settings" };
 
@@ -307,6 +309,20 @@ export default async function SettingsPage(
   const igHandle = isCoach && !viewingOther ? await readInstagramHandle(supabase, user.id) : null;
   // Beside it, "My page QR code" for a poster that opens the coach's public page (Oct 27): the code while the page is on and published, else where to turn it on. Nothing is switched on here.
   const myPageQr = isCoach && !viewingOther ? await readMyPageQr(supabase, user.id, params.groupId) : null;
+  // Suggestion settings for a coach who has no Availability tab (clutter audit DK11 review, Nov 21): the same coach_preferences read as Availability. Where the money tabs are
+  // hidden (a team-sport group, a team-only organization) they always show; for a team coach the block itself checks the menus' rule. A failed read shows nothing.
+  let suggestionPrefs: SuggestionPrefs | null = null;
+  let suggestionForce = false;
+  if (isCoach && !viewingOther) {
+    const orgId = (group as { organization_id?: string | null } | null)?.organization_id ?? null;
+    const [prefsRead, orgGroupsRead] = await Promise.all([
+      supabase.from("coach_preferences").select("suggestion_mode, suggestion_lead_days, suggestion_lead_mode, suggestion_lead_weekday").eq("coach_id", user.id).maybeSingle(),
+      orgId ? supabase.from("groups").select("team_mode").eq("organization_id", orgId).limit(500) : Promise.resolve({ data: [] as { team_mode: boolean | null }[], error: null }),
+    ]);
+    if (!prefsRead.error) suggestionPrefs = (prefsRead.data as SuggestionPrefs | null) ?? {};
+    const orgTeamOnly = !orgGroupsRead.error && orgIsTeamOnly((orgGroupsRead.data ?? []) as { team_mode?: boolean | null }[]);
+    suggestionForce = moneyHiddenFor({ coachLevel: false, groupIsTeamSport: isTeamSportGroup((group as { team_mode?: boolean | null } | null)?.team_mode), orgTeamOnly });
+  }
   const coachingGroup = isCoach ? (
     <SettingsGroup label="Coaching">
             {/* In their own space the phone IS their app (Release 2): the layout switch (tablets only) and the app download. No "Coach home" link anywhere: the group dashboard is out of the navigation (clutter audit DK11, Nov 21). */}
@@ -316,6 +332,7 @@ export default async function SettingsPage(
                 <DownloadAppButton />
               </div>
             )}
+            {suggestionPrefs && <SuggestionSettingsWhereNoAvailability coachId={user.id} force={suggestionForce} prefs={suggestionPrefs} />}
             <div className="mt-4 pt-4 border-t border-steel/15">
               <GoogleCalendarConnection
                 groupId={params.groupId}

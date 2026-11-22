@@ -291,8 +291,9 @@ export default async function CoachDashboardPage(
           scopeAll) view. Only show it inline when the coach has
           explicitly asked for the cross-group picture, which the
           shell's single-group strip can't provide. */}
-      {/* With room (@4xl): the activity feed on the left, the cross-group panel and the suggestion settings on the right. Narrower, the same order as always (display: contents + order). Layout audit #10. */}
-      <div className="flex flex-col @4xl:grid @4xl:grid-cols-[minmax(0,1fr)_22rem] @4xl:gap-8 @4xl:items-start">
+      {/* The activity feed, and only with ?scope=all the cross-group panel beside it (with room, @4xl; narrower, the same order as always: display: contents + order, layout audit #10).
+          The suggestion settings that sat there are on Calendar > Availability (clutter audit DK11, Nov 21), so without scope=all there is no second column. */}
+      <div className={`flex flex-col ${scopeAll ? "@4xl:grid @4xl:grid-cols-[minmax(0,1fr)_22rem] @4xl:gap-8 @4xl:items-start" : ""}`}>
       <div className="order-2 min-w-0 @4xl:col-start-1 @4xl:row-start-1">
       <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
         Recent activity
@@ -357,10 +358,11 @@ export default async function CoachDashboardPage(
       )}
       </div>
 
-      <div className="contents @4xl:block @4xl:col-start-2 @4xl:row-start-1 @4xl:space-y-8 min-w-0">
-      {scopeAll && <div className="order-1"><NeedsAttentionPanel coachId={user.id} items={needsAttentionItems} /></div>}
-
-      </div>
+      {scopeAll && (
+        <div className="contents @4xl:block @4xl:col-start-2 @4xl:row-start-1 @4xl:space-y-8 min-w-0">
+          <div className="order-1"><NeedsAttentionPanel coachId={user.id} items={needsAttentionItems} /></div>
+        </div>
+      )}
       </div>
     </CoachDesktopShell>
   );
