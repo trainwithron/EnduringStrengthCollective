@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Play, Video, X } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -30,6 +30,19 @@ import {
   type CatalogMachine,
   type CatalogRequestRow,
 } from "@/lib/machine-catalog";
+import {
+  allTicked,
+  demoFailedLine,
+  demoTicksNeeded,
+  hasDemo,
+  machineSuggestions,
+  matchesLine,
+  mergeMachineExercises,
+  planDemoCarry,
+  sameMachine,
+  tickedRows,
+  toggleAll,
+} from "@/lib/machine-add-suggest";
 import { useSignedVideoUrls } from "./use-signed-video-urls";
 import type { LibraryExerciseRow } from "./exercise-library-list";
 
@@ -83,6 +96,8 @@ export function MachineCatalogSection({
   const [pendingCount, setPendingCount] = useState<number | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  // What didn't come along with a save (the ticked demos of a new machine that didn't attach); the save itself went through.
+  const [warning, setWarning] = useState<string | null>(null);
 
   const loadRequests = useCallback(async () => {
     const supabase = createBrowserClient();
@@ -118,8 +133,9 @@ export function MachineCatalogSection({
     setMessage(`${catalogMachineName(m)} is in your machines below, with its QR code.`);
   }
 
-  async function sent(text: string) {
+  async function sent(text: string, warn: string | null = null) {
     setMessage(text);
+    setWarning(warn);
     await Promise.all([reload(), loadRequests()]);
     onListChanged?.();
   }
@@ -149,6 +165,7 @@ export function MachineCatalogSection({
         onChange={(e) => {
           setQuery(e.target.value);
           setMessage(null);
+          setWarning(null);
         }}
         placeholder="Search, for example Viking press or Hammer Strength"
         className="w-full h-11 bg-graphite border border-steel/30 text-chalk px-3 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
@@ -215,17 +232,26 @@ export function MachineCatalogSection({
           {message}
         </p>
       )}
+      {warning && (
+        <p className="font-body text-sm text-rust-ink" role="alert" data-demo-carry-failed>
+          {warning}
+        </p>
+      )}
 
       {suggesting ? (
         <MachineRequestForm
           key={`${suggesting.brand}|${suggesting.model}`}
+          coachId={coachId}
           isAdmin={isAdmin}
+          // Ron's own exercises named after the machine, offered as he types: only on the admin page (a coach's form, and the coach Exercise library, are unchanged)
+          suggestFrom={isAdmin && curateOnly ? library : null}
+          catalog={catalog}
           initialBrand={suggesting.brand}
           initialModel={suggesting.model}
           onCancel={() => setSuggesting(null)}
-          onSent={async (text) => {
+          onSent={async (text, warn) => {
             setSuggesting(null);
-            await sent(text);
+            await sent(text, warn);
           }}
         />
       ) : (
@@ -375,6 +401,32 @@ async function sendRequest(row: Record<string, unknown>, isAdmin: boolean): Prom
   return { ok: true };
 }
 
+// One of the admin's own demos onto an exercise on the shared list ("Or use one of my demos", and the ticked exercises of a new machine): a YouTube link is used as it is; an uploaded
+// video is copied inside storage into the shared list's bucket (no upload from the phone again), so changing the exercise's own demo later never takes it off the list. The caller
+// has checked the permission ticks first.
+async function sendMyDemo({
+  coachId,
+  isAdmin,
+  itemId,
+  row,
+}: {
+  coachId: string;
+  isAdmin: boolean;
+  itemId: string;
+  row: { videoPath: string | null; youtubeUrl: string | null };
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (row.videoPath) {
+    const ext = row.videoPath.split(".").pop()?.toLowerCase() || "mp4";
+    const to = `${coachId}/${crypto.randomUUID()}.${ext}`;
+    const { error: copyError } = await createBrowserClient().storage.from("exercise-media").copy(row.videoPath, to, { destinationBucket: MACHINE_DEMOS_BUCKET });
+    if (copyError) return { ok: false, error: "Couldn't use that video. Try again, or record it." };
+    return sendRequest({ submitted_by: coachId, kind: "demo", item_id: itemId, video_path: to, rights_confirmed: true, subject_consent: true }, isAdmin);
+  }
+  const url = catalogYoutubeLink(row.youtubeUrl ?? "");
+  if (!url) return { ok: false, error: "That demo's link isn't a YouTube video link." };
+  return sendRequest({ submitted_by: coachId, kind: "demo", item_id: itemId, youtube_url: url, rights_confirmed: true }, isAdmin);
+}
+
 const RIGHTS_LABEL = "I filmed this video and have the right to share it";
 // Ron, Nov 20 (S4): the person on camera, not only the filmer, agreed (a client, possibly a minor, could be in a video every gym sees). Required for a filmed video, with its own
 // column (catalog_requests.subject_consent, step 211). A YouTube link plays from its owner's channel, so it gets its own wording instead of "I filmed this".
@@ -490,30 +542,14 @@ function DemoRequestForm({
     await onSent(done);
   }
 
-  // The admin's own demo: a YouTube link is used as it is; an uploaded video is copied inside storage into the shared list's bucket (no upload from the phone again), so changing the
-  // exercise's own demo later never takes it off the list.
+  // The admin's own demo, through sendMyDemo (below).
   async function sendMine() {
     const row = myDemos.find((e) => e.id === mine);
     if (!row || !(row.videoPath ? needRights() : needLinkRights())) return;
     setError(null);
     setStage("send");
     setProgress(0);
-    if (row.videoPath) {
-      const ext = row.videoPath.split(".").pop()?.toLowerCase() || "mp4";
-      const to = `${coachId}/${crypto.randomUUID()}.${ext}`;
-      const { error: copyError } = await createBrowserClient().storage.from("exercise-media").copy(row.videoPath, to, { destinationBucket: MACHINE_DEMOS_BUCKET });
-      if (copyError) {
-        setProgress(null);
-        return setError("Couldn't use that video. Try again, or record it.");
-      }
-      return sendVideoPath(to);
-    }
-    const url = catalogYoutubeLink(row.youtubeUrl ?? "");
-    if (!url) {
-      setProgress(null);
-      return setError("That demo's link isn't a YouTube video link.");
-    }
-    const r = await sendRequest({ submitted_by: coachId, kind: "demo", item_id: item.id, youtube_url: url, rights_confirmed: true }, isAdmin);
+    const r = await sendMyDemo({ coachId, isAdmin, itemId: item.id, row });
     setProgress(null);
     if (!r.ok) return setError(r.error);
     await onSent(done);
@@ -639,18 +675,26 @@ function DemoRequestForm({
 }
 
 // A new machine (or more exercises for one already on the list): brand, model, and the exercises done on it, each one from the exercise catalog or a new name.
+// On the admin page, `suggestFrom` is the admin's own exercises: while the brand or the machine's name is typed, the ones named with it are listed, ticked, and the ticked ones go on
+// the machine with their demos (Ron, Nov 21). null everywhere else.
 function MachineRequestForm({
+  coachId,
   isAdmin,
+  suggestFrom,
+  catalog,
   initialBrand,
   initialModel,
   onCancel,
   onSent,
 }: {
+  coachId: string;
   isAdmin: boolean;
+  suggestFrom: LibraryExerciseRow[] | null;
+  catalog: CatalogMachine[];
   initialBrand: string;
   initialModel: string;
   onCancel: () => void;
-  onSent: (text: string) => Promise<void>;
+  onSent: (text: string, warning: string | null) => Promise<void>;
 }) {
   const [brand, setBrand] = useState(initialBrand);
   const [model, setModel] = useState(initialModel);
@@ -659,6 +703,30 @@ function MachineRequestForm({
   const [names, setNames] = useState<{ id: string; name: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The matches he unticked (a match starts ticked), and the permission ticks the ticked demos need.
+  const [unticked, setUnticked] = useState<Set<string>>(() => new Set());
+  const [rights, setRights] = useState(false);
+  const [consent, setConsent] = useState(false);
+  const [linkRights, setLinkRights] = useState(false);
+
+  // Typing stays quick: the list follows the typing a moment behind, and is worked out only when the words change (the library is already here, nothing is read).
+  const brandSoon = useDeferredValue(brand);
+  const modelSoon = useDeferredValue(model);
+  const onList = catalog.find((m) => sameMachine(m, { brand: brandSoon, model: modelSoon }));
+  const matches = useMemo(
+    () =>
+      machineSuggestions({
+        show: !!suggestFrom,
+        library: suggestFrom ?? [],
+        brand: brandSoon,
+        model: modelSoon,
+        skipNames: [...(onList?.items.map((i) => i.name) ?? []), ...exercises.map((e) => e.name)],
+      }),
+    [suggestFrom, brandSoon, modelSoon, onList, exercises],
+  );
+  const ticked = tickedRows(matches, unticked);
+  const ticksNeeded = demoTicksNeeded(ticked);
+  const everyTicked = allTicked(matches, unticked);
 
   useEffect(() => {
     void createBrowserClient()
@@ -683,15 +751,53 @@ function MachineRequestForm({
   }
 
   async function send() {
-    const cleaned = cleanMachineRequest({ brand, model, exercises });
+    // The ticked exercises (shown only on the admin page; none anywhere else) come first, then the typed ones.
+    const cleaned = cleanMachineRequest({ brand, model, exercises: mergeMachineExercises(ticked, exercises, names) });
     if (!cleaned.ok) return setError(cleaned.error);
+    // Their demos ask for the same ticks "use one of my demos" does.
+    if (ticksNeeded.video && !rights) return setError(`Tick "${RIGHTS_LABEL}" first, or untick the exercises with a video.`);
+    if (ticksNeeded.video && !consent) return setError(`Tick "${CONSENT_LABEL}" first, or untick the exercises with a video.`);
+    if (ticksNeeded.link && !linkRights) return setError(`Tick "${LINK_RIGHTS_LABEL}" first, or untick the exercises with a YouTube link.`);
+    const priorItemIds = catalog.find((m) => sameMachine(m, cleaned))?.items.map((i) => i.id) ?? [];
     setBusy(true);
     setError(null);
     const r = await sendRequest({ kind: "machine", brand: cleaned.brand, model: cleaned.model, exercises: cleaned.exercises }, isAdmin);
-    setBusy(false);
-    if (!r.ok) return setError(r.error);
+    if (!r.ok) {
+      setBusy(false);
+      return setError(r.error);
+    }
     const label = `${cleaned.brand} ${cleaned.model}`;
-    await onSent(isAdmin ? `${label} is on the shared list.` : `Sent. Spotlight reviews ${label}; you'll see the answer under Your requests.`);
+    // The machine is on the list now. Each ticked demo goes onto its new exercise there, the same way "use one of my demos" does; one that fails is named, the rest stay.
+    const failed: string[] = [];
+    if (isAdmin && ticked.some(hasDemo)) {
+      const { data, error: readError } = await createBrowserClient().from("catalog_machines").select(CATALOG_SELECT).order("brand").order("model").limit(1000);
+      const saved = readError ? null : catalogFromRows((data ?? []) as never).find((m) => sameMachine(m, cleaned));
+      const plan = planDemoCarry(ticked, saved?.items ?? null, priorItemIds);
+      for (const row of plan.missing) failed.push(row.name);
+      for (const { itemId, row } of plan.carry) {
+        const d = await sendMyDemo({ coachId, isAdmin, itemId, row });
+        if (!d.ok) failed.push(row.name);
+      }
+    }
+    setBusy(false);
+    await onSent(isAdmin ? `${label} is on the shared list.` : `Sent. Spotlight reviews ${label}; you'll see the answer under Your requests.`, demoFailedLine(failed));
+  }
+
+  function tickBox(on: boolean, onChange: (v: boolean) => void, label: string) {
+    return (
+      <label className="flex items-start gap-3 min-h-11 font-body text-sm text-chalk">
+        <input
+          type="checkbox"
+          checked={on}
+          onChange={(e) => {
+            onChange(e.target.checked);
+            setError(null);
+          }}
+          className="w-5 h-5 mt-0.5 accent-rust shrink-0"
+        />
+        <span>{label}</span>
+      </label>
+    );
   }
 
   return (
@@ -712,6 +818,52 @@ function MachineRequestForm({
           <input type="text" value={model} maxLength={80} onChange={(e) => setModel(e.target.value)} placeholder="Viking Press" className="mt-1 w-full h-11 bg-graphite border border-steel/30 text-chalk px-3 font-body text-base sm:text-sm focus:outline-none focus:border-rust" />
         </label>
       </div>
+      {matches.length > 0 && (
+        <div className="space-y-2" data-machine-suggest>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-body text-xs text-steel" role="status">
+              {matchesLine(matches.length)}. Ticked ones go on this machine{ticked.some(hasDemo) ? ", with their demos" : ""}.
+            </p>
+            <button type="button" onClick={() => setUnticked((prev) => toggleAll(matches, prev))} className="min-h-11 px-2 font-body text-xs text-rust-ink shrink-0">
+              {everyTicked ? "Untick all" : "Tick all"}
+            </button>
+          </div>
+          <ul className="max-h-80 overflow-y-auto border border-steel/20 divide-y divide-steel/15">
+            {matches.map((m) => (
+              <li key={m.id}>
+                <label className="flex items-center gap-3 min-h-11 px-3 py-1 font-body text-sm text-chalk cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!unticked.has(m.id)}
+                    onChange={(e) => {
+                      const on = e.target.checked;
+                      setUnticked((prev) => {
+                        const next = new Set(prev);
+                        if (on) next.delete(m.id);
+                        else next.add(m.id);
+                        return next;
+                      });
+                      setError(null);
+                    }}
+                    className="w-5 h-5 accent-rust shrink-0"
+                  />
+                  <span className="flex-1 min-w-0 break-words">
+                    {m.name}
+                    {hasDemo(m) && <span className="block font-body text-xs text-steel">{m.videoPath ? "Its video comes along" : "Its YouTube link comes along"}</span>}
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          {ticksNeeded.video && (
+            <>
+              {tickBox(rights, setRights, RIGHTS_LABEL)}
+              {tickBox(consent, setConsent, CONSENT_LABEL)}
+            </>
+          )}
+          {ticksNeeded.link && tickBox(linkRights, setLinkRights, `For the YouTube links: ${LINK_RIGHTS_LABEL.charAt(0).toLowerCase() + LINK_RIGHTS_LABEL.slice(1)}`)}
+        </div>
+      )}
       <div>
         <p className="font-body text-xs text-steel">Exercises done on it, in order</p>
         {exercises.length > 0 && (
