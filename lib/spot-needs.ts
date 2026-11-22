@@ -77,7 +77,8 @@ export function badgeCountOf(data: SpotNeeds | null): number | null {
 
 // Moving from page to page on a phone, the dot is not asked for again within a minute (it was asked for on every page). Opening Spotlight always asks. Kept per tab (sessionStorage),
 // for the organization it was read for, and cleared on sign-out.
-export const SPOT_NEEDS_CACHE_KEY = "spot-needs-cache-v1";
+// v2 (Nov 21, PH14): an answer kept before the count left out notices is never reused.
+export const SPOT_NEEDS_CACHE_KEY = "spot-needs-cache-v2";
 export const SPOT_NEEDS_CACHE_MS = 60_000;
 
 export function spotNeedsCacheEntry(data: SpotNeeds, org: string | null, now: number): string {

@@ -1013,7 +1013,9 @@ export default async function AthleteProfilePage(
   );
 
   // Where "Back" goes when there is no step back to take: Spotlight (which holds the client list) on a phone, the Clients page on a computer.
-  const backFallback = (await prefersAthleteStyleView()) ? PHONE_SPOTLIGHT : "/clients";
+  // The same device rule decides whether "View as client" (act-as) is offered: act-as is honoured only in the phone view.
+  const phoneView = await prefersAthleteStyleView();
+  const backFallback = phoneView ? PHONE_SPOTLIGHT : "/clients";
 
   let shellGroupId = params.groupId;
   let shellGroupName = group?.name ?? "Coaching";
@@ -1092,11 +1094,9 @@ export default async function AthleteProfilePage(
         {!selfView && (
           <div className="flex flex-wrap items-center gap-2 mt-4">
             <VideoCheckinRecorder athleteId={params.athleteId} groupId={params.groupId} coachId={user.id} />
-            {/* The one place "View as client" lives on a phone (PH11: it came off every Spotlight client row). Phone only: the computer has no act-as (3a34e6d4); its Program tab
-                keeps the read-only preview. Never on the coach's own profile. */}
-            <span className="lg:hidden contents">
-              <ViewAsClientButton athleteId={params.athleteId} groupId={params.groupId} name={profile?.full_name ?? "this client"} />
-            </span>
+            {/* The one place "View as client" lives on a phone (PH11: it came off every Spotlight client row). Phone view only, by the same rule act-as honours: the computer
+                has no act-as (3a34e6d4); its Program tab keeps the read-only preview. Never on the coach's own profile. */}
+            {phoneView && <ViewAsClientButton athleteId={params.athleteId} groupId={params.groupId} name={profile?.full_name ?? "this client"} />}
           </div>
         )}
       </div>

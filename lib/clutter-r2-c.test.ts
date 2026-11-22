@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ACTION_NOTICE_TYPES, SPOT_NEEDS_CACHE_MS, SPOT_NEEDS_TIMEOUT_MS, badgeCountOf, spotCount, type SpotNeeds } from "./spot-needs";
+import { ACTION_NOTICE_TYPES, SPOT_NEEDS_CACHE_KEY, SPOT_NEEDS_CACHE_MS, SPOT_NEEDS_TIMEOUT_MS, badgeCountOf, spotCount, type SpotNeeds } from "./spot-needs";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push() {}, refresh() {} }) }));
 
@@ -61,6 +61,8 @@ describe("PH14: notices live only in the bell", () => {
   });
   it("round 1's read stays as it was: a minute's memory, one read shared, 15 seconds, ?full=1 and never from a hidden tab", () => {
     expect(SPOT_NEEDS_CACHE_MS).toBe(60_000);
+    // a new key, so an answer kept before deploy (which counted notices) is never reused
+    expect(SPOT_NEEDS_CACHE_KEY).toBe("spot-needs-cache-v2");
     expect(SPOT_NEEDS_TIMEOUT_MS).toBe(15_000);
     expect(lib).toContain("if (inflight && (inflight.full || !full)) return inflight.request;");
     expect(lib).toContain('fetch(full ? "/api/coach/spot-needs?full=1" : "/api/coach/spot-needs"');
@@ -78,7 +80,7 @@ describe("PH11: View as client lives once, on the client's Profile page", () => 
     expect(panel).not.toContain("/api/coach/act-as");
     expect(panel).not.toContain("pendingClient");
   });
-  it("the button asks first, with the words the row used, then starts the view", async () => {
+  it("the button uses the coach's own word, asks first with the words the row used, then starts the view", async () => {
     const { ViewAsClientButton } = await import("@/components/coach/view-as-client-button");
     const html = renderToStaticMarkup(createElement(ViewAsClientButton, { athleteId: "a1", groupId: "g1", name: "Jane" }));
     expect(html).toContain("View as client");
@@ -89,12 +91,16 @@ describe("PH11: View as client lives once, on the client's Profile page", () => 
     expect(button).toContain("body: JSON.stringify({ athleteId, groupId })");
     expect(button).toContain("router.push(`/groups/${groupId}`);");
     expect(button.match(/min-h-11/g)?.length).toBe(3);
+    expect(button).toContain("const term = useTerm();");
+    expect(button).toContain("View as {term(\"client\")}");
   });
-  it("on the profile once, for a coach looking at a client (never their own profile), on the phone only (the computer has no act-as)", () => {
+  it("on the profile once, for a coach looking at a client (never their own profile), in the phone view only (the device rule act-as honours)", () => {
     expect(profile.match(/<ViewAsClientButton /g)?.length).toBe(1);
     const block = profile.slice(profile.lastIndexOf("{!selfView && (", profile.indexOf("<ViewAsClientButton ")), profile.indexOf("<ViewAsClientButton "));
     expect(block).toContain("<VideoCheckinRecorder");
-    expect(block).toContain('<span className="lg:hidden contents">');
+    expect(profile).toContain("const phoneView = await prefersAthleteStyleView();");
+    expect(profile).toContain("{phoneView && <ViewAsClientButton ");
+    expect(profile).not.toContain('<span className="lg:hidden contents">');
     // the computer keeps its read-only preview in the Program tab
     expect(profile).toContain('<span className="hidden lg:inline-flex">\n                        <ViewAsClientLink');
   });
