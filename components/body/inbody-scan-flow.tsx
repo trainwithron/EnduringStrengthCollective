@@ -5,8 +5,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { resizePhoto, type ResizedPhoto } from "@/lib/image-resize";
 import { EMPTY_SCAN, FIELD_LABELS, numberFromField, sanityChecks, valuesForSave, type Check, type ScanValues } from "@/lib/inbody-scan";
 
-export type InbodyStep = "pick" | "reading" | "review" | "saving";
-type Step = InbodyStep;
+type Step = "pick" | "reading" | "review" | "saving";
 
 // A reading that never answers must not leave the person waiting (Nov 21): after this long it stops, and the same screen opens blank to type the numbers in, with the photo kept.
 export const READ_TIMEOUT_MS = 60_000;
@@ -28,8 +27,6 @@ export function InbodyScanFlow({
   athleteName,
   onSaved,
   onClose,
-  onStepChange,
-  framed = true,
 }: {
   athleteId: string;
   groupId: string;
@@ -37,21 +34,14 @@ export function InbodyScanFlow({
   athleteName: string;
   onSaved: () => void;
   onClose: () => void;
-  // Told where the flow is, so a pop-up around it knows when closing would lose work (the InBody tile on Home).
-  onStepChange?: (step: InbodyStep) => void;
-  // false inside a pop-up, which is its own frame.
-  framed?: boolean;
 }) {
   const coachAdding = viewerId !== athleteId;
   // Two ways in (Ron, Nov 21): the camera (capture) or the phone's photos (no capture, so the gallery opens).
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<Step>("pick");
-  const frame = framed ? "border border-steel/20 p-4" : "";
-  useEffect(() => {
-    onStepChange?.(step);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step]);
+  // (it always sits in the scans list now, in its own frame: Home's InBody pop-up is gone, CL10 Nov 21)
+  const frame = "border border-steel/20 p-4";
   const [photo, setPhoto] = useState<ResizedPhoto | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
