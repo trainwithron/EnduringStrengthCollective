@@ -230,7 +230,7 @@ export default async function BusinessDashboardPage(
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
           A snapshot of this organization.{" "}
           {realMRR > 0 || realIncomeThisMonth > 0
-            ? "Income and MRR below are real, from your connected packages."
+            ? "Income and monthly revenue below are real, from your connected packages."
             : "Set up packages to see real income and monthly recurring revenue here. Until then, the rates you set below give an estimate."}
         </p>
       </div>
@@ -245,7 +245,7 @@ export default async function BusinessDashboardPage(
           so the last row doesn't leave an odd single tile stranded). */}
       <div className="mb-4">
         <StatHeroTile
-          label={realMRR > 0 ? "MRR" : "Estimated MRR"}
+          label={realMRR > 0 ? "Monthly revenue" : "Estimated monthly revenue"}
           value={`$${headlineMrr(realMRR, estimatedMRR).value.toLocaleString()}`}
           detail={realMRR > 0 ? "From active subscriptions — the clearest signal of business health" : "From rates set below — set up packages for a real number"}
         />
