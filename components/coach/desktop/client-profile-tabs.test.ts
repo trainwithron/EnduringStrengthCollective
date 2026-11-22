@@ -69,7 +69,8 @@ describe("the profile page", () => {
     expect(actions).not.toMatch(/>\s*Log/);
     // Back returns where the coach came from (the Clients page, or Spotlight on a phone, when there is no step back), and says just "Back"
     expect(page).toContain("<BackLink fallbackHref={backFallback}");
-    expect(page).toContain("(await prefersAthleteStyleView()) ? PHONE_SPOTLIGHT : \"/clients\"");
+    expect(page).toContain("const phoneView = await prefersAthleteStyleView();");
+    expect(page).toContain("const backFallback = phoneView ? PHONE_SPOTLIGHT : \"/clients\";");
     expect(page).toMatch(/&larr; Back\s*<\/BackLink>/);
     expect(page).not.toContain("Back to clients");
   });

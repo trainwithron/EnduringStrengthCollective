@@ -12,11 +12,12 @@ describe("the client profile loads its data in three waves, not one query after 
   it("every top-level wait that is left is a batch (Promise.all), the auth/params, or a retry after an error", () => {
     const lines = dataPart.split("\n").filter((l) => /^  (const|let) .*= await |^  await /.test(l) || /^  \] = await Promise\.all/.test(l));
     const serial = lines.filter((l) => !/Promise\.all/.test(l));
-    // params, searchParams, server client, auth user - and nothing else at the top level.
+    // params, searchParams, server client, auth user - and nothing else at the top level (the phone-view check reads only cookies and headers, no database; PH11).
     expect(serial.map((l) => l.trim())).toEqual([
       "const params = await props.params;",
       "const searchParamsResolved = await props.searchParams;",
       "const supabase = await createServerClient();",
+      "const phoneView = await prefersAthleteStyleView();",
     ]);
     expect((dataPart.match(/\] = await Promise\.all\(/g) ?? []).length).toBe(3);
   });

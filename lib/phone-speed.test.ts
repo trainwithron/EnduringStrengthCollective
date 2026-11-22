@@ -111,7 +111,7 @@ describe("group 2", () => {
     expect(hub).toContain("if (!opening) {");
     expect(hub).toContain("readSpotNeedsCache(window.sessionStorage.getItem(SPOT_NEEDS_CACHE_KEY), org, Date.now())");
     expect(read("components/group/sign-out-button.tsx")).toContain("window.sessionStorage.removeItem(SPOT_NEEDS_CACHE_KEY)");
-    expect(SPOT_NEEDS_CACHE_KEY).toBe("spot-needs-cache-v1");
+    expect(SPOT_NEEDS_CACHE_KEY).toBe("spot-needs-cache-v2"); // v2 since PH14 (the count left out notices)
     expect(read("app/api/coach/spot-needs/route.ts")).toContain("await Promise.all([getActiveAnchor(supabase, user.id), supabase.from(\"profiles\").select(\"timezone\")");
   });
   it("B4: a phone never mounts the side panel or the chat tab, and never reads the desktop badges", () => {

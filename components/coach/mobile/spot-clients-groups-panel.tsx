@@ -55,7 +55,8 @@ async function getCurrentOrgId(supabase: ReturnType<typeof createBrowserClient>,
 // fromHub: the Spotlight hub has its own organization dropdown and gives this panel the group of the organization it chose. The panel then follows that group's organization, ignores
 // its own remembered one, hides its own organization tabs (one selector, one answer) and does not write its memory, so clients are never listed or created in a different
 // organization from the one the hub's header names.
-// The one client list on a phone (PH9): each row has Log their workout (the main button), Profile and Message (and View as client), and the header links Requests and Check-ins.
+// The one client list on a phone (PH9): each row has Log their workout (the main button), Profile and Message, and the header links Requests and Check-ins.
+// "View as client" is not on the rows (Nov 21, PH11): it lives once, on the client's Profile page (components/coach/view-as-client-button.tsx).
 // requestsWaiting / checkinsToReview: the numbers Spotlight already read (lib/spot-needs.ts), shown beside those links when known.
 export function SpotClientsGroupsPanel({
   groupId,
@@ -79,12 +80,6 @@ export function SpotClientsGroupsPanel({
   const [groups, setGroups] = useState<CoachedGroupOption[] | null>(null);
   const [orgs, setOrgs] = useState<{ id: string; name: string }[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
-  // overnight_comprehensive_polish_pass_sept19_20.md, finding #2 — this
-  // tap starts real account impersonation (the coach sees and writes as
-  // this client from here on, until they exit), a categorically
-  // different action from desktop's "Client Profile" button, which only
-  // opens a read-only page. A one-tap confirm, matching Ron's own call.
-  const [pendingClient, setPendingClient] = useState<ListedClient | null>(null);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
   // + New group opens the small form (PH12: a setup task, folded away from the daily list).
@@ -168,11 +163,6 @@ export function SpotClientsGroupsPanel({
     };
   }, [clientAnchorGroup, groups]);
 
-  function requestActAsClient(client: ListedClient) {
-    if (busy) return;
-    setPendingClient(client);
-  }
-
   // Primary action: the explicit in-person log route (athlete comes from
   // the URL, coach-role checked, "Logging for X", marked coach-logged).
   function logSessionFor(client: ListedClient) {
@@ -187,16 +177,6 @@ export function SpotClientsGroupsPanel({
     if (busy) return;
     onNavigated();
     router.push(`/groups/${client.groupId}/athletes/${client.id}`);
-  }
-
-  async function confirmActAsClient() {
-    if (!pendingClient || busy) return;
-    const client = pendingClient;
-    setBusy(true);
-    await fetch("/api/coach/act-as", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ athleteId: client.id, groupId: client.groupId }) });
-    onNavigated();
-    router.push(`/groups/${client.groupId}`);
-    router.refresh();
   }
 
   // The conversation with this client (the same page the Clients page's Message opens).
@@ -291,36 +271,6 @@ export function SpotClientsGroupsPanel({
     } catch {
       // Non-fatal.
     }
-  }
-
-  if (pendingClient) {
-    return (
-      <div>
-        <p className="font-body text-sm text-chalk mb-1">View as {pendingClient.fullName}?</p>
-        <p className="font-body text-xs text-steel mb-4">
-          You&apos;ll see their real data, and anything you log from here on is attributed to them — until you
-          exit this view.
-        </p>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={confirmActAsClient}
-            className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-50"
-          >
-            View as {pendingClient.fullName}
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => setPendingClient(null)}
-            className="font-body text-sm text-steel disabled:opacity-50"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    );
   }
 
   return (
@@ -443,14 +393,6 @@ export function SpotClientsGroupsPanel({
                     className="flex-1 h-11 px-2 border border-steel/30 text-chalk font-body text-xs disabled:opacity-50 active:border-rust/50"
                   >
                     Message
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => requestActAsClient(c)}
-                    className="flex-1 h-11 px-2 border border-steel/30 text-steel font-body text-xs disabled:opacity-50 active:border-rust/50"
-                  >
-                    View as client
                   </button>
                 </div>
               </div>

@@ -5,7 +5,8 @@ import { SPOT_NEEDS_CACHE_KEY, badgeCountOf, fetchSpotNeeds, readSpotNeedsCache,
 import { ACTIVE_ORG_COOKIE, readBrowserCookie } from "@/lib/active-org";
 
 // The number on the installed app's icon (Ron, Nov 20, wave 3 C10; Nov 21, PH1: the same number as the Spotlight dot and "Waiting for you (n)", from the same answer, lib/spot-needs.ts).
-// Where the device supports app badges (an installed app on most phones and desktops), the icon shows how many things wait for the coach, and nothing when there are none. Anywhere else
+// Where the device supports app badges (an installed app on most phones and desktops), the icon shows how many things wait for the coach to act on (Nov 21, PH14: not the bell's notices,
+// so the icon, the dot and "Waiting for you (n)" stay one number), and nothing when there are none. Anywhere else
 // this does nothing. Checked when a coach page opens, once when the app comes back to the front, and every five minutes while it is on screen (never in a hidden tab; an answer under a
 // minute old is used again).
 // Spotlight also sets it each time it reads what is waiting. Draws nothing.

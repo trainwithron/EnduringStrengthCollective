@@ -1,18 +1,10 @@
 // What the Spotlight button carries on a coach's phone (Ron, Oct 19: "that could be our notification bell ... just like a dull fading in and out. Or a dot."):
-// what "Waiting for you" lists, for the organization the coach is working in: requests waiting on the coach's answer (sessions asked for or moved, late cancels and moves, weekly-schedule
-// changes, people asking to train), weekly check-ins to review, sessions waiting for "did it happen" and unread notices. The button shows a small dot with the count when there is anything;
+// what "Waiting for you" lists to act on, for the organization the coach is working in: requests waiting on the coach's answer (sessions asked for or moved, late cancels and moves,
+// weekly-schedule changes, people asking to train), weekly check-ins to review and sessions waiting for "did it happen". The button shows a small dot with the count when there is anything;
 // when something NEW arrived since the coach last opened Spotlight it fades in and out gently twice, then stays a dot.
-// One number everywhere (Nov 21, PH1): the dot, "Waiting for you (n)" and the app icon's badge all show spotCount. One thing counts once (PH2): a message counts by its notice (the fold
-// lists the notice, not the message), and a notice about a request or a check-in is not counted again beside the request or check-in it is about.
+// One number everywhere (Nov 21, PH1): the dot, "Waiting for you (n)" and the app icon's badge all show spotCount.
+// Notices live only in the bell beside Spotlight (Nov 21, PH14): "Waiting for you" no longer lists them and they are not in this number; the bell shows its own unread count.
 import { REQUEST_NOTICE_TYPES } from "@/lib/notice-links";
-
-export interface SpotNotice {
-  id: string;
-  type: string;
-  body: string;
-  linkPath: string;
-  createdAt: string;
-}
 
 export interface SpotNeeds {
   needsChoice: boolean;
@@ -22,7 +14,6 @@ export interface SpotNeeds {
   // startHref: the workout itself when the client's Log page would offer exactly one "Start" (PH24); otherwise null and the button opens the Log page.
   next: { athleteId: string; groupId: string; startIso: string; name: string; hasProgram: boolean; startHref?: string | null } | null;
   open: { sessionId: string; athleteId: string; groupId: string; startedIso: string; name: string } | null;
-  notices: SpotNotice[];
   // The Requests page's own "waiting" number (PH1, PH3); 0 when it could not be read.
   requestsWaiting: number;
   // Weekly check-ins waiting for review, as the Check-ins page counts them; 0 when it could not be read.
@@ -32,15 +23,13 @@ export interface SpotNeeds {
   newestAt: string | null;
 }
 
-// Notices already counted by their own row: the request or the check-in they are about.
-const COUNTED_ELSEWHERE = new Set<string>([...REQUEST_NOTICE_TYPES, "weekly_checkin"]);
+// The notices about something counted here (a request or a check-in). They are not counted or listed (PH14); the newest unread one only tells the button that a new request or
+// check-in arrived (the gentle fade).
+export const ACTION_NOTICE_TYPES: readonly string[] = [...REQUEST_NOTICE_TYPES, "weekly_checkin"];
 
-export function countedNotices(notices: Pick<SpotNotice, "type">[]): number {
-  return notices.filter((n) => !COUNTED_ELSEWHERE.has(n.type)).length;
-}
-
-export function spotCount(n: Pick<SpotNeeds, "sessionsToCheck" | "notices" | "requestsWaiting" | "checkinsToReview">): number {
-  return n.sessionsToCheck.length + countedNotices(n.notices) + Math.max(0, n.requestsWaiting || 0) + Math.max(0, n.checkinsToReview || 0);
+// Only what "Waiting for you" lists to act on; never a notice (PH14).
+export function spotCount(n: Pick<SpotNeeds, "sessionsToCheck" | "requestsWaiting" | "checkinsToReview">): number {
+  return n.sessionsToCheck.length + Math.max(0, n.requestsWaiting || 0) + Math.max(0, n.checkinsToReview || 0);
 }
 
 // The workout "Start <name>'s workout" opens straight into (PH24): only when the Log page would offer exactly one "Start" choice; otherwise null (the Log page, which offers the choice).
@@ -80,7 +69,7 @@ export function fetchSpotNeeds(full = false): Promise<SpotNeeds | null> {
   return request;
 }
 
-// The number on the app icon for an answer: the same count as the dot (null when the coach still has to choose an organization: the icon is left as it was).
+// The number on the app icon for an answer: the same count as the dot, so action items only, never the bell's notices (PH14; null when the coach still has to choose an organization: the icon is left as it was).
 export function badgeCountOf(data: SpotNeeds | null): number | null {
   if (!data || data.needsChoice || typeof data.count !== "number") return null;
   return data.count;
@@ -88,7 +77,8 @@ export function badgeCountOf(data: SpotNeeds | null): number | null {
 
 // Moving from page to page on a phone, the dot is not asked for again within a minute (it was asked for on every page). Opening Spotlight always asks. Kept per tab (sessionStorage),
 // for the organization it was read for, and cleared on sign-out.
-export const SPOT_NEEDS_CACHE_KEY = "spot-needs-cache-v1";
+// v2 (Nov 21, PH14): an answer kept before the count left out notices is never reused.
+export const SPOT_NEEDS_CACHE_KEY = "spot-needs-cache-v2";
 export const SPOT_NEEDS_CACHE_MS = 60_000;
 
 export function spotNeedsCacheEntry(data: SpotNeeds, org: string | null, now: number): string {
