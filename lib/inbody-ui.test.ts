@@ -79,8 +79,8 @@ describe("the review screen and the screens that hold it", () => {
     expect(section).toContain("Delete this scan and its photo? A weigh-in made from it stays in the weight log.");
     expect(section.indexOf('.remove([row.photo_path])')).toBeLessThan(section.indexOf('.from("body_scans").delete()'));
   });
-  it("it opens from the client's Home InBody tile, the scans are on My progress (CL1, Nov 21), and it is on the coach's Progress tab", () => {
-    expect(read("components/athlete/day-card.tsx")).toContain("<InbodyEntry athleteId={athleteId} groupId={groupId} sheetOnly />");
+  it("it is on the client's My progress (CL1 and CL10, Nov 21: no longer a Home tile) and on the coach's Progress tab", () => {
+    expect(read("components/athlete/day-card.tsx")).not.toContain("<InbodyEntry");
     expect(read("app/(coach)/groups/[groupId]/progress/page.tsx")).toContain("<InbodyEntry athleteId={athleteId} groupId={params.groupId} />");
     expect(read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx")).toContain("<InbodyScansSection athleteId={params.athleteId}");
   });

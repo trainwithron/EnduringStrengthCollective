@@ -17,25 +17,27 @@ import { kgToLb } from "@/lib/units";
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
 
 describe("the three tiles open pop-ups, not places further down the page", () => {
-  const html = renderToStaticMarkup(createElement(TodayTiles));
+  // How I Feel, Log weight and Log food (CL9 and CL10, Nov 21: Log food took the InBody tile's place)
+  const html = renderToStaticMarkup(createElement(TodayTiles, { showFood: true }));
   it("are three buttons that say they open a dialog; none is a link to a spot on the page", () => {
     expect(html.match(/<button type="button" aria-haspopup="dialog"/g)?.length).toBe(3);
     expect(html).not.toContain("<a ");
     expect(html).not.toContain('href="#');
-    for (const t of ["checkin", "weight", "inbody"]) expect(html).toContain(`data-tile="${t}"`);
+    for (const t of ["checkin", "weight", "food"]) expect(html).toContain(`data-tile="${t}"`);
+    expect(html).not.toContain('data-tile="inbody"');
   });
   it("each tile takes focus (so it gets it back) and asks its owner to open", () => {
     const tiles = read("components/athlete/today-tiles.tsx");
     expect(tiles).toContain("e.currentTarget.focus();");
     expect(tiles).toContain("openFromTile(e, OPEN_CHECKIN_EVENT)");
     expect(tiles).toContain("openFromTile(e, OPEN_WEIGHT_EVENT)");
-    expect(tiles).toContain("openFromTile(e, OPEN_INBODY_EVENT)");
+    expect(tiles).toContain("openFromTile(e, OPEN_FOOD_EVENT)");
     expect(read("components/athlete/wellness-checkin-popup.tsx")).toContain("window.addEventListener(OPEN_CHECKIN_EVENT, open);");
     expect(read("components/athlete/weight-log-widget.tsx")).toContain("window.addEventListener(OPEN_WEIGHT_EVENT, open);");
-    expect(read("components/body/inbody-entry.tsx")).toContain("window.addEventListener(OPEN_INBODY_EVENT, openIt);");
+    expect(read("components/athlete/log-food-sheet.tsx")).toContain("window.addEventListener(OPEN_FOOD_EVENT, openIt);");
   });
   it("nothing scrolls any more", () => {
-    for (const f of ["components/athlete/today-tiles.tsx", "components/athlete/wellness-checkin-popup.tsx", "components/athlete/weight-log-widget.tsx", "components/body/inbody-entry.tsx"]) {
+    for (const f of ["components/athlete/today-tiles.tsx", "components/athlete/wellness-checkin-popup.tsx", "components/athlete/weight-log-widget.tsx", "components/athlete/log-food-sheet.tsx"]) {
       expect(read(f), f).not.toContain("scrollIntoView");
     }
   });
@@ -62,7 +64,7 @@ describe("the pop-up", () => {
     expect(s).toContain("if (e.target === e.currentTarget) requestClose();");
     expect(read("components/athlete/wellness-checkin-popup.tsx")).toContain(`returnFocusTo='[data-tile="checkin"]'`);
     expect(read("components/athlete/weight-log-widget.tsx")).toContain(`returnFocusTo='[data-tile="weight"]'`);
-    expect(read("components/body/inbody-entry.tsx")).toContain(`returnFocusTo='[data-tile="inbody"]'`);
+    expect(read("components/athlete/log-food-sheet.tsx")).toContain(`returnFocusTo='[data-tile="food"]'`);
   });
 });
 

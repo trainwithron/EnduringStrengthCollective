@@ -13,8 +13,8 @@ const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").repla
 describe("client Home: today first", () => {
   it("the Today card comes first, then the three tiles, then the check-in, then the programs and the day's nutrition and weight", () => {
     const card = read("components/athlete/day-card.tsx");
-    // the week's asks right under the check-in (CL8); the InBody line is only its pop-up (CL1)
-    const order = ["<WorkoutSection", "{isToday && <TodayTiles />}", "{checkin}", "{asks}", "{afterWorkout}", "<TodayWidget", 'id="log-weight"', "<InbodyEntry athleteId={athleteId} groupId={groupId} sheetOnly />"];
+    // the week's asks right under the check-in (CL8); the Log food pop-up last (CL10: it took the InBody tile's place)
+    const order = ["<WorkoutSection", "{isToday && <TodayTiles showFood={foodTile} />}", "{checkin}", "{asks}", "{afterWorkout}", "<TodayWidget", 'id="log-weight"', "{foodTile && <LogFoodSheet athleteId={athleteId} groupId={groupId} logDate={dateKey} />}"];
     const at = order.map((s) => card.indexOf(s));
     for (const i of at) expect(i).toBeGreaterThan(-1);
     expect([...at].sort((a, b) => a - b)).toEqual(at);
@@ -32,13 +32,13 @@ describe("client Home: today first", () => {
       expect(page.indexOf(later), later).toBeGreaterThan(day);
     }
   });
-  it("the three tiles open what Home already had: the check-in, the weight log and the InBody scans (each in a pop-up since Nov 21: lib/home-tiles-open.test.ts)", () => {
+  it("the three tiles open the check-in, the weight log and the food search (each in a pop-up since Nov 21: lib/home-tiles-open.test.ts; Log food took InBody's place, CL10)", () => {
     const tiles = read("components/athlete/today-tiles.tsx");
     expect(tiles).toContain('data-tile="checkin"');
     expect(tiles).not.toContain('href="#log-weight"');
-    expect(tiles).toContain("openFromTile(e, OPEN_INBODY_EVENT)");
+    expect(tiles).toContain("openFromTile(e, OPEN_FOOD_EVENT)");
     expect(read("components/athlete/wellness-checkin-popup.tsx")).toContain("window.addEventListener(OPEN_CHECKIN_EVENT, open);");
-    expect(read("components/body/inbody-entry.tsx")).toContain("window.addEventListener(OPEN_INBODY_EVENT, openIt);");
+    expect(read("components/athlete/log-food-sheet.tsx")).toContain("window.addEventListener(OPEN_FOOD_EVENT, openIt);");
   });
   it("Day, Week and Month are not on Home", () => {
     const page = read("app/(coach)/groups/[groupId]/page.tsx");

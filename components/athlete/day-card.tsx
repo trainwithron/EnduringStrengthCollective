@@ -4,7 +4,7 @@ import { VIEW_PROGRAM_LABEL, startLabel, weekdayName } from "@/lib/coach-log-cho
 import { Lock, Check } from "lucide-react";
 import { TodayWidget, type TodayMacros, type TodayHabit } from "./today-widget";
 import { WeightLogWidget, type WeightLogEntry } from "./weight-log-widget";
-import { InbodyEntry } from "@/components/body/inbody-entry";
+import { LogFoodSheet } from "./log-food-sheet";
 import type { DayWorkoutInfo } from "@/lib/athlete-day-schedule";
 import type { DaySession } from "@/lib/program-day-contexts";
 import { computeReadinessAverage, type WellnessCheckinValues } from "@/lib/wellness";
@@ -52,6 +52,7 @@ export function DayCard({
   asks = null,
   eaten = null,
   resume = null,
+  foodTile = false,
 }: {
   groupId: string;
   athleteId: string;
@@ -84,7 +85,7 @@ export function DayCard({
   afterWorkout?: React.ReactNode;
   // The client's programs as Home already lists them: where each one is up to ("Week x of y") and how many workouts are done, for the Today card.
   programs?: HomeProgramCard[];
-  // Today's wellness check-in, right under the tiles (the Check in tile opens it).
+  // Today's wellness check-in, right under the tiles (the How I Feel tile opens it).
   checkin?: React.ReactNode;
   // The week's asks (the weekly check-in, the 90-day goal look), right under the workout and the tiles (CL8, Nov 21).
   asks?: React.ReactNode;
@@ -92,6 +93,8 @@ export function DayCard({
   eaten?: FoodTotals | null;
   // Today's workout was left open: its button says Resume workout and opens that session (CL7).
   resume?: { sessionId: string; workoutId: string } | null;
+  // The Log food tile and its pop-up (CL10): only where Home shows the Nutrition card and the coach has food tracking on for this client.
+  foodTile?: boolean;
 }) {
   return (
     <div className="space-y-4">
@@ -113,7 +116,7 @@ export function DayCard({
         resume={resume}
       />
 
-      {isToday && <TodayTiles />}
+      {isToday && <TodayTiles showFood={foodTile} />}
       {checkin}
       {asks}
 
@@ -122,11 +125,11 @@ export function DayCard({
       {isToday ? (
         <>
           <TodayWidget todayDate={dateKey} macros={macros} habits={habits} mealLine={mealLine ?? null} mealHref={`/groups/${groupId}/nutrition`} eaten={eaten} />
-          {/* The Log weight and InBody tiles open these (CL1: no second weight row and no "InBody scans" link here; the scans are on My progress). */}
+          {/* The Log weight and Log food tiles open these (CL1: no second weight row; CL10: InBody is on My progress, not Home). */}
           <div id="log-weight" className="scroll-mt-4">
             <WeightLogWidget athleteId={athleteId} groupId={groupId} initialLogs={weightLogs} weightUnit={weightUnit} opensFromTile />
           </div>
-          <InbodyEntry athleteId={athleteId} groupId={groupId} sheetOnly />
+          {foodTile && <LogFoodSheet athleteId={athleteId} groupId={groupId} logDate={dateKey} />}
         </>
       ) : (
         <ReadOnlyDaySummary macros={macros} habits={habits} />

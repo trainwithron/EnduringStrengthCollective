@@ -16,13 +16,16 @@ export function FoodSearchLog({
   groupId,
   logDate,
   onLogged,
+  inSheet = false,
 }: {
   athleteId: string;
   groupId: string;
   logDate: string;
   onLogged: (entry: FoodLogEntry) => void;
+  // Inside Home's Log food pop-up (CL10, Nov 21): open from the start, and the pop-up has the title and the close button.
+  inSheet?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(inSheet);
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<FoodHit[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -127,13 +130,15 @@ export function FoodSearchLog({
   }
 
   return (
-    <div className="bg-surface rounded-card p-3" data-testid="food-search">
-      <div className="flex items-center justify-between gap-3 mb-2">
-        <p className="font-body text-[13px] font-semibold text-steel">Search foods</p>
-        <button type="button" onClick={() => setOpen(false)} className="min-h-[44px] px-2 font-body text-xs text-steel">
-          Close
-        </button>
-      </div>
+    <div className={inSheet ? "" : "bg-surface rounded-card p-3"} data-testid="food-search">
+      {!inSheet && (
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <p className="font-body text-[13px] font-semibold text-steel">Search foods</p>
+          <button type="button" onClick={() => setOpen(false)} className="min-h-[44px] px-2 font-body text-xs text-steel">
+            Close
+          </button>
+        </div>
+      )}
 
       {!detail && (
         <>
