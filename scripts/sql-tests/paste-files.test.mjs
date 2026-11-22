@@ -1078,10 +1078,11 @@ for (const s of steps) {
   check("release-t: the bundle applies again after an undo" + (errT2 ? ": " + errT2 : ""), !errT2 && (await hasCol()) && (await storesSource()) && (await hasAccess()));
 }
 // The paste channel garbles non-ASCII characters (a typed em dash became three odd characters in a live function), so no line of SQL in a paste file may contain one (comments are fine:
-// they are never run). Steps already applied are listed and left alone.
+// they are never run). Steps already applied are listed and left alone. (The public-page redesign of Oct 28 is applied: its one middle dot, in Ron's eyebrow text, arrived intact,
+// read on live Nov 21 as bytes c2 b7.)
 {
   const { readdirSync } = await import("node:fs");
-  const ALREADY_APPLIED = new Set(["apply-release-q-all.sql", "apply-step55-0310.sql", "undo-step55-0310.sql"]);
+  const ALREADY_APPLIED = new Set(["apply-release-q-all.sql", "apply-step55-0310.sql", "undo-step55-0310.sql", "apply-public-page-redesign-all.sql"]);
   const offenders = [];
   for (const f of readdirSync(new URL("../../supabase/apply/", import.meta.url))) {
     if (!f.endsWith(".sql") || ALREADY_APPLIED.has(f)) continue;

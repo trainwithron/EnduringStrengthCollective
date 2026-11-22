@@ -1,6 +1,10 @@
 // The team sheet's reads name columns (SHEET_READS in lib/team-sheet/load-sheet.ts, CONTEXT_READS in lib/team-sheet/review.ts, SAVED_UPLOAD_COLUMNS in lib/team-sheet/reads.ts). A column that does not exist makes the whole
 // read fail in production, and a test with a made-up database cannot see that, so every name is checked here against the real table definitions of the migration chain.
 import { readFileSync } from "node:fs";
+import { PLAN_ORDER } from "../harness.mjs";
+
+// Checked on the whole schema: the phase of the newest migration in the plan (Nov 21: it ran after 0419, before 0460 added the target_pct_max the sheet now reads).
+const NEWEST = PLAN_ORDER[PLAN_ORDER.length - 1];
 
 const read = (rel) => readFileSync(new URL(`../../../${rel}`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
@@ -39,7 +43,7 @@ export default {
   name: "Team sheet reads name real columns",
   migrations: [],
   phases: {
-    async "0419"({ db, h }) {
+    async [NEWEST]({ db, h }) {
       const sheet = parseBlock(read("lib/team-sheet/load-sheet.ts"), "export const SHEET_READS = {");
       const context = parseBlock(read("lib/team-sheet/review.ts"), "export const CONTEXT_READS = {");
       const saved = /SAVED_UPLOAD_COLUMNS = "([^"]+)"/.exec(read("lib/team-sheet/reads.ts"))?.[1];
