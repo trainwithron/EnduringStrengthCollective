@@ -8,8 +8,7 @@ vi.mock("@/lib/supabase/client", () => ({ createBrowserClient: () => ({}) }));
 
 import { TodayTiles } from "@/components/athlete/today-tiles";
 import { WeightLogWidget, savedWeightLine } from "@/components/athlete/weight-log-widget";
-import { InbodyEntry, inbodyCloseRule } from "@/components/body/inbody-entry";
-import { READ_TIMEOUT_MS, READ_TOO_LONG } from "@/components/body/inbody-scan-flow";
+import { InbodyScanFlow, READ_TIMEOUT_MS, READ_TOO_LONG } from "@/components/body/inbody-scan-flow";
 import { HomeSheet } from "@/components/athlete/home-sheet";
 import { kgToLb } from "@/lib/units";
 
@@ -131,10 +130,15 @@ describe("Log weight", () => {
   });
 });
 
-describe("InBody", () => {
-  const html = renderToStaticMarkup(createElement(InbodyEntry, { athleteId: "a", groupId: "g", initialSheetOpen: true }));
-  it("opens Take a photo (the camera) or Upload a photo (the phone's photos), with the same outside-AI line", () => {
-    expect(html).toContain('aria-label="InBody scan"');
+describe("InBody (on My progress; Home's InBody tile and its pop-up are gone, CL10 Nov 21)", () => {
+  const html = renderToStaticMarkup(createElement(InbodyScanFlow, { athleteId: "a", groupId: "g", viewerId: "a", athleteName: "you", onSaved: () => {}, onClose: () => {} }));
+  it("the Home pop-up is gone: no sheet, no tile event, no sheet-only mode", () => {
+    const e = read("components/body/inbody-entry.tsx");
+    for (const gone of ["HomeSheet", "OPEN_INBODY_EVENT", "sheetOnly", "inbodyCloseRule", "initialSheetOpen"]) expect(e, gone).not.toContain(gone);
+    expect(e).toContain("<InbodyScansSection");
+    expect(read("components/body/inbody-scans-section.tsx")).toContain("<InbodyScanFlow");
+  });
+  it("adding one offers Take a photo (the camera) or Upload a photo (the phone's photos), with the same outside-AI line", () => {
     expect(html).toContain("Take a photo");
     expect(html).toContain("Upload a photo");
     expect(html).toContain("data-ai-disclosure");
@@ -145,19 +149,9 @@ describe("InBody", () => {
     expect(inputs.filter((i) => i.includes('capture="environment"'))).toHaveLength(1);
   });
   it("goes on into the same reading", () => {
-    expect(read("components/body/inbody-entry.tsx")).toContain("<InbodyScanFlow");
     expect(read("components/body/inbody-scan-flow.tsx")).toContain('fetch("/api/ai/parse-inbody-scan"');
   });
-  it("can always be closed: free while choosing, a question first while it reads, checks or saves", () => {
-    expect(inbodyCloseRule("pick")).toEqual({ action: "close" });
-    expect(inbodyCloseRule("reading")).toEqual({ action: "ask", ask: { message: "Stop reading this scan? Nothing is saved.", confirmLabel: "Stop", cancelLabel: "Keep reading" } });
-    expect(inbodyCloseRule("review").action).toBe("ask");
-    expect(inbodyCloseRule("saving").action).toBe("ask");
-    for (const s of ["pick", "reading", "review", "saving"] as const) expect(inbodyCloseRule(s).action, s).not.toBe("block");
-    const e = read("components/body/inbody-entry.tsx");
-    expect(e).toContain("guard={() => rule.action}");
-    expect(e).toContain("ask={rule.ask}");
-    // Escape, the close button and a tap outside all ask the sheet's own question
+  it("a Home pop-up with work in it asks its own question before it closes (Escape, the close button and a tap outside alike)", () => {
     const s = read("components/athlete/home-sheet.tsx");
     expect(s.replace(/\s+/g, " ")).toContain('if (action !== "ask") return action; requestClose(); return "block";');
     expect(s).toContain("confirmDialog({ message: ask.message, confirmLabel: ask.confirmLabel, cancelLabel: ask.cancelLabel, destructive: true })");

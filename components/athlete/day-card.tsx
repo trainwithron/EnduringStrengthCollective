@@ -93,7 +93,7 @@ export function DayCard({
   eaten?: FoodTotals | null;
   // Today's workout was left open: its button says Resume workout and opens that session (CL7).
   resume?: { sessionId: string; workoutId: string } | null;
-  // The Log food tile and its pop-up (CL10): only where Home shows the Nutrition card and the coach has food tracking on for this client.
+  // The Log food tile and its pop-up (CL10): for anyone who can log food on Nutrition (the coach has food tracking on for this client).
   foodTile?: boolean;
 }) {
   return (

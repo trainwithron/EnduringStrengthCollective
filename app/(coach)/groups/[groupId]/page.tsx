@@ -796,8 +796,9 @@ export default async function GroupHubPage(
 
       // Today's log: what is eaten so far (the Nutrition card shows eaten / target, CL22, Nov 21; the same sum as the Nutrition page's ring), and the meals checked off when there is
       // a meal plan. Any failure just leaves them out. With the coach's food tracking off for this client there is no "Eaten today": the card shows the targets only (read on its own,
-      // as the Nutrition page does, so a database without the column reads as on).
-      if (isToday && macrosEnabled) {
+      // as the Nutrition page does, so a database without the column reads as on). It is read for every tier: the Log food tile follows the Nutrition page, where anyone with
+      // tracking on logs food (Commander, Nov 21).
+      if (isToday) {
         try {
           const { data: trackingRow } = await supabase
             .from("group_memberships")
@@ -809,6 +810,8 @@ export default async function GroupHubPage(
         } catch {
           foodTrackingOn = true;
         }
+      }
+      if (isToday && macrosEnabled) {
         try {
           const { data: loggedMeals, error: loggedError } = await supabase
             .from("food_log_entries")
@@ -1038,8 +1041,8 @@ export default async function GroupHubPage(
                 wellnessCheckin={wellnessCheckin}
                 mealLine={mealLine}
                 eaten={dayEaten}
-                // Log food (CL10): where the Nutrition card shows (today, a tier with macros) and food tracking is on
-                foodTile={isToday && macrosEnabled && foodTrackingOn}
+                // Log food (CL10): today, for anyone who can log food on Nutrition (food tracking on), whatever their tier
+                foodTile={isToday && foodTrackingOn}
                 sessionsLeft={sessionsLeft}
                 bookHref={bookHref}
                 doneSessionByWorkout={doneSessionByWorkout}

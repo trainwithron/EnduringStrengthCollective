@@ -36,8 +36,12 @@ describe("CL10: the third tile is Log food", () => {
     expect(html).toContain("Log food");
     expect(html).not.toContain("InBody");
   });
-  it("Home shows it only where the Nutrition card shows and food tracking is on; InBody is off Home", () => {
-    expect(read(HOME)).toContain("foodTile={isToday && macrosEnabled && foodTrackingOn}");
+  it("Home shows it to anyone who can log food on Nutrition (tracking on, any tier, group included); InBody is off Home", () => {
+    const home = read(HOME);
+    expect(home).toContain("foodTile={isToday && foodTrackingOn}");
+    // the tracking switch is read for every tier, before the macros-only eaten totals
+    expect(home).toContain("      if (isToday) {\n        try {\n          const { data: trackingRow }");
+    expect(home.indexOf('.select("food_tracking_enabled")')).toBeLessThan(home.indexOf("if (isToday && macrosEnabled) {\n        try {\n          const { data: loggedMeals"));
     const card = read("components/athlete/day-card.tsx");
     expect(card).toContain("{isToday && <TodayTiles showFood={foodTile} />}");
     expect(card).toContain("{foodTile && <LogFoodSheet athleteId={athleteId} groupId={groupId} logDate={dateKey} />}");
@@ -75,6 +79,13 @@ describe("CL17: the feed", () => {
     expect(feedTabs({ withPosts: new Set<FeedChannel>(["pr_board"]), active: "form_checks", teamSport: false, isCoach: false }).shown).toEqual(["form_checks", "pr_board", "general"]);
     expect(feedTabs({ withPosts: none, active: "general", teamSport: true, isCoach: false }).more).toContain("team_chat");
     expect(read("components/feed/channel-tabs.tsx")).toContain("data-more-channels");
+  });
+  it("the merged General gets Team Chat's new posts live too", () => {
+    const list = read("components/feed/feed-list.tsx");
+    expect(list).toContain("const listenKey = (listensTo ?? [channel]).join(\",\");");
+    expect(list).toContain("if (!listenKey.split(\",\").includes(payload.new.channel)) return;");
+    expect(list).toContain("}, [groupId, viewerId, listenKey]);");
+    expect(read(FEED).split("listensTo={channelsRead(channel, teamSport)}").length - 1).toBe(2);
   });
   it("is titled Feed, and Team feed only for a team-sport group", () => {
     expect(feedTitle(false)).toBe("Feed");

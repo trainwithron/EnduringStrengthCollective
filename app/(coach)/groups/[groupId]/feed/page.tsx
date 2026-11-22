@@ -328,6 +328,7 @@ export default async function FeedPage(
               isCoach={isCoach}
               highlightPostId={highlightPostId}
               blockedIds={blockedIds}
+              listensTo={channelsRead(channel, teamSport)}
             />
           </div>
         </div>
@@ -402,6 +403,7 @@ export default async function FeedPage(
         isCoach={renderAsCoach}
         highlightPostId={highlightPostId}
         blockedIds={blockedIds}
+        listensTo={channelsRead(channel, teamSport)}
       />
       {!noSharedGroup && (
       <NewPostComposer

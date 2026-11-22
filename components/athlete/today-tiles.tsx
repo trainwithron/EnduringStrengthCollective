@@ -8,7 +8,7 @@ import { OPEN_FOOD_EVENT } from "@/components/athlete/log-food-sheet";
 // The three tiles under the Today card on a client's Home (Look Refresh, client step, Ron Nov 20). Each OPENS its thing in a pop-up over Home (Ron, Nov 21: they used to only
 // scroll the page): How I Feel opens the daily wellness check-in (even after it was skipped or answered, to change it; CL9, Nov 21: it was "Check in", which is the weekly form's
 // name), Log weight opens one number box with the keyboard up, and Log food opens the food search with the keyboard up (CL10, Nov 21: it took the InBody tile's place; InBody is on
-// My progress). Log food shows only where Home shows the Nutrition card and the coach has food tracking on. The pop-ups belong to what already owns each save (the check-in card, the
+// My progress). Log food shows for anyone who can log food on Nutrition (the coach has food tracking on). The pop-ups belong to what already owns each save (the check-in card, the
 // weight log, the food search); a tile only says "open". The tile takes focus first, so focus comes back to it when the pop-up closes.
 export const OPEN_CHECKIN_EVENT = "open-wellness-checkin";
 

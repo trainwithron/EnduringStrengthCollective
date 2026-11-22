@@ -18,6 +18,7 @@ export function FeedList({
   isCoach,
   highlightPostId,
   blockedIds = [],
+  listensTo,
 }: {
   groupId: string;
   initialPosts: FeedPost[];
@@ -30,7 +31,10 @@ export function FeedList({
   highlightPostId?: string | null;
   // The members the viewer has blocked (read on the server); their posts are not shown.
   blockedIds?: string[];
+  // The channels whose new posts arrive live here (default: `channel` only). A merged General lists Team Chat too (CL17, Nov 21: lib/feed-channels.ts channelsRead).
+  listensTo?: FeedChannel[];
 }) {
+  const listenKey = (listensTo ?? [channel]).join(",");
   const [posts, setPosts] = useState(initialPosts);
   const [blocked, setBlocked] = useState<ReadonlySet<string>>(new Set(blockedIds));
   const onBlocked = (authorId: string) => setBlocked((prev) => new Set([...prev, authorId]));
@@ -79,7 +83,7 @@ export function FeedList({
         { event: "INSERT", schema: "public", table: "posts", filter: `group_id=eq.${groupId}` },
         async (payload) => {
           // Belongs to a channel the viewer isn't currently looking at.
-          if (payload.new.channel !== channel) return;
+          if (!listenKey.split(",").includes(payload.new.channel)) return;
 
           const { data } = await supabase
             .from("posts")
@@ -193,7 +197,7 @@ export function FeedList({
     return () => {
       supabase.removeChannel(realtimeChannel);
     };
-  }, [groupId, viewerId, channel]);
+  }, [groupId, viewerId, listenKey]);
 
   if (visiblePosts.length === 0) {
     // Only a coach can post on Announcements, so a client is not told to "share something" there.
