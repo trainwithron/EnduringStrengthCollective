@@ -694,7 +694,7 @@ export function ExerciseCard({
               )}
               {rowAction && <span className="ml-auto">{rowAction}</span>}
               {fieldsOpen && (
-                <div ref={fieldsRef} className="absolute z-10 right-0 bottom-full mb-1 bg-surface border border-steel/30 p-2 w-56 whitespace-normal" data-fields-popup>
+                <div ref={fieldsRef} className="absolute z-10 right-0 top-full mt-1 bg-surface border border-steel/30 p-2 w-56 whitespace-normal" data-fields-popup>
                   {exercise.trackedFields.length > 0 && (
                     <div className="flex flex-wrap gap-1 mb-1.5">
                       {exercise.trackedFields.map((f) => (
