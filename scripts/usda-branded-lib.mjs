@@ -335,3 +335,16 @@ export function pendingBatches(batches, loadedNames) {
   const loaded = new Set(loadedNames);
   return batches.filter((b) => !loaded.has(b.name));
 }
+
+// A call that ran past the database's statement time limit (Postgres code 57014): the loader says what to do in plain words.
+export function isStatementTimeout(responseText) {
+  return /57014|statement timeout|canceling statement due to statement timeout/i.test(String(responseText ?? ""));
+}
+export function timeoutHint(batchName) {
+  return [
+    `${batchName} ran past the database's time limit for one call (code 57014): its batch is too big for the table as it is now. Nothing of it was kept.`,
+    "Write the batches again smaller, into a NEW folder and under a NEW --name (a new name loads everything again, which is safe: each product is updated in place),",
+    "for example: node scripts/usda-branded-import.mjs <csv folder> --name branded-2026-10b --out <new folder> --json --max-bytes 150000",
+    "then run this loader on the new folder. Do not reuse the old name with new batch sizes: the old markers would skip products that were never loaded.",
+  ].join("\n");
+}

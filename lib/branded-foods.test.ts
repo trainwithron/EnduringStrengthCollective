@@ -264,3 +264,24 @@ describe("JSON batches for load_usda_branded_batch, and the loader's helpers (sc
     expect(loader).not.toMatch(/console\.(log|error)\([^)]*\bkey\b/);
   });
 });
+
+describe("the monthly refresh stays inside the database's 8-second limit (Nov 23: 1.4 MB calls timed out once the index grew)", () => {
+  it("JSON batches default to about 250 KB; SQL files keep 1.4 MB; 0468 is in the shared rehearsal", () => {
+    const importer = readFileSync(join(__dirname, "..", "scripts/usda-branded-import.mjs"), "utf8");
+    expect(importer).toContain('const maxBytes = Number(valueOf("--max-bytes") ?? (asJson ? 250_000 : 1_400_000));');
+    expect(importer.indexOf("const asJson")).toBeLessThan(importer.indexOf("const maxBytes"));
+    expect(readFileSync(join(__dirname, "..", "scripts/sql-tests/harness.mjs"), "utf8")).toContain('"0467", "0468",');
+  });
+  it("a call that times out (57014) gets a plain hint: smaller batches, a NEW folder and a NEW name, never the old name", async () => {
+    const { isStatementTimeout, timeoutHint } = await import("../scripts/usda-branded-lib.mjs");
+    expect(isStatementTimeout('{"code":"57014","message":"canceling statement due to statement timeout"}')).toBe(true);
+    expect(isStatementTimeout('{"code":"23514","message":"violates check constraint"}')).toBe(false);
+    const hint = timeoutHint("branded-2026-10-0120");
+    expect(hint).toContain("code 57014");
+    expect(hint).toContain("NEW --name");
+    expect(hint).toContain("--max-bytes 150000");
+    expect(hint).toContain("Do not reuse the old name");
+    const loader = readFileSync(join(__dirname, "..", "scripts/usda-branded-load.mjs"), "utf8");
+    expect(loader).toContain("if (isStatementTimeout(text)) console.error(timeoutHint(b.name));");
+  });
+});
