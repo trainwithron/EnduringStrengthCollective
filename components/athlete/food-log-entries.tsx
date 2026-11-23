@@ -181,7 +181,8 @@ function EntryRow({
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const searched = !!entry.nutrients && !!entry.amountG && !!entry.servingQty;
+  // a searched food: its amount can be changed. A drink logged by volume has no gram amount, only its serving (step 223).
+  const searched = !!entry.nutrients && !!entry.servingQty && (!!entry.amountG || !!entry.servingLabel);
   const [qty, setQty] = useState(String(entry.servingQty ?? 1));
   const [name, setName] = useState(entry.description ?? "");
   const [cal, setCal] = useState(String(entry.calories ?? ""));
@@ -263,7 +264,11 @@ function EntryRow({
         {searched ? (
           <label className="block">
             <span className="block font-body text-xs text-steel mb-1">
-              Number of servings of {entry.servingLabel} ({servingText({ servingLabel: entry.servingLabel ?? null, servingQty: 1, amountG: (entry.amountG ?? 0) / (entry.servingQty ?? 1) })})
+              {entry.amountG
+                ? `Number of servings of ${entry.servingLabel} (${servingText({ servingLabel: entry.servingLabel ?? null, servingQty: 1, amountG: entry.amountG / (entry.servingQty ?? 1) })})`
+                : entry.servingLabel === "ml"
+                  ? "Amount in ml"
+                  : `Number of servings of ${entry.servingLabel}`}
             </span>
             <input type="number" inputMode="decimal" min="0" step="any" value={qty} onChange={(e) => setQty(e.target.value)} aria-label="Servings" className="w-28 min-h-[44px] bg-surface border border-steel/30 px-3 font-body text-sm text-chalk" />
           </label>

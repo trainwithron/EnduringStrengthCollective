@@ -6,7 +6,8 @@ import * as usdaLib from "../scripts/usda-lib.mjs";
 import * as batchLib from "../scripts/usda-batch-lib.mjs";
 import { searchFoods } from "@/lib/food-search";
 import { mlServingOptions, packagedDetail, packagedPortions, packagedTitle, searchPackaged, type PackagedHit } from "@/lib/packaged-foods";
-import { usdaEntryRow } from "@/lib/food-entry";
+import { rescaleEntryPatch, usdaEntryRow } from "@/lib/food-entry";
+import { servingText } from "@/lib/food-serving";
 import { per100Line } from "@/components/athlete/food-search-log";
 
 // Step 223 (Ron, Nov 23: "type whole milk and get whole milk; 2% milk gives exactly 2% milk; sourdough bread gives sourdough bread"). The ranking itself is rehearsed in SQL
@@ -276,5 +277,64 @@ describe("the loader (step 223: public.load_usda_food_batch, sent by scripts/usd
     expect(sql).toContain("grant execute on function public.load_usda_food_batch(text, jsonb, jsonb, jsonb, text, text[]) to service_role;");
     expect(sql).toContain("if exists (select 1 from public.usda_load_batches where name = p_name) then\n    return 0;");
     expect(read("scripts/usda-food-load.mjs")).not.toMatch(/console\.(log|error)\([^)]*\bkey\b/);
+  });
+});
+
+describe("plain names, read against the real list (Spot Commander, Nov 23)", () => {
+  it("a species and its cut keep the order; a preparation still turns round", () => {
+    const cases: [string, string][] = [
+      ["Pork, tenderloin", "Pork tenderloin"], ["Pork, ribs", "Pork ribs"], ["Pork, belly", "Pork belly"], ["Lamb, chop", "Lamb chop"], ["Veal, chop", "Veal chop"],
+      ["Venison, steak", "Venison steak"], ["Turkey, neck", "Turkey neck"], ["Chicken, back", "Chicken back"], ["Beef, brisket", "Beef brisket"], ["Beef, oxtails", "Beef oxtails"],
+      ["Ham, prosciutto", "Ham prosciutto"],
+      ["Beef, corned", "Corned beef"], ["Beef, roast", "Roast beef"], ["Duck, Peking", "Peking duck"], ["Chicken, ground", "Ground chicken"], ["Pork, smoked", "Smoked pork"],
+    ];
+    for (const [d, want] of cases) expect(plainNameFor(d), d).toBe(want);
+  });
+  it('"Fish, X" is X when X is the fish; a stick, cake or patty stays "Fish ..."; a preparation turns round', () => {
+    expect(plainNameFor("Fish, carp")).toBe("Carp");
+    expect(plainNameFor("Fish, swordfish")).toBe("Swordfish");
+    expect(plainNameFor("Fish, snapper")).toBe("Snapper");
+    expect(plainNameFor("Fish, stick")).toBe("Fish stick");
+    expect(plainNameFor("Fish, cake")).toBe("Fish cake");
+    expect(plainNameFor("Fish, patty")).toBe("Fish patty");
+    expect(plainNameFor("Fish, baked")).toBe("Baked fish");
+  });
+  it("a second part that is the thing itself keeps the order", () => {
+    expect(plainNameFor("Crab, cake")).toBe("Crab cake");
+    expect(plainNameFor("Shrimp, cake or patty")).toBe("Shrimp cake or patty");
+    expect(plainNameFor("Turkey, nuggets")).toBe("Turkey nuggets");
+    expect(plainNameFor("Chicken, sticks")).toBe("Chicken sticks");
+  });
+  it('a second part starting with "not" is never turned round', () => {
+    expect(plainNameFor("Cocoa powder, not reconstituted")).toBeNull();
+  });
+  it('"sour dough" is written "sourdough" in every plain name', () => {
+    expect(plainNameFor("Roll, sour dough")).toBe("Sourdough roll");
+    expect(plainNameFor("Bread, sour dough")).toBe("Sourdough bread");
+  });
+  it("the four hand-made names", () => {
+    expect(plainNameFor("Liver, paste or pate")).toBe("Liver pâté");
+    expect(plainNameFor("Queso Anejo, aged Mexican cheese")).toBe("Queso añejo");
+    expect(plainNameFor("Firni, Indian pudding")).toBe("Firni (Indian pudding)");
+    expect(plainNameFor("Cheese spread, pressurized can")).toBe("Spray cheese spread");
+  });
+});
+
+describe("a drink logged by volume, on the diary", () => {
+  const entry = { id: "e", mealSlot: null, status: "quick_log", description: "Acme Sports drink", calories: 60, proteinG: 0, carbsG: 15, fatG: 0, amountG: null, servingLabel: "ml", servingQty: 250, nutrients: { kcal: 60, carbs_g: 15 } } as never;
+  it("shows its serving", () => {
+    expect(servingText({ servingLabel: "ml", servingQty: 250, amountG: null })).toBe("250 ml");
+    expect(servingText({ servingLabel: "1 can (355 ml)", servingQty: 2, amountG: null })).toBe("2 x 1 can (355 ml)");
+    expect(servingText({ servingLabel: null, servingQty: null, amountG: null })).toBe("");
+  });
+  it("its amount can be changed: the snapshot is re-scaled by the ml, still with no gram amount", () => {
+    expect(rescaleEntryPatch(entry, 500)).toMatchObject({ amount_g: null, serving_qty: 500, calories: 120, carbs_g: 30, nutrients: { kcal: 120, carbs_g: 30 } });
+    expect(rescaleEntryPatch(entry, 0)).toBeNull();
+    expect(rescaleEntryPatch(entry, 25000)).toBeNull();
+  });
+  it("the diary treats it as a searched food (amount editable, serving shown)", () => {
+    const ui = read("components/athlete/food-log-entries.tsx");
+    expect(ui).toContain("const searched = !!entry.nutrients && !!entry.servingQty && (!!entry.amountG || !!entry.servingLabel);");
+    expect(ui).toContain('"Amount in ml"');
   });
 });

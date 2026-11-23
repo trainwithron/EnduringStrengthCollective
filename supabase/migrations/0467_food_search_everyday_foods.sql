@@ -149,7 +149,7 @@ create or replace function public.load_usda_food_batch(p_name text, p_foods json
 returns integer
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $function$
 declare
   v_refresh boolean := p_mode = 'refresh';

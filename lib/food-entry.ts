@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FoodLogEntry } from "@/components/athlete/meal-checkoff-list";
-import { macrosOf, scaleNutrients, per100gFromSnapshot, MAX_AMOUNT_G, type NutrientMap } from "@/lib/food-serving";
+import { macrosOf, scaleNutrients, per100gFromSnapshot, MAX_AMOUNT_G, MAX_SERVING_QTY, type NutrientMap } from "@/lib/food-serving";
 import { liveFoodSource } from "@/lib/imported-food";
 
 // Writing, changing, copying and removing food log entries for the food search (and, from phase 2, custom foods and saved meals). Every write is the signed-in client's own
@@ -125,9 +125,19 @@ export async function insertUsdaEntry(supabase: SupabaseClient, input: UsdaEntry
   return entryFromRow(data as unknown as FoodLogRow);
 }
 
-// A different amount of the same logged food: the calories, macros and every nutrient are re-scaled from the stored snapshot (no lookup), keeping the serving as logged.
-export function rescaleEntryPatch(entry: FoodLogEntry, newQty: number): { amount_g: number; serving_qty: number; calories: number; protein_g: number; carbs_g: number; fat_g: number; nutrients: NutrientMap } | null {
-  if (!entry.nutrients || !entry.amountG || !entry.servingQty || !(newQty > 0)) return null;
+// A different amount of the same logged food: the calories, macros and every nutrient are re-scaled from the stored snapshot (no lookup), keeping the serving as logged. A drink
+// logged by volume (no gram amount, step 223) is re-scaled by the number of servings or ml, and still stores no gram amount.
+export function rescaleEntryPatch(entry: FoodLogEntry, newQty: number): { amount_g: number | null; serving_qty: number; calories: number; protein_g: number; carbs_g: number; fat_g: number; nutrients: NutrientMap } | null {
+  if (!entry.nutrients || !entry.servingQty || !(newQty > 0)) return null;
+  if (!entry.amountG) {
+    if (!entry.servingLabel) return null;
+    const cap = entry.servingLabel === "ml" ? MAX_AMOUNT_G : MAX_SERVING_QTY;
+    if (newQty > cap) return null;
+    // scaleNutrients(x, 100 * ratio) multiplies every value by the ratio
+    const scaled = scaleNutrients(entry.nutrients, (100 * newQty) / entry.servingQty);
+    const sm = macrosOf(scaled);
+    return { amount_g: null, serving_qty: newQty, calories: sm.calories, protein_g: sm.proteinG, carbs_g: sm.carbsG, fat_g: sm.fatG, nutrients: scaled };
+  }
   const gramsPerServing = entry.amountG / entry.servingQty;
   const grams = Math.round(gramsPerServing * newQty * 10) / 10;
   if (!(grams > 0) || grams > MAX_AMOUNT_G) return null;

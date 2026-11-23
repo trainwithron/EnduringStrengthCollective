@@ -109,10 +109,13 @@ export function macrosOf(n: NutrientMap): Macros {
   };
 }
 
-// A short line for a logged serving: "1.5 x 1 cup, chopped" or "85 g (3 oz)".
+// A short line for a logged serving: "1.5 x 1 cup, chopped" or "85 g (3 oz)". A drink logged by volume has no gram amount: "250 ml" or "1 x 1 can (355 ml)".
 export function servingText(args: { servingLabel: string | null; servingQty: number | null; amountG: number | null }): string {
   const { servingLabel, servingQty, amountG } = args;
-  if (amountG == null) return "";
+  if (amountG == null) {
+    if (!servingLabel || servingQty == null) return "";
+    return servingLabel === "ml" ? `${trim1(servingQty)} ml` : `${trim1(servingQty)} x ${servingLabel}`;
+  }
   if (servingLabel && servingQty != null && servingLabel !== "grams" && servingLabel !== "ounces") {
     return `${trim1(servingQty)} x ${servingLabel} (${formatAmount(amountG)})`;
   }

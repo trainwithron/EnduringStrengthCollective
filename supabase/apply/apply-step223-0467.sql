@@ -154,7 +154,7 @@ create or replace function public.load_usda_food_batch(p_name text, p_foods json
 returns integer
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $function$
 declare
   v_refresh boolean := p_mode = 'refresh';
@@ -256,4 +256,4 @@ select
   has_function_privilege('service_role', 'public.load_usda_food_batch(text, jsonb, jsonb, jsonb, text, text[])', 'execute')
     and not has_function_privilege('authenticated', 'public.load_usda_food_batch(text, jsonb, jsonb, jsonb, text, text[])', 'execute')
     and not has_function_privilege('anon', 'public.load_usda_food_batch(text, jsonb, jsonb, jsonb, text, text[])', 'execute') as loader_server_key_only,
-  (select prosecdef and 'search_path=public' = any(proconfig) from pg_proc where oid = 'public.load_usda_food_batch(text, jsonb, jsonb, jsonb, text, text[])'::regprocedure) as loader_runs_with_a_fixed_path;
+  (select prosecdef and 'search_path=public, pg_temp' = any(proconfig) from pg_proc where oid = 'public.load_usda_food_batch(text, jsonb, jsonb, jsonb, text, text[])'::regprocedure) as loader_runs_with_a_fixed_path;
