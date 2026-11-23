@@ -115,6 +115,14 @@ export function buildNutrientIndex(nutrientRows, warn = () => {}) {
     }
     index.set(String(r.id), { key: hit.key, rank: hit.rank, factor: hit.factor });
   }
+  // The FNDDS files (step 223) point food_nutrient.csv at a nutrient by its NUMBER ("208"), where Foundation and SR Legacy use its id ("1008"). Every nutrient the app uses is also
+  // found by its number, unless that number is some nutrient's id (no clash in the current files: ids are 1000 and up, numbers below), so neither file can be misread.
+  const ids = new Set(nutrientRows.map((r) => String(r.id)));
+  for (const r of nutrientRows) {
+    const nbr = String(r.nutrient_nbr).replace(/\.0+$/, "");
+    const hit = index.get(String(r.id));
+    if (hit && nbr && !ids.has(nbr) && !index.has(nbr)) index.set(nbr, hit);
+  }
   return index;
 }
 

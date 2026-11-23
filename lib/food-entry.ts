@@ -87,6 +87,8 @@ export interface UsdaEntryInput {
   // A packaged (brand-name) food from the search's "Packaged foods" group (step 223): it is not one of the USDA foods table's foods, so it is logged as a barcode food with its
   // code, and no fdc_id.
   packaged?: { barcode: string | null } | null;
+  // The amount is in ml (a packaged drink labelled by volume): the nutrients are scaled the same way, but no gram amount is stored, since a liquid's weight is not its volume.
+  amountInMl?: boolean;
 }
 
 const MAX_DESCRIPTION = 160;
@@ -110,7 +112,7 @@ export function usdaEntryRow(input: UsdaEntryInput) {
     food_source: input.packaged ? ("barcode" as const) : ("usda" as const),
     fdc_id: input.packaged ? null : input.fdcId,
     ...(input.packaged ? { barcode: input.packaged.barcode ? input.packaged.barcode.slice(0, 32) : null } : {}),
-    amount_g: input.grams,
+    amount_g: input.amountInMl ? null : input.grams,
     serving_label: input.servingLabel,
     serving_qty: input.servingQty,
     nutrients,

@@ -34,6 +34,8 @@ export function buildPortions(portionRows, measureUnitRows, foods) {
     if (!Number.isFinite(grams) || grams <= 0 || grams >= 100000) continue;
     const description = describePortion(r, unitNames).slice(0, 200);
     if (!description) continue;
+    // FNDDS lists "Quantity not specified" (the amount people report when they give none): it is not a serving anyone picks, and as the first portion it would be the default
+    if (/^quantity not specified$/i.test(description.trim())) continue;
     const seqNum = r.seq_num === "" || r.seq_num == null ? NaN : Number(r.seq_num);
     const list = byFood.get(fdcId) ?? [];
     list.push({ seq: Number.isInteger(seqNum) && seqNum > 0 ? seqNum : null, description, gram_weight: Math.round(grams * 100) / 100 });
@@ -219,4 +221,27 @@ export function formatReport(report, mode, refreshKeys = []) {
     "",
   ];
   return lines.join("\n");
+}
+
+// ---- the same batch as JSON, for the loader (step 223: public.load_usda_food_batch, sent by scripts/usda-food-load.mjs with the server key) ----
+// The function applies exactly what toBatchSql writes (the same add / refresh rules), all of it or none of it, and skips a batch whose marker is already there. A JSON batch must stay
+// under MAX_JSON_BATCH_BYTES (an API request body has a size limit).
+export const MAX_JSON_BATCH_BYTES = 1_400_000;
+
+export function toBatchJson(batchName, foods, nutrientRows, portionRows, opts = {}) {
+  const mode = opts.mode === "refresh" ? "refresh" : "add";
+  const body = {
+    p_name: batchName,
+    p_mode: mode,
+    p_refresh_keys: [...(opts.refreshKeys ?? [])],
+    p_foods: [...foods.values()]
+      .sort((a, b) => a.fdc_id - b.fdc_id)
+      .map((f) => ({ fdc_id: f.fdc_id, description: f.description, data_type: f.data_type, food_category: f.food_category ?? null, plain_name: f.plain_name ?? null, extra_names: f.extra_names ?? null, common: f.common === true })),
+    p_nutrients: nutrientRows.map((n) => ({ fdc_id: n.fdc_id, nutrient_key: n.nutrient_key, amount_per_100g: n.amount_per_100g })),
+    p_portions: portionRows.map((p) => ({ fdc_id: p.fdc_id, seq: p.seq, description: p.description, gram_weight: p.gram_weight })),
+  };
+  const text = JSON.stringify(body);
+  const bytes = Buffer.byteLength(text, "utf8");
+  if (bytes > MAX_JSON_BATCH_BYTES) throw new Error(`batch ${batchName} is ${bytes} bytes as JSON, over ${MAX_JSON_BATCH_BYTES}: use a smaller --batch-size`);
+  return text;
 }

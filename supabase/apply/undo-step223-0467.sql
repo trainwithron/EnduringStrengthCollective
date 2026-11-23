@@ -1,4 +1,4 @@
--- UNDO: step 223. Only if it must be taken back. Puts the food search back exactly as it was (migration 0300) and removes the synonyms. If no everyday (FNDDS) foods were loaded yet, the
+-- UNDO: step 223. Only if it must be taken back. Puts the food search back exactly as it was (migration 0300) and removes the synonyms and the batch loader. If no everyday (FNDDS) foods were loaded yet, the
 -- name columns go and the data type rule is as before; if they were loaded, those foods and their names are KEPT (nothing is deleted) and the old search simply reads them as it
 -- reads any food. Last result: one row, all true.
 
@@ -40,6 +40,7 @@ revoke all on function public.search_usda_foods(text[], integer) from public, an
 grant execute on function public.search_usda_foods(text[], integer) to authenticated, service_role;
 
 drop table if exists public.food_search_synonyms;
+drop function if exists public.load_usda_food_batch(text, jsonb, jsonb, jsonb, text, text[]);
 
 do $undo$
 begin
@@ -61,6 +62,7 @@ select
   position('plain_name' in (select pg_get_function_result('public.search_usda_foods(text[], integer)'::regprocedure))) = 0 as search_returns_as_before,
   has_function_privilege('authenticated', 'public.search_usda_foods(text[], integer)', 'execute') and not has_function_privilege('anon', 'public.search_usda_foods(text[], integer)', 'execute') as search_access_as_before,
   to_regclass('public.food_search_synonyms') is null as synonyms_gone,
+  to_regprocedure('public.load_usda_food_batch(text, jsonb, jsonb, jsonb, text, text[])') is null as loader_gone,
   (exists (select 1 from public.usda_foods where data_type = 'Survey (FNDDS)'))
     or ((select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'usda_foods' and column_name in ('plain_name', 'extra_names', 'common')) = 0
         and position('Survey (FNDDS)' in (select pg_get_constraintdef(oid) from pg_constraint where conname = 'usda_foods_data_type_check' and conrelid = 'public.usda_foods'::regclass)) = 0) as table_as_before_or_everyday_foods_kept;

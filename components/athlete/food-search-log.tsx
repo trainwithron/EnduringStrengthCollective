@@ -7,14 +7,14 @@ import { loadFoodDetail, searchFoods, type FoodDetail, type FoodHit } from "@/li
 import { defaultServing, formatAmount, gramsFor, macrosOf, quantityProblem, scaleNutrients, servingOptions } from "@/lib/food-serving";
 import { MEAL_SLOTS, MEAL_SLOT_LABEL, defaultMealSlot, insertUsdaEntry, type MealSlot } from "@/lib/food-entry";
 import { completeness, formatNutrientAmount, panelRows } from "@/lib/nutrient-panel";
-import { PACKAGED_RESULT_LIMIT, packagedDetail, packagedTitle, searchPackaged, type PackagedHit } from "@/lib/packaged-foods";
+import { PACKAGED_RESULT_LIMIT, mlServingOptions, packagedDetail, packagedTitle, searchPackaged, type PackagedHit } from "@/lib/packaged-foods";
 import type { NutrientMap } from "@/lib/food-serving";
 import { Search } from "lucide-react";
 
-// "Per 100 g (3.5 oz): 61 kcal · 3.3p / 4.6c / 3.2f" (a value the food does not report is left out; missing calories say so).
-export function per100Line(per100g: NutrientMap): string {
+// "Per 100 g (3.5 oz): 61 kcal · 3.3p / 4.6c / 3.2f" (a value the food does not report is left out; missing calories say so). A packaged drink labelled by volume: "Per 100 ml".
+export function per100Line(per100g: NutrientMap, unit: "g" | "ml" = "g"): string {
   return (
-    `Per 100 g (3.5 oz): ${per100g.kcal != null ? `${Math.round(per100g.kcal)} kcal` : "calories not reported"}` +
+    `${unit === "ml" ? "Per 100 ml" : "Per 100 g (3.5 oz)"}: ${per100g.kcal != null ? `${Math.round(per100g.kcal)} kcal` : "calories not reported"}` +
     (per100g.protein_g != null ? ` · ${formatNutrientAmount(per100g.protein_g)}p` : "") +
     (per100g.carbs_g != null ? ` / ${formatNutrientAmount(per100g.carbs_g)}c` : "") +
     (per100g.fat_g != null ? ` / ${formatNutrientAmount(per100g.fat_g)}f` : "")
@@ -81,7 +81,8 @@ export function FoodSearchLog({
     return () => clearTimeout(timer);
   }, [query, open]);
 
-  const options = useMemo(() => servingOptions(detail?.portions ?? []), [detail]);
+  // A drink labelled by volume is measured in ml (its servings, then ml), never in grams.
+  const options = useMemo(() => (detail?.per100Unit === "ml" ? mlServingOptions(detail.portions) : servingOptions(detail?.portions ?? [])), [detail]);
   const option = options.find((o) => o.key === optionKey) ?? options[0];
   const qty = Number(qtyText);
   const problem = detail && option ? quantityProblem(option, qty) : null;
@@ -113,7 +114,7 @@ export function FoodSearchLog({
     setError(null);
     setAdded(null);
     const d = packagedDetail(hit);
-    const start = defaultServing(servingOptions(d.portions));
+    const start = defaultServing(d.per100Unit === "ml" ? mlServingOptions(d.portions) : servingOptions(d.portions));
     setDetail(d);
     setPicked({ title: d.description, usdaName: null, packaged: { barcode: hit.gtinUpc } });
     setOptionKey(start.option.key);
@@ -137,6 +138,7 @@ export function FoodSearchLog({
       grams,
       per100g: detail.per100g,
       packaged: picked?.packaged ?? null,
+      amountInMl: detail.per100Unit === "ml",
     });
     setSaving(false);
     if (!entry) {
@@ -222,9 +224,9 @@ export function FoodSearchLog({
                   <ul className="divide-y divide-steel/15">
                     {packagedHits.map((p) => (
                       <li key={`packaged-${p.fdcId}`}>
-                        <button type="button" onClick={() => pickPackaged(p)} className="w-full text-left px-3 py-2 min-h-[44px]">
+                        <button type="button" onClick={() => pickPackaged(p)} disabled={loadingDetail} className="w-full text-left px-3 py-2 min-h-[44px] disabled:opacity-60">
                           <span className="block font-body text-sm text-chalk">{packagedTitle(p)}</span>
-                          <span className="block font-body text-xs text-steel [font-variant-numeric:tabular-nums]">{per100Line(p.per100g)}</span>
+                          <span className="block font-body text-xs text-steel [font-variant-numeric:tabular-nums]">{per100Line(p.per100g, p.servingSizeUnit === "ml" ? "ml" : "g")}</span>
                         </button>
                       </li>
                     ))}
@@ -299,7 +301,7 @@ export function FoodSearchLog({
           </div>
 
           {problem && <p className="font-body text-xs text-rust-ink mt-2" role="alert">{problem}</p>}
-          {grams != null && <p className="font-body text-xs text-steel mt-2">That is {formatAmount(grams)}.</p>}
+          {grams != null && <p className="font-body text-xs text-steel mt-2">That is {detail.per100Unit === "ml" ? `${grams} ml` : formatAmount(grams)}.</p>}
 
           {macros && (
             <div className="mt-3 border border-steel/20 p-3">

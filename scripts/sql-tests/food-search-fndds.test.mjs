@@ -65,6 +65,9 @@ const sr = [
   [999001, "Bread, white", "SR Legacy", [270, 9.0, 50.0, 3.2]],
   [171477, "Chicken, broilers or fryers, breast, meat only, cooked, roasted", "SR Legacy", [165, 31.02, 0, 3.57]],
   [2646170, "Milk, whole, 3.25% milkfat, with added vitamin D", "Foundation", [61, 3.27, 4.63, 3.2]],
+  // only a synonym reaches it ("skim" is written "fat free"), and the plain food for "apples"
+  [170903, "Yogurt, plain, fat free", "SR Legacy", [56, 5.7, 7.7, 0.2]],
+  [171301, "Apples, dried, sulfured, uncooked", "SR Legacy", [243, 0.9, 65.9, 0.3]],
 ];
 for (const [id, d, t, [kcal, p, c, f]] of sr) {
   await db.query(`insert into public.usda_foods (fdc_id, description, data_type) values ($1, $2, $3)`, [id, d, t]);
@@ -94,14 +97,74 @@ expect("no food was touched by the paste", (await db.query(`select count(*)::int
 const out = mkdtempSync(join(tmpdir(), "fndds-batches-"));
 const importer = fileURLToPath(new URL("../usda-import.mjs", import.meta.url));
 const sample = fileURLToPath(new URL("./fixtures/fndds-sample/", import.meta.url));
-execFileSync(process.execPath, [importer, sample, "--name", "fndds-rehearsal", "--out", out, "--batch-size", "10"], { stdio: "pipe" });
+execFileSync(process.execPath, [importer, sample, "--name", "fndds-rehearsal", "--out", out, "--batch-size", "10", "--json"], { stdio: "pipe" });
 const batches = readdirSync(out).filter((f) => f.endsWith(".sql")).sort();
-expect("the importer wrote batches", batches.length === 2, batches.join(","));
+const jsonBatches = readdirSync(out).filter((f) => f.endsWith(".json") && f.startsWith("batch-")).sort();
+expect("the importer wrote batches, as SQL and as JSON", batches.length === 3 && jsonBatches.length === 3, batches.concat(jsonBatches).join(","));
 for (let pass = 0; pass < 2; pass++) for (const b of batches) await db.exec(readFileSync(join(out, b), "utf8"));
+const snapshot = async () =>
+  JSON.stringify(
+    (await db.query(`select f.fdc_id, f.description, f.data_type, f.food_category, f.plain_name, f.extra_names, f.common,
+       (select json_agg(json_build_array(n.nutrient_key, n.amount_per_100g) order by n.nutrient_key) from public.usda_food_nutrients n where n.fdc_id = f.fdc_id) nutrients,
+       (select json_agg(json_build_array(p.seq, p.description, p.gram_weight) order by p.seq) from public.usda_food_portions p where p.fdc_id = f.fdc_id) portions
+     from public.usda_foods f where f.data_type = 'Survey (FNDDS)' order by f.fdc_id`)).rows
+  );
+const bySql = await snapshot();
+
+// ---- the loader (public.load_usda_food_batch, what scripts/usda-food-load.mjs calls with the server key): the same foods as the SQL batches, twice is once, a bad batch is none ----
+await db.exec(`delete from public.usda_foods where data_type = 'Survey (FNDDS)'; delete from public.usda_load_batches where name like 'fndds-rehearsal-%';`);
+const callLoader = async (bodyText, role = "service_role") => {
+  const b = JSON.parse(bodyText);
+  await db.exec(`set role ${role}`);
+  try {
+    return (await db.query(`select public.load_usda_food_batch($1, $2::jsonb, $3::jsonb, $4::jsonb, $5, $6::text[]) as n`, [b.p_name, JSON.stringify(b.p_foods), JSON.stringify(b.p_nutrients), JSON.stringify(b.p_portions), b.p_mode, b.p_refresh_keys])).rows[0].n;
+  } finally {
+    await db.exec(`reset role`);
+  }
+};
+const firstPass = [];
+for (const f of jsonBatches) firstPass.push(await callLoader(readFileSync(join(out, f), "utf8")));
+const secondPass = [];
+for (const f of jsonBatches) secondPass.push(await callLoader(readFileSync(join(out, f), "utf8")));
+expect("loader: every batch loads, and loading them again does nothing (0 each)", firstPass.every((n) => n > 0) && secondPass.every((n) => n === 0), JSON.stringify([firstPass, secondPass]));
+expect("loader: exactly the same foods, nutrients and portions as the SQL batches", (await snapshot()) === bySql);
+expect("loader: one marker per batch", (await db.query(`select count(*)::int n from public.usda_load_batches where name like 'fndds-rehearsal-%'`)).rows[0].n === 3);
+const bad = JSON.parse(readFileSync(join(out, jsonBatches[0]), "utf8"));
+bad.p_name = "fndds-bad-001";
+bad.p_foods = bad.p_foods.map((f, i) => ({ ...f, fdc_id: 3900000 + i }));
+bad.p_nutrients = bad.p_nutrients.map((n) => ({ ...n, fdc_id: 3900000 }));
+bad.p_portions = [];
+bad.p_foods[bad.p_foods.length - 1].data_type = "Branded"; // the last food is refused, so the batch must leave nothing at all
+let badError = null;
+try {
+  await callLoader(JSON.stringify(bad));
+} catch (e) {
+  badError = e.message;
+}
+const leftBehind = (await db.query(`select (select count(*)::int from public.usda_foods where fdc_id >= 3900000) foods, (select count(*)::int from public.usda_load_batches where name = 'fndds-bad-001') marker`)).rows[0];
+expect("loader: a bad batch fails whole, with no food and no marker left", !!badError && leftBehind.foods === 0 && leftBehind.marker === 0, JSON.stringify(leftBehind));
+let tooBig = null;
+try {
+  await callLoader(JSON.stringify({ ...bad, p_name: "fndds-big-001", p_foods: Array.from({ length: 1001 }, (_, i) => ({ ...bad.p_foods[0], fdc_id: 3800000 + i, data_type: "Survey (FNDDS)" })) }));
+} catch (e) {
+  tooBig = e.message;
+}
+expect("loader: a batch over the size cap is refused", /too big/.test(tooBig ?? ""), tooBig ?? "");
+for (const role of ["authenticated", "anon"]) {
+  let denied = null;
+  try {
+    await callLoader(readFileSync(join(out, jsonBatches[0]), "utf8"), role);
+  } catch (e) {
+    denied = e.message;
+  }
+  expect(`loader: ${role} cannot call it`, /permission denied/.test(denied ?? ""), denied ?? "it ran");
+}
 rmSync(out, { recursive: true, force: true });
 const loaded = (await db.query(`select count(*)::int n, count(plain_name)::int named, count(*) filter (where common)::int common, count(extra_names)::int extra from public.usda_foods where data_type = 'Survey (FNDDS)'`)).rows[0];
-expect("15 everyday foods loaded once, with plain names, hand-named ones and other names", loaded.n === 15 && loaded.named === 10 && loaded.common === 10 && loaded.extra === 3, JSON.stringify(loaded));
-expect("their nutrients and portions came too", (await db.query(`select count(*)::int n from public.usda_food_nutrients where fdc_id between 2705000 and 2710000`)).rows[0].n === 60 && (await db.query(`select count(*)::int n from public.usda_food_portions`)).rows[0].n === 7);
+expect("21 everyday foods loaded once, with plain names, hand-named ones and other names", loaded.n === 21 && loaded.named === 13 && loaded.common === 12 && loaded.extra === 3, JSON.stringify(loaded));
+expect("their nutrients and portions came too", (await db.query(`select count(*)::int n from public.usda_food_nutrients where fdc_id between 2705000 and 2710000`)).rows[0].n === 84 && (await db.query(`select count(*)::int n from public.usda_food_portions`)).rows[0].n === 6);
+expect("'Quantity not specified' is never a serving", (await db.query(`select count(*)::int n from public.usda_food_portions where description ilike 'quantity not specified'`)).rows[0].n === 0);
+expect("raw salmon keeps USDA's name (raw is dropped only for fruit and vegetables)", (await db.query(`select plain_name from public.usda_foods where fdc_id = 2709202`)).rows[0].plain_name === null);
 expect("whole milk is named Whole milk, USDA's name kept", (await db.query(`select plain_name, description from public.usda_foods where fdc_id = 2705385`)).rows[0].plain_name === "Whole milk");
 
 // ---- the searches, the way the app calls it (lib/food-search.ts tokenize), as a signed-in person ----
@@ -127,6 +190,10 @@ expect('"french bread" gives Bread, French or Vienna first', (await firstId("fre
 const chicken = await search("chicken breast");
 expect('"chicken breast": a plain cooked chicken breast in the top 3', chicken.slice(0, 3).some((x) => x.fdc_id === 2705900), chicken.map((x) => x.fdc_id).join(","));
 expect('"banana" gives Banana, raw first', (await firstId("banana")) === 2709100, await list("banana"));
+expect('"eggs" (plural) finds the eggs, the boiled egg first', (await firstId("eggs")) === 2707150 && (await search("eggs")).some((x) => x.fdc_id === 2707158), await list("eggs"));
+expect('"salmon" gives cooked salmon first, not Salmon salad', (await firstId("salmon")) === 2709200, await list("salmon"));
+expect('"skim yogurt": a food only the synonym reaches (SR Legacy "Yogurt, plain, fat free") is found, first', (await firstId("skim yogurt")) === 170903, await list("skim yogurt"));
+expect('"apples": the plain food (Apples, dried) comes before an everyday food that only holds the word (Apple juice)', (await firstId("apples")) === 171301 && (await search("apples")).some((x) => x.fdc_id === 2709300), await list("apples"));
 // every row carries its plain name (null when it would repeat USDA's)
 expect("the plain name comes back with each row", (await search("whole milk"))[0].plain_name === "Whole milk");
 // one row per name, everyday first, SR Legacy still there below
@@ -162,7 +229,7 @@ expect("a signed-out person cannot search", (await db.query(`select has_function
 r = lastRow(await db.exec(undo));
 expect("undo (everyday foods loaded): one row, all true", oneRowAllTrue(r), shown(r));
 expect("undo: the search is exactly the live one again", (await fnMd5()) === "ddf683e15f560d97fa552ae06ea5b097");
-expect("undo: no food deleted, names kept", (await db.query(`select count(*)::int n, count(plain_name)::int named from public.usda_foods where data_type = 'Survey (FNDDS)'`)).rows[0].named === 10);
+expect("undo: no food deleted, names kept", (await db.query(`select count(*)::int n, count(plain_name)::int named from public.usda_foods where data_type = 'Survey (FNDDS)'`)).rows[0].named === 13);
 expect("undo: the old search still finds the everyday foods", (await db.query(`select count(*)::int n from public.search_usda_foods(array['milk'], 50) where data_type = 'Survey (FNDDS)'`)).rows[0].n > 0);
 r = lastRow(await db.exec(apply));
 expect("paste again after the undo: one row, all true", oneRowAllTrue(r), shown(r));

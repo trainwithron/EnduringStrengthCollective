@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { FoodPortion, NutrientMap } from "@/lib/food-serving";
+import { servingOptions, type FoodPortion, type NutrientMap, type ServingOption } from "@/lib/food-serving";
 import type { FoodDetail } from "@/lib/food-search";
 
 // The "Packaged foods" group of the food search (step 223, Ron Nov 23): brand-name products from USDA's Branded Foods, shown UNDER the everyday results and only when there are
@@ -37,16 +37,30 @@ export function packagedTitle(hit: Pick<PackagedHit, "brand" | "description">): 
   return `${brand} ${desc}`;
 }
 
-// The label's serving as a portion the serving picker offers, when it is in grams ("1 bar (40 g)"). A serving in ml is not turned into grams (a liquid's weight is not its volume);
-// grams and ounces are always offered anyway.
+// The label's serving as a portion the serving picker offers: "1 bar (40 g)", or for a drink labelled by volume "1 can (355 ml)" (its amounts are in ml: per100g is then per 100 ml,
+// part B). Nothing when the label gives no usable size.
 export function packagedPortions(hit: Pick<PackagedHit, "servingSize" | "servingSizeUnit" | "householdServing">): FoodPortion[] {
-  if (hit.servingSizeUnit !== "g" || !(hit.servingSize != null && hit.servingSize > 0 && hit.servingSize < 100000)) return [];
-  const grams = Math.round(hit.servingSize * 10) / 10;
+  if ((hit.servingSizeUnit !== "g" && hit.servingSizeUnit !== "ml") || !(hit.servingSize != null && hit.servingSize > 0 && hit.servingSize < 100000)) return [];
+  const amount = Math.round(hit.servingSize * 10) / 10;
   const house = (hit.householdServing ?? "").trim();
-  return [{ seq: 1, description: `${house || "1 serving"} (${grams} g)`.slice(0, 200), gramWeight: grams }];
+  return [{ seq: 1, description: `${house || "1 serving"} (${amount} ${hit.servingSizeUnit})`.slice(0, 200), gramWeight: amount }];
 }
 
 // What the serving picker and the nutrient panel need, straight from the hit (no read).
 export function packagedDetail(hit: PackagedHit): FoodDetail {
-  return { fdcId: hit.fdcId, description: packagedTitle(hit), per100g: { ...hit.per100g }, portions: packagedPortions(hit) };
+  return {
+    fdcId: hit.fdcId,
+    description: packagedTitle(hit),
+    per100g: { ...hit.per100g },
+    portions: packagedPortions(hit),
+    per100Unit: hit.servingSizeUnit === "ml" ? "ml" : "g",
+  };
+}
+
+// The serving choices for a drink labelled by volume: its servings, then ml. No grams or ounces (the label gives no weight). `gramWeight` here counts ml, the unit per100g is in.
+export function mlServingOptions(portions: FoodPortion[]): ServingOption[] {
+  return [
+    ...servingOptions(portions).filter((o) => o.kind === "portion"),
+    { key: "ml", label: "ml", gramWeight: 1, kind: "grams" },
+  ];
 }

@@ -5,15 +5,15 @@ import * as fnddsLib from "../scripts/usda-fndds-lib.mjs";
 import * as usdaLib from "../scripts/usda-lib.mjs";
 import * as batchLib from "../scripts/usda-batch-lib.mjs";
 import { searchFoods } from "@/lib/food-search";
-import { packagedDetail, packagedPortions, packagedTitle, searchPackaged, type PackagedHit } from "@/lib/packaged-foods";
+import { mlServingOptions, packagedDetail, packagedPortions, packagedTitle, searchPackaged, type PackagedHit } from "@/lib/packaged-foods";
 import { usdaEntryRow } from "@/lib/food-entry";
 import { per100Line } from "@/components/athlete/food-search-log";
 
 // Step 223 (Ron, Nov 23: "type whole milk and get whole milk; 2% milk gives exactly 2% milk; sourdough bread gives sourdough bread"). The ranking itself is rehearsed in SQL
 // (scripts/sql-tests/food-search-fndds.test.mjs); these are the pure parts: the plain names, USDA's other names, the import, the packaged group and how a pick is logged.
 const { plainNameFor, isCommonFood, buildExtraNames, addEverydayNames, PLAIN_NAME_OVERRIDES } = fnddsLib as any;
-const { buildFoods, parseCsv } = usdaLib as any;
-const { toBatchSql } = batchLib as any;
+const { buildFoods, parseCsv, buildNutrientIndex } = usdaLib as any;
+const { toBatchSql, buildPortions } = batchLib as any;
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
 
 describe("plain names: a re-wording of USDA's own name, never a new fact", () => {
@@ -28,7 +28,19 @@ describe("plain names: a re-wording of USDA's own name, never a new fact", () =>
   });
   it("the rule: a short two-part name is turned round; ', raw' is dropped", () => {
     expect(plainNameFor("Cheese, cheddar")).toBe("Cheddar cheese");
-    expect(plainNameFor("Pear, raw")).toBe("Pear");
+    expect(plainNameFor("Pear, raw", "Pears")).toBe("Pear");
+  });
+  it("NFS / NS (\"not further specified\") is never turned round", () => {
+    for (const d of ["Milk, NFS", "Bread, NFS", "Cheese, NFS", "Soup, NS"]) expect(plainNameFor(d), d).toBeNull();
+  });
+  it("raw is dropped only for a fruit or vegetable: raw meat or fish keeps USDA's name", () => {
+    expect(plainNameFor("Salmon, raw", "Fish")).toBeNull();
+    expect(plainNameFor("Beef, raw", "Beef, excludes ground")).toBeNull();
+    expect(plainNameFor("Pear, raw")).toBeNull(); // no category known: kept as USDA wrote it
+    expect(plainNameFor("Spinach, raw", "Spinach")).toBe("Spinach");
+  });
+  it("a second part that starts with on / in / and / or / as is not a kind", () => {
+    for (const d of ["Hamburger, on bun", "Tuna, in oil", "Fries, and ketchup", "Beans, or peas", "Chicken, as ingredient"]) expect(plainNameFor(d), d).toBeNull();
   });
   it("anything longer or not a kind stays as USDA wrote it (null: show USDA's name)", () => {
     expect(plainNameFor("Bread, French or Vienna, toasted")).toBeNull();
@@ -83,6 +95,24 @@ describe("USDA's other names (additional descriptions)", () => {
 });
 
 describe("the import reads the everyday foods", () => {
+  it("FNDDS points at a nutrient by its number; Foundation / SR Legacy by its id: both are read", () => {
+    const index = buildNutrientIndex([{ id: "1008", name: "Energy", unit_name: "KCAL", nutrient_nbr: "208" }, { id: "1003", name: "Protein", unit_name: "G", nutrient_nbr: "203.0" }]);
+    expect(index.get("1008")?.key).toBe("kcal");
+    expect(index.get("208")?.key).toBe("kcal");
+    expect(index.get("203")?.key).toBe("protein_g");
+  });
+  it("'Quantity not specified' is never a serving (it would be the default)", () => {
+    const foods = new Map([[1, { fdc_id: 1 }]]);
+    const rows = buildPortions(
+      [
+        { fdc_id: "1", seq_num: "1", amount: "", measure_unit_id: "9999", portion_description: "Quantity not specified", modifier: "", gram_weight: "244" },
+        { fdc_id: "1", seq_num: "2", amount: "", measure_unit_id: "9999", portion_description: "1 cup", modifier: "", gram_weight: "244" },
+      ],
+      [{ id: "9999", name: "undetermined" }],
+      foods
+    );
+    expect(rows.map((r: { description: string }) => r.description)).toEqual(["1 cup"]);
+  });
   it("survey_fndds_food is 'Survey (FNDDS)', with its WWEIA category", () => {
     const foods = buildFoods(parseCsv('fdc_id,data_type,description,food_category_id\n2705385,survey_fndds_food,"Milk, whole",1002\n9,branded_food,Bar,1\n'), [{ id: "1002", description: "Milk, whole" }]);
     expect(foods.get(2705385)).toEqual({ fdc_id: 2705385, description: "Milk, whole", data_type: "Survey (FNDDS)", food_category: "Milk, whole" });
@@ -110,8 +140,9 @@ describe("the search (migration 0467)", () => {
     expect(sql).toContain("returns table(fdc_id integer, description text, data_type text, food_category text, kcal numeric, protein_g numeric, carbs_g numeric, fat_g numeric, plain_name text)");
     expect(sql).toContain("grant execute on function public.search_usda_foods(text[], integer) to authenticated, service_role;");
   });
-  it("ranks exact, then starts-with, then the hand-named, then FNDDS / Foundation / SR Legacy; one row per name", () => {
-    const order = ["o.exact desc", "o.starts desc", "o.common desc", "o.type_rank asc"];
+  it("ranks exact, then starts-with, then the plain food, then FNDDS / Foundation / SR Legacy, the word places, then the hand-named; one row per name", () => {
+    // the plain food (its name starting with the first word) before the hand-named and the data type (review, Nov 23)
+    const order = ["o.exact desc", "o.starts desc", "(lower(o.description) like (select q.first_tok from q) || '%') desc", "o.type_rank asc", "o.first_words desc", "o.second_words desc", "o.common desc", "length(o.description) asc"];
     const at = order.map((s) => sql.indexOf(s));
     for (const i of at) expect(i).toBeGreaterThan(-1);
     expect([...at].sort((a, b) => a - b)).toEqual(at);
@@ -149,7 +180,7 @@ describe("the Packaged foods group", () => {
   });
   it("offers the label's serving when it is in grams, never turns ml into grams", () => {
     expect(packagedPortions(hit)).toEqual([{ seq: 1, description: "1 bar (60 g)", gramWeight: 60 }]);
-    expect(packagedPortions({ ...hit, servingSizeUnit: "ml", servingSize: 250 })).toEqual([]);
+    expect(packagedPortions({ ...hit, servingSizeUnit: null, servingSize: 250 })).toEqual([]);
     expect(packagedPortions({ ...hit, servingSize: null })).toEqual([]);
     expect(packagedDetail(hit)).toMatchObject({ fdcId: 9000001, description: "Acme Protein bar, chocolate", per100g: { kcal: 400 } });
   });
@@ -159,6 +190,23 @@ describe("the Packaged foods group", () => {
     const everyday = usdaEntryRow(base);
     expect(everyday).toMatchObject({ food_source: "usda", fdc_id: 9000001 });
     expect("barcode" in everyday).toBe(false);
+  });
+  it("a drink labelled by volume is measured in ml: per 100 ml, its servings in ml, no grams or ounces, and no gram amount logged", () => {
+    const drink: PackagedHit = { ...hit, description: "Sports drink", servingSize: 355, servingSizeUnit: "ml", householdServing: "1 can", per100g: { kcal: 24, carbs_g: 6 } };
+    const d = packagedDetail(drink);
+    expect(d.per100Unit).toBe("ml");
+    expect(d.portions).toEqual([{ seq: 1, description: "1 can (355 ml)", gramWeight: 355 }]);
+    expect(mlServingOptions(d.portions).map((o) => o.label)).toEqual(["1 can (355 ml)", "ml"]);
+    expect(packagedDetail(hit).per100Unit).toBe("g");
+    expect(per100Line({ kcal: 24 }, "ml")).toBe("Per 100 ml: 24 kcal");
+    const row = usdaEntryRow({ athleteId: "a", groupId: "g", logDate: "2026-11-23", mealSlot: null, fdcId: 1, description: "Acme Sports drink", servingLabel: "1 can (355 ml)", servingQty: 1, grams: 355, per100g: drink.per100g, packaged: { barcode: null }, amountInMl: true });
+    expect(row).toMatchObject({ amount_g: null, calories: 85, food_source: "barcode" });
+    const ui = read("components/athlete/food-search-log.tsx");
+    expect(ui).toContain('detail?.per100Unit === "ml" ? mlServingOptions(detail.portions) : servingOptions(detail?.portions ?? [])');
+    expect(ui).toContain('amountInMl: detail.per100Unit === "ml",');
+  });
+  it("a packaged food cannot be picked while an everyday food is still loading", () => {
+    expect(read("components/athlete/food-search-log.tsx")).toContain("onClick={() => pickPackaged(p)} disabled={loadingDetail}");
   });
   it("lists nothing until it is wired to part B's searchBranded", async () => {
     expect(await searchPackaged({} as never, "bar")).toEqual([]);
@@ -175,5 +223,58 @@ describe("the Packaged foods group", () => {
   it("the per-100 g line", () => {
     expect(per100Line({ kcal: 61, protein_g: 3.27, carbs_g: 4.63, fat_g: 3.2 })).toBe("Per 100 g (3.5 oz): 61 kcal · 3.27p / 4.63c / 3.2f");
     expect(per100Line({})).toBe("Per 100 g (3.5 oz): calories not reported");
+  });
+});
+
+describe("the loader (step 223: public.load_usda_food_batch, sent by scripts/usda-food-load.mjs with the server key)", () => {
+  it("reads .env.local the usual way", async () => {
+    const { parseEnvFile } = (await import("../scripts/usda-food-load-lib.mjs")) as any;
+    expect(parseEnvFile('# x\nNEXT_PUBLIC_SUPABASE_URL="https://a.supabase.co"\nexport SUPABASE_SERVICE_ROLE_KEY=abc\n\nBAD\n')).toEqual({ NEXT_PUBLIC_SUPABASE_URL: "https://a.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "abc" });
+  });
+  it("sends the JSON batches in order, and refuses an index without them", async () => {
+    const { batchFiles } = (await import("../scripts/usda-food-load-lib.mjs")) as any;
+    expect(batchFiles({ jsonFiles: ["batch-002.json", "batch-001.json"] })).toEqual(["batch-001.json", "batch-002.json"]);
+    expect(() => batchFiles({ files: ["batch-001.sql"] })).toThrow("--json");
+    expect(() => batchFiles({ jsonFiles: ["../x.json"] })).toThrow("unexpected");
+  });
+  it("one POST to the function with the key in the headers only; a failure never shows the key", async () => {
+    const { sendBatch } = (await import("../scripts/usda-food-load-lib.mjs")) as any;
+    const calls: { url: string; init: { headers: Record<string, string>; body: string } }[] = [];
+    const ok = async (url: string, init: any) => (calls.push({ url, init }), { ok: true, status: 200, text: async () => "1234" });
+    expect(await sendBatch(ok, "https://a.supabase.co/", "SECRET", '{"p_name":"x"}')).toEqual({ ok: true, rows: 1234 });
+    expect(calls[0].url).toBe("https://a.supabase.co/rest/v1/rpc/load_usda_food_batch");
+    expect(calls[0].init.headers.Authorization).toBe("Bearer SECRET");
+    expect(calls[0].init.body).toBe('{"p_name":"x"}');
+    const failing = async () => ({ ok: false, status: 400, text: async () => '{"message":"bad SECRET"}' });
+    const r = await sendBatch(failing, "https://a.supabase.co", "SECRET", "{}");
+    expect(r.ok).toBe(false);
+    expect(r.error).not.toContain("SECRET");
+    const thrown = async () => {
+      throw new Error("network down near SECRET");
+    };
+    expect((await sendBatch(thrown, "https://a.supabase.co", "SECRET", "{}")).error).not.toContain("SECRET");
+  });
+  it("a JSON batch holds the same rows as its SQL batch, and a too-big one is refused", () => {
+    const { toBatchJson } = batchLib as any;
+    const foods = new Map([[1, { fdc_id: 1, description: "Milk, whole", data_type: "Survey (FNDDS)", food_category: null, plain_name: "Whole milk", extra_names: null, common: true }]]);
+    const body = JSON.parse(toBatchJson("fndds-x-001", foods, [{ fdc_id: 1, nutrient_key: "kcal", amount_per_100g: 61 }], [{ fdc_id: 1, seq: 1, description: "1 cup", gram_weight: 244 }]));
+    expect(body).toEqual({
+      p_name: "fndds-x-001",
+      p_mode: "add",
+      p_refresh_keys: [],
+      p_foods: [{ fdc_id: 1, description: "Milk, whole", data_type: "Survey (FNDDS)", food_category: null, plain_name: "Whole milk", extra_names: null, common: true }],
+      p_nutrients: [{ fdc_id: 1, nutrient_key: "kcal", amount_per_100g: 61 }],
+      p_portions: [{ fdc_id: 1, seq: 1, description: "1 cup", gram_weight: 244 }],
+    });
+    const huge = new Map([[1, { fdc_id: 1, description: "x".repeat(1_500_000), data_type: "Survey (FNDDS)" }]]);
+    expect(() => toBatchJson("fndds-x-002", huge, [], [])).toThrow("smaller --batch-size");
+  });
+  it("the function is server-key only, runs with a fixed path, and loads a batch whole or not at all", () => {
+    const sql = read("supabase/migrations/0467_food_search_everyday_foods.sql");
+    expect(sql).toContain("security definer\nset search_path = public");
+    expect(sql).toContain("revoke all on function public.load_usda_food_batch(text, jsonb, jsonb, jsonb, text, text[]) from public, anon, authenticated;");
+    expect(sql).toContain("grant execute on function public.load_usda_food_batch(text, jsonb, jsonb, jsonb, text, text[]) to service_role;");
+    expect(sql).toContain("if exists (select 1 from public.usda_load_batches where name = p_name) then\n    return 0;");
+    expect(read("scripts/usda-food-load.mjs")).not.toMatch(/console\.(log|error)\([^)]*\bkey\b/);
   });
 });

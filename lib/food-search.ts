@@ -137,6 +137,8 @@ export interface FoodDetail {
   description: string;
   per100g: NutrientMap;
   portions: FoodPortion[];
+  // "ml" for a packaged drink labelled by volume: per100g is then per 100 ml, and the amounts (and portions) are in ml, never turned into grams. Absent: grams.
+  per100Unit?: "g" | "ml";
 }
 
 // Everything the serving picker and the nutrient panel need for one food. Portions are optional: a database without them (or a food USDA has none for) simply offers grams and ounces.

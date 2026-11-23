@@ -18,25 +18,44 @@ export const PLAIN_NAME_OVERRIDES = {
   "Rice, white, cooked, no added fat": { name: "White rice, cooked", common: true },
   "Rice, brown, cooked, no added fat": { name: "Brown rice, cooked", common: true },
   "Egg, whole, boiled or poached": { name: "Boiled egg", common: true },
-  "Egg, whole, fried, no added fat": { name: "Fried egg", common: true },
-  "Egg, whole, scrambled, no added fat": { name: "Scrambled eggs", common: true },
+  "Egg, whole, fried no added fat": { name: "Fried egg", common: true },
+  "Egg omelet or scrambled egg, NS as to fat": { name: "Scrambled eggs or omelet", common: true },
   "Banana, raw": { name: "Banana", common: true },
   "Apple, raw": { name: "Apple", common: true },
   "Orange, raw": { name: "Orange", common: true },
   "Peanut butter": { name: "Peanut butter", common: true },
   "Oatmeal, regular or quick, made with water, no added fat": { name: "Oatmeal, made with water", common: true },
-  "Yogurt, Greek, plain, nonfat": { name: "Greek yogurt, plain, nonfat", common: true },
+  "Yogurt, Greek, nonfat milk, plain": { name: "Greek yogurt, plain, nonfat", common: true },
+  // USDA files fish as "Fish, salmon, ..." and potatoes by how they are cooked: the everyday one gets the name people type
+  "Fish, salmon, baked or broiled": { name: "Salmon, cooked", common: true },
+  "Fish, tuna, canned": { name: "Canned tuna", common: true },
+  "Potato, baked, peel not eaten": { name: "Baked potato", common: true },
+  "Sweet potato, baked, no added fat": { name: "Baked sweet potato", common: true },
+  "Broccoli, raw": { name: "Broccoli", common: true },
+  "Avocado, raw": { name: "Avocado", common: true },
+  "Beef, ground": { name: "Ground beef", common: true },
+  "Turkey, ground": { name: "Ground turkey", common: true },
 };
 
-// Second parts that are not a kind of the food ("Banana, raw" is just a banana; "Soup, NS as to type" says nothing): never moved in front.
-const NOT_A_KIND = /^(ns |not specified|from |made with|with |without |for use|raw$|prepared|ready-to|canned$|frozen$|baby food)/i;
+// Second parts that are not a kind of the food ("Soup, NS as to type" and "Milk, NFS" say nothing; "Hamburger, on bun" is not an "On bun hamburger"): never moved in front.
+const NOT_A_KIND = /^(ns |ns$|nfs|not specified|from |made with|with |without |no |on |in |and |or |as |for use|raw$|prepared|ready-to|canned$|frozen$|baby food)/i;
+
+// The fruit and vegetable categories (WWEIA, as named in wweia_food_category.csv): only there is ", raw" dropped ("Banana, raw" is just a banana). Raw meat or fish keeps USDA's
+// name, so a diary never hides that it was raw.
+export const FRUIT_AND_VEGETABLE_CATEGORIES = new Set([
+  "Apples", "Bananas", "Grapes", "Peaches and nectarines", "Strawberries", "Blueberries and other berries", "Citrus fruits", "Melons", "Dried fruits", "Other fruits and fruit salads",
+  "Pears", "Pineapple", "Mango and papaya", "Tomatoes", "Carrots", "Other red and orange vegetables", "Broccoli", "Spinach", "Lettuce and lettuce salads",
+  "Other dark green vegetables", "String beans", "Cabbage", "Onions", "Corn", "Other starchy vegetables", "Other vegetables and combinations",
+]);
+// Words that make a second part a description, not a kind ("cheese only", "vegetarian with egg", "round ball"): left as USDA wrote it.
+const NOT_A_KIND_ANYWHERE = /\b(nfs|ns|with|without|only|ball|style|type|flavor|flavors)\b/i;
 
 const capitalize = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
-// The rule, for a description with no hand-made name: "Milk, whole" -> "Whole milk"; "Bread, white" -> "White bread"; "Banana, raw" -> "Banana". Only a two-part name whose first part
-// is one or two words and whose second is a short describing word or two is turned round; anything longer stays as USDA wrote it (moving words around a long name changes its sense).
-// Returns null when the plain name would only repeat USDA's.
-export function plainNameFor(description) {
+// The rule, for a description with no hand-made name: "Milk, whole" -> "Whole milk"; "Bread, white" -> "White bread"; "Pear, raw" -> "Pear" (a fruit or vegetable only). Only a
+// two-part name whose first part is one or two words and whose second is a short describing word or two is turned round; anything longer stays as USDA wrote it (moving words around
+// a long name changes its sense). `category` is the food's WWEIA category. Returns null when the plain name would only repeat USDA's.
+export function plainNameFor(description, category = null) {
   const desc = String(description ?? "").trim();
   if (!desc) return null;
   const override = PLAIN_NAME_OVERRIDES[desc];
@@ -44,8 +63,11 @@ export function plainNameFor(description) {
   const parts = desc.split(",").map((s) => s.trim());
   if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
   const [food, kind] = parts;
-  if (/^raw$/i.test(kind) && food.split(/\s+/).length <= 3) return capitalize(food);
-  if (food.split(/\s+/).length > 2 || kind.split(/\s+/).length > 3 || NOT_A_KIND.test(kind) || /[()]/.test(kind)) return null;
+  if (/^raw$/i.test(kind)) return FRUIT_AND_VEGETABLE_CATEGORIES.has(String(category ?? "")) && food.split(/\s+/).length <= 3 ? capitalize(food) : null;
+  if (food.split(/\s+/).length > 2 || kind.split(/\s+/).length > 3 || NOT_A_KIND.test(kind) || NOT_A_KIND_ANYWHERE.test(kind) || /[()]/.test(kind)) return null;
+  // a word of the food repeated in the kind ("Cheese spread, cream cheese") reads badly turned round
+  const foodWords = new Set(food.toLowerCase().split(/\s+/));
+  if (kind.toLowerCase().split(/\s+/).some((w) => foodWords.has(w))) return null;
   const name = capitalize(`${kind} ${food.toLowerCase()}`);
   return name.length <= 120 ? name : null;
 }
@@ -90,7 +112,7 @@ export function addEverydayNames(foods, extraNames = new Map()) {
   const seen = new Set();
   for (const f of foods.values()) {
     if (f.data_type !== "Survey (FNDDS)") continue;
-    f.plain_name = plainNameFor(f.description);
+    f.plain_name = plainNameFor(f.description, f.food_category);
     f.common = isCommonFood(f.description);
     if (f.common) seen.add(f.description);
     f.extra_names = extraNames.get(f.fdc_id) ?? null;

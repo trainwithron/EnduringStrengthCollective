@@ -3,7 +3,8 @@
 //
 //   node scripts/usda-import.mjs <folder with the USDA CSV files>                       (dry run: reads the files, prints what it WOULD load, writes nothing)
 //   node scripts/usda-import.mjs <folder> --compare-live                                (adds the BEFORE / AFTER report against the database; read-only)
-//   node scripts/usda-import.mjs <folder> --name fdc-2026-04 --out <dir> [--compare-live] [--mode add|refresh] [--refresh-keys folate_mcg] [--batch-size 150]
+//   node scripts/usda-import.mjs <folder> --name fdc-2026-04 --out <dir> [--compare-live] [--mode add|refresh] [--refresh-keys folate_mcg] [--batch-size 150] [--json]
+//   (--json also writes each batch as JSON; load those with node scripts/usda-food-load.mjs <dir>, step 223)
 //
 // Download the CSV zips from https://fdc.nal.usda.gov/download-datasets.html (Foundation Foods and SR Legacy), unzip them into one folder so it holds food.csv, food_category.csv,
 // nutrient.csv, food_nutrient.csv, and (for portions) food_portion.csv and measure_unit.csv, and point this at it. For FNDDS also wweia_food_category.csv (the categories) and
@@ -22,7 +23,7 @@ import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } 
 import { createInterface } from "node:readline";
 import { join } from "node:path";
 import { buildFoods, buildNutrientIndex, chunk, createNutrientCollector, parseCsv, parseCsvLine, NUTRIENT_SOURCES } from "./usda-lib.mjs";
-import { buildPortions, compareWithExisting, formatReport, toBatchSql } from "./usda-batch-lib.mjs";
+import { buildPortions, compareWithExisting, formatReport, toBatchJson, toBatchSql } from "./usda-batch-lib.mjs";
 import { addEverydayNames, buildExtraNames } from "./usda-fndds-lib.mjs";
 
 const args = process.argv.slice(2);
@@ -38,6 +39,8 @@ const batchSize = Number(valueOf("--batch-size") ?? 150);
 const mode = valueOf("--mode") ?? "add";
 const refreshKeys = (valueOf("--refresh-keys") ?? "").split(",").map((k) => k.trim()).filter(Boolean);
 const compareLive = args.includes("--compare-live");
+// --json: also write each batch as JSON for scripts/usda-food-load.mjs (which sends it to public.load_usda_food_batch with the server key)
+const asJson = args.includes("--json");
 
 if (!folder) {
   console.error("Usage: node scripts/usda-import.mjs <folder with food.csv, food_category.csv, nutrient.csv, food_nutrient.csv, food_portion.csv, measure_unit.csv> [--compare-live] [--name <batch prefix> --out <dir> [--mode add|refresh] [--refresh-keys a,b] [--batch-size 150]]");
@@ -160,16 +163,32 @@ if (outDir) {
   for (const p of portionRows) (portionsByFood.get(p.fdc_id) ?? portionsByFood.set(p.fdc_id, []).get(p.fdc_id)).push(p);
   const ids = [...foods.keys()].sort((a, b) => a - b);
   const files = [];
+  const jsonFiles = [];
   chunk(ids, batchSize).forEach((group, i) => {
     const sub = new Map(group.map((id) => [id, foods.get(id)]));
+    const batchName = `${name}-${String(i + 1).padStart(3, "0")}`;
+    const nutrients = group.flatMap((id) => nutrientsByFood.get(id) ?? []);
+    const portions = group.flatMap((id) => portionsByFood.get(id) ?? []);
     const file = `batch-${String(i + 1).padStart(3, "0")}.sql`;
-    writeFileSync(
-      join(outDir, file),
-      toBatchSql(`${name}-${String(i + 1).padStart(3, "0")}`, sub, group.flatMap((id) => nutrientsByFood.get(id) ?? []), group.flatMap((id) => portionsByFood.get(id) ?? []), { mode, refreshKeys })
-    );
+    writeFileSync(join(outDir, file), toBatchSql(batchName, sub, nutrients, portions, { mode, refreshKeys }));
     files.push(file);
+    // --json: the same batch for the loader (scripts/usda-food-load.mjs -> public.load_usda_food_batch); the SAME name, so a batch loaded either way is never loaded twice
+    if (asJson) {
+      const jsonFile = `batch-${String(i + 1).padStart(3, "0")}.json`;
+      writeFileSync(join(outDir, jsonFile), toBatchJson(batchName, sub, nutrients, portions, { mode, refreshKeys }));
+      jsonFiles.push(jsonFile);
+    }
   });
-  writeFileSync(join(outDir, "index.json"), JSON.stringify({ name, mode, refreshKeys, batchSize, foods: foods.size, nutrientRows: nutrientRows.length, portions: portionRows.length, files }, null, 1));
+  // Every plain name the import gives, to read before any batch is run (Spot Commander, Nov 23)
+  const named = [...foods.values()].filter((x) => x.data_type === "Survey (FNDDS)").sort((a, b) => a.fdc_id - b.fdc_id);
+  if (named.length > 0) {
+    const cell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    writeFileSync(
+      join(outDir, "plain-names-review.csv"),
+      ["fdc_id,description,plain_name,common,food_category", ...named.map((x) => [x.fdc_id, cell(x.description), cell(x.plain_name), x.common ? "yes" : "", cell(x.food_category)].join(","))].join("\n") + "\n"
+    );
+  }
+  writeFileSync(join(outDir, "index.json"), JSON.stringify({ name, mode, refreshKeys, batchSize, foods: foods.size, nutrientRows: nutrientRows.length, portions: portionRows.length, files, jsonFiles }, null, 1));
   if (reportText) writeFileSync(join(outDir, "BEFORE_AFTER_REPORT.md"), reportText);
   console.log(`Wrote ${files.length} batch files (${mode} mode) to ${outDir}${reportText ? " and BEFORE_AFTER_REPORT.md" : ""}. Run them in order; each is all-or-nothing and a finished one is skipped if run again.`);
   if (!reportText) console.log("Tip: add --compare-live to write the BEFORE / AFTER report, and read it before running any batch.");
