@@ -86,13 +86,29 @@ export function brandedHitFromRow(row: BrandedRow): BrandedHit {
 export async function searchBranded(supabase: SupabaseClient, query: string, limit = 10): Promise<BrandedHit[] | null> {
   const tokens = tokenize(query);
   if (tokens.length === 0) return [];
+  const want = Math.min(Math.max(Math.round(limit), 1), 50);
   try {
-    const { data, error } = await supabase.rpc("search_branded_foods", { p_tokens: tokens, p_limit: Math.min(Math.max(Math.round(limit), 1), 50) });
+    // Extra rows (the database gives at most 50), so after dropping repeats there are still `limit` different products.
+    const { data, error } = await supabase.rpc("search_branded_foods", { p_tokens: tokens, p_limit: Math.min(want * 4, 50) });
     if (error) return null;
-    return ((data ?? []) as BrandedRow[]).map(brandedHitFromRow);
+    return dedupeBrandedHits(((data ?? []) as BrandedRow[]).map(brandedHitFromRow)).slice(0, want);
   } catch {
     return null;
   }
+}
+
+// One product shown once (Spot Commander, Nov 23, live: "whole milk" showed "365 WHOLE FOODS MARKET WHOLE MILK" four times, one per size or UPC with the same words): the first of
+// each brand + name + kcal (rounded) is kept, in the search's own order. Products with a different kcal are different foods to log, so they stay.
+export function dedupeBrandedHits(hits: BrandedHit[]): BrandedHit[] {
+  const seen = new Set<string>();
+  const out: BrandedHit[] = [];
+  for (const h of hits) {
+    const k = [(h.brand ?? "").trim().toLowerCase(), h.description.replace(/\s+/g, " ").trim().toLowerCase(), Math.round(h.per100g.kcal ?? -1)].join("|");
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(h);
+  }
+  return out;
 }
 
 // ---- barcodes ----

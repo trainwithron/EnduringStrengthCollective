@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { barcodeCandidates, brandedBarcodeResult, brandedHitFromRow, expandUpcE, lookupBrandedBarcode, pickBarcodeRow, searchBranded, type BrandedRow } from "./branded-foods";
+import { barcodeCandidates, brandedBarcodeResult, brandedHitFromRow, dedupeBrandedHits, expandUpcE, lookupBrandedBarcode, pickBarcodeRow, searchBranded, type BrandedRow } from "./branded-foods";
 import { lookupBarcodeInOrder, NOT_FOUND, UNREACHABLE } from "./barcode-lookup";
 import { normalizeBarcode } from "./food-barcode";
 // the importer's pure parts (scripts/usda-branded-lib.mjs)
@@ -154,12 +154,28 @@ describe("searchBranded", () => {
   it("sends the query's words to the database search; a failed read is null, no words is []", async () => {
     const rpc = vi.fn(async () => ({ data: [row()], error: null }));
     const hits = await searchBranded({ rpc } as never, "Cheerios oat cereal", 10);
-    expect(rpc).toHaveBeenCalledWith("search_branded_foods", { p_tokens: ["cheerios", "oat", "cereal"], p_limit: 10 });
+    // four times the rows asked for (at most 50), so repeats can be dropped and `limit` still come back
+    expect(rpc).toHaveBeenCalledWith("search_branded_foods", { p_tokens: ["cheerios", "oat", "cereal"], p_limit: 40 });
     expect(hits?.[0]).toMatchObject({ fdcId: 1000001, brand: "Cheerios", dataType: "Branded" });
     expect(await searchBranded({ rpc: async () => ({ data: null, error: { message: "x" } }) } as never, "milk")).toBeNull();
     expect(await searchBranded({ rpc } as never, "  ")).toEqual([]);
     await searchBranded({ rpc } as never, "milk", 500);
     expect(rpc).toHaveBeenLastCalledWith("search_branded_foods", { p_tokens: ["milk"], p_limit: 50 });
+  });
+  it("one product once: the same brand, name and kcal (a size or a UPC apart) shows once, in rank order; a different kcal or brand stays; `limit` different products come back", async () => {
+    const wm = (fdc: number, over: Partial<BrandedRow> = {}) => row({ fdc_id: fdc, gtin: String(fdc), brand_name: "365 WHOLE FOODS MARKET", description: "WHOLE MILK", kcal: 61, ...over });
+    const rows = [
+      wm(1),
+      wm(2, { serving_size: 480 }),
+      wm(3, { description: " whole  milk ", kcal: 61.2 }),
+      wm(4, { kcal: 64 }),
+      wm(5, { brand_name: "MAPLE VIEW MILK CO." }),
+      wm(6),
+      wm(7, { brand_name: "ORGANIC VALLEY" }),
+    ];
+    const hits = await searchBranded({ rpc: async () => ({ data: rows, error: null }) } as never, "whole milk", 3);
+    expect(hits?.map((h) => h.fdcId)).toEqual([1, 4, 5]);
+    expect(dedupeBrandedHits(rows.map(brandedHitFromRow)).map((h) => h.fdcId)).toEqual([1, 4, 5, 7]);
   });
 });
 
