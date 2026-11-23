@@ -339,3 +339,15 @@ describe("a drink logged by volume, on the diary", () => {
     expect(ui).toContain('"Amount in ml"');
   });
 });
+
+describe("step 225 (live check of step 223: 'eggs' gave a lab egg yolk)", () => {
+  it("the first-word tier takes every form of the query; nothing else of the search changes", () => {
+    const m = read("supabase/migrations/0469_food_search_eggs.sql");
+    expect(m).toContain("bool_or(lower(c.description) like split_part(v.phrase, ' ', 1) || '%') as first_starts,");
+    expect(m).toContain("      o.first_starts desc,");
+    expect(m).not.toContain("(lower(o.description) like (select q.first_tok from q) || '%') desc");
+    expect(m).toContain("create or replace function public.search_usda_foods(p_tokens text[], p_limit integer default 60)");
+    expect(m).toContain("grant execute on function public.search_usda_foods(text[], integer) to authenticated, service_role;");
+    expect(read("supabase/apply/undo-step225-0469.sql")).toContain("'59fe9a87f5434ae068163b5f130b61d5' as search_as_step_223_left_it");
+  });
+});
