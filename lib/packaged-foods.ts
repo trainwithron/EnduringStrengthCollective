@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { servingOptions, type FoodPortion, type NutrientMap, type ServingOption } from "@/lib/food-serving";
 import type { FoodDetail } from "@/lib/food-search";
+import { searchBranded } from "@/lib/branded-foods";
 
 // The "Packaged foods" group of the food search (step 223, Ron Nov 23): brand-name products from USDA's Branded Foods, shown UNDER the everyday results and only when there are
 // some. The rows come from part B's searchBranded (lib/branded-foods.ts, step 224); this file is the food search's side of it: the agreed hit shape, turning a pick into what the
@@ -26,8 +27,8 @@ export type PackagedSearch = (supabase: SupabaseClient, query: string, limit?: n
 
 export const PACKAGED_RESULT_LIMIT = 10;
 
-// Wired to part B's searchBranded when the two parts are merged (until then nothing is listed, so the group never shows). null = the search failed, [] = no rows.
-export const searchPackaged: PackagedSearch = async () => [];
+// Part B's searchBranded (lib/branded-foods.ts, step 224): the USDA Branded Foods search. null = the search failed (the group simply hides), [] = no rows.
+export const searchPackaged: PackagedSearch = searchBranded;
 
 // "Brand Description" (the brand once, even when USDA already starts the description with it).
 export function packagedTitle(hit: Pick<PackagedHit, "brand" | "description">): string {

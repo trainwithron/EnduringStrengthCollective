@@ -209,8 +209,9 @@ describe("the Packaged foods group", () => {
   it("a packaged food cannot be picked while an everyday food is still loading", () => {
     expect(read("components/athlete/food-search-log.tsx")).toContain("onClick={() => pickPackaged(p)} disabled={loadingDetail}");
   });
-  it("lists nothing until it is wired to part B's searchBranded", async () => {
-    expect(await searchPackaged({} as never, "bar")).toEqual([]);
+  it("is wired to part B's searchBranded (USDA Branded Foods)", async () => {
+    const { searchBranded } = await import("@/lib/branded-foods");
+    expect(searchPackaged).toBe(searchBranded);
   });
   it("sits under the everyday results and shows only when there are rows", () => {
     const ui = read("components/athlete/food-search-log.tsx");
