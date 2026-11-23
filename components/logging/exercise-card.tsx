@@ -118,6 +118,9 @@ export function ExerciseCard({
   const [fieldsOpen, setFieldsOpen] = useState(false);
   // Swap, Remove and Change what I log behind one "⋯" on the exercise (CL18, Nov 21: seven or eight small controls per exercise mid-set).
   const [menuOpen, setMenuOpen] = useState(false);
+  // Which way the ⋯ menu opens (Ron, Nov 23: "Box opens wrong way"). A long name pushes ⋯ under it at the LEFT edge, where a right-anchored menu ran off the screen; it opens
+  // toward whichever side has room.
+  const [menuOpensRight, setMenuOpensRight] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   // The fields pop-up, opened from the menu's "Change what I log": brought into view with its first chip focused, so a keyboard or screen-reader user lands in it.
@@ -478,13 +481,17 @@ export function ExerciseCard({
                   type="button"
                   aria-label="More for this exercise"
                   aria-expanded={menuOpen}
-                  onClick={() => setMenuOpen((v) => !v)}
+                  onClick={() => {
+                    const r = menuButtonRef.current?.getBoundingClientRect();
+                    setMenuOpensRight(!!r && typeof window !== "undefined" && r.left + r.width / 2 < window.innerWidth / 2);
+                    setMenuOpen((v) => !v);
+                  }}
                   className="min-w-11 min-h-11 -mr-2 flex items-center justify-center rounded-full font-body text-lg leading-none text-steel active:bg-surface-2"
                 >
                   &#8943;
                 </button>
                 {menuOpen && (
-              <div className="absolute right-0 top-full z-20 mt-1 w-56 rounded-card bg-surface-2 border border-steel/30 py-1 shadow-lg flex flex-col">
+              <div className={`absolute ${menuOpensRight ? "left-0" : "right-0"} top-full z-20 mt-1 w-56 max-w-[calc(100vw-2rem)] rounded-card bg-surface-2 border border-steel/30 py-1 shadow-lg flex flex-col`} data-exercise-menu-panel>
                 <button
                   type="button"
                   onClick={() => {
