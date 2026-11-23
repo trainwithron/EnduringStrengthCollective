@@ -9,7 +9,7 @@
 // never printed. A person runs this, on purpose, after the paste; never the app or a deploy.
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { parseEnvText, pendingBatches } from "./usda-branded-lib.mjs";
+import { isStatementTimeout, parseEnvText, pendingBatches, timeoutHint } from "./usda-branded-lib.mjs";
 
 const args = process.argv.slice(2);
 const folder = args.find((a) => !a.startsWith("--"));
@@ -64,8 +64,10 @@ for (const b of todo) {
   const t0 = Date.now();
   const res = await fetch(`${url}/rest/v1/rpc/load_usda_branded_batch`, { method: "POST", headers, body });
   if (!res.ok) {
-    console.error(`${b.file} (${b.name}) failed: ${res.status} ${(await res.text()).slice(0, 500)}`);
+    const text = await res.text();
+    console.error(`${b.file} (${b.name}) failed: ${res.status} ${text.slice(0, 500)}`);
     console.error(`Stopped. ${done} loaded this run; nothing of ${b.name} was kept. Fix it and run this again: what is loaded is skipped.`);
+    if (isStatementTimeout(text)) console.error(timeoutHint(b.name));
     process.exit(1);
   }
   const rows = await res.json();

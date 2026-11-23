@@ -2,7 +2,10 @@
 // atomic, resumable SQL batches. Ron, Nov 23: the food search rebuild, part B.
 //
 //   node scripts/usda-branded-import.mjs <folder with the Branded Foods CSV files>                       (dry run: reads the files, prints what it WOULD load, writes nothing)
-//   node scripts/usda-branded-import.mjs <folder> --name branded-2026-10 --out <dir> [--max-bytes 1400000] [--json]
+//   node scripts/usda-branded-import.mjs <folder> --name branded-2026-10 --out <dir> [--json] [--max-bytes N]
+//
+// --max-bytes defaults to 250000 for --json (each call must finish inside the database's 8-second limit for the server key, and a call slows as the search index grows: the
+// October 2026 load timed out at 1.4 MB, Nov 23) and to 1400000 for SQL files run in the SQL editor.
 //
 // --json writes batch-0001.json, ... instead: one body each for public.load_usda_branded_batch (the same rules and markers, one call per batch), which
 // scripts/usda-branded-load.mjs sends in order with the server key. That is the way to load the full release: 100 MB of SQL cannot be pasted.
@@ -29,10 +32,10 @@ const valueOf = (flag) => {
 };
 const outDir = valueOf("--out");
 const name = valueOf("--name");
-const maxBytes = Number(valueOf("--max-bytes") ?? 1_400_000);
+const maxBytes = Number(valueOf("--max-bytes") ?? (asJson ? 250_000 : 1_400_000));
 
 if (!folder) {
-  console.error("Usage: node scripts/usda-branded-import.mjs <folder with branded_food.csv, food.csv, nutrient.csv, food_nutrient.csv> [--name <batch prefix> --out <dir> [--max-bytes 1400000]]");
+  console.error("Usage: node scripts/usda-branded-import.mjs <folder with branded_food.csv, food.csv, nutrient.csv, food_nutrient.csv> [--name <batch prefix> --out <dir> [--json] [--max-bytes N]]");
   process.exit(1);
 }
 if (outDir && (!name || !/^branded-[a-z0-9][a-z0-9-]{1,52}$/.test(name))) {
