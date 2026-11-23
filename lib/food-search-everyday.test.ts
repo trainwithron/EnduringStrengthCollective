@@ -331,7 +331,7 @@ describe("a drink logged by volume, on the diary", () => {
   it("its amount can be changed: the snapshot is re-scaled by the ml, still with no gram amount", () => {
     expect(rescaleEntryPatch(entry, 500)).toMatchObject({ amount_g: null, serving_qty: 500, calories: 120, carbs_g: 30, nutrients: { kcal: 120, carbs_g: 30 } });
     expect(rescaleEntryPatch(entry, 0)).toBeNull();
-    expect(rescaleEntryPatch(entry, 25000)).toBeNull();
+    expect(rescaleEntryPatch(entry, 10001)).toBeNull();
   });
   it("the diary treats it as a searched food (amount editable, serving shown)", () => {
     const ui = read("components/athlete/food-log-entries.tsx");

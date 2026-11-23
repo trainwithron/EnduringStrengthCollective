@@ -131,7 +131,7 @@ export function rescaleEntryPatch(entry: FoodLogEntry, newQty: number): { amount
   if (!entry.nutrients || !entry.servingQty || !(newQty > 0)) return null;
   if (!entry.amountG) {
     if (!entry.servingLabel) return null;
-    const cap = entry.servingLabel === "ml" ? MAX_AMOUNT_G : MAX_SERVING_QTY;
+    const cap = MAX_SERVING_QTY; // the database allows serving_qty up to 10000 (food_log_entries_detail_check), ml included
     if (newQty > cap) return null;
     // scaleNutrients(x, 100 * ratio) multiplies every value by the ratio
     const scaled = scaleNutrients(entry.nutrients, (100 * newQty) / entry.servingQty);
