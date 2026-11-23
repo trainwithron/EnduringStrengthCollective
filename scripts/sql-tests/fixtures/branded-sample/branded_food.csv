@@ -1,0 +1,9 @@
+"fdc_id","brand_owner","brand_name","subbrand_name","gtin_upc","ingredients","not_a_significant_source_of","serving_size","serving_size_unit","household_serving_fulltext","branded_food_category","data_source","package_weight","modified_date","available_date","market_country","discontinued_date","preparation_state_code","trade_channel","short_description"
+"1000001","General Mills Sales Inc.","Cheerios","","016000275287","WHOLE GRAIN OATS, CORN STARCH, SUGAR","","28","g","1 cup","Cereal","LI","","2023-05-01","2023-06-01","United States","","","",""
+"1000002","Fairlife, LLC","fairlife","","0811620020121","ULTRA-FILTERED REDUCED FAT MILK,
+LACTASE ENZYME, VITAMIN A PALMITATE, VITAMIN D3","","240","MLT","1 cup","Milk","LI","","2022-01-01","2022-02-01","United States","","","",""
+"1000003","Fairlife, LLC","fairlife","","00811620020121","ULTRA-FILTERED REDUCED FAT MILK","","240","MLT","1 cup","Milk","LI","","2024-03-01","2024-03-15","United States","","","",""
+"1000004","Quest Nutrition","Quest","","888849000012","PROTEIN BLEND, ALMONDS ""ROASTED""","","60","GRM","1 bar","Protein Bars","LI","","2023-01-01","2023-01-10","United States","","","",""
+"1000005","Mystery Foods","","","","WATER","","1","ONZ","1 packet","Drinks","LI","","2023-01-01","2023-01-10","United States","","","",""
+"1000006","No Kcal Co","NoKcal","","012345678905","SALT","","1","g","1 pinch","Spices","LI","","2023-01-01","2023-01-10","United States","","","",""
+"1000007","Weird Co","Weird","","012345678912","AIR","","10","g","","Snacks","LI","","2023-01-01","2023-01-10","United States","","","",""
