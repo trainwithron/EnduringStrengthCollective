@@ -201,5 +201,7 @@ describe("the importer reads the Branded Foods CSV (hand-made sample: scripts/sq
     expect(groups.length).toBeGreaterThan(1);
     expect(groups.flat()).toHaveLength(900);
     for (const g of groups) expect(Buffer.byteLength(toBrandedBatchSql("branded-x-0001", g))).toBeLessThan(100_000);
+    // and they are full (a row's share is its own lines, not a whole statement's worth): every batch but the last is over 90% of the size given
+    for (const g of groups.slice(0, -1)) expect(Buffer.byteLength(toBrandedBatchSql("branded-x-0001", g))).toBeGreaterThan(90_000);
   });
 });

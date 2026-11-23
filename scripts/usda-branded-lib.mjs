@@ -236,18 +236,13 @@ export function toBrandedBatchSql(batchName, rows) {
     if (withGtin.length > 0) {
       parts.push(
         "  delete from public.usda_branded_foods b using (values\n" +
-          withGtin.map((r) => `    (${r.fdc_id}, ${sqlText(r.gtin)})`).join(",\n") +
+          withGtin.map(gtinLine).join(",\n") +
           "\n  ) as v(fdc_id, gtin) where b.gtin = v.gtin and b.fdc_id <> v.fdc_id;"
       );
     }
     parts.push(
       "  insert into public.usda_branded_foods (fdc_id, gtin, brand_owner, brand_name, description, category, serving_size, serving_size_unit, household_serving, kcal, protein_g, carbs_g, fat_g, fiber_g, sugars_g, sodium_mg, published_date) values\n" +
-        rows
-          .map(
-            (r) =>
-              `    (${r.fdc_id}, ${sqlText(r.gtin)}, ${sqlText(r.brand_owner)}, ${sqlText(r.brand_name)}, ${sqlText(r.description)}, ${sqlText(r.category)}, ${num(r.serving_size)}, ${sqlText(r.serving_size_unit)}, ${sqlText(r.household_serving)}, ${num(r.kcal)}, ${num(r.protein_g)}, ${num(r.carbs_g)}, ${num(r.fat_g)}, ${num(r.fiber_g)}, ${num(r.sugars_g)}, ${num(r.sodium_mg)}, ${r.published_date ? `${sqlText(r.published_date)}::date` : "null"})`
-          )
-          .join(",\n") +
+        rows.map(valuesLine).join(",\n") +
         "\n  on conflict (fdc_id) do update set gtin = excluded.gtin, brand_owner = excluded.brand_owner, brand_name = excluded.brand_name, description = excluded.description, category = excluded.category," +
         " serving_size = excluded.serving_size, serving_size_unit = excluded.serving_size_unit, household_serving = excluded.household_serving, kcal = excluded.kcal," +
         " protein_g = excluded.protein_g, carbs_g = excluded.carbs_g, fat_g = excluded.fat_g, fiber_g = excluded.fiber_g, sugars_g = excluded.sugars_g," +
@@ -258,14 +253,23 @@ export function toBrandedBatchSql(batchName, rows) {
   return parts.join("\n") + "\n";
 }
 
-// Splits the rows into batches whose SQL stays under maxBytes (a batch must fit in one database call): each row's share is measured as it would be written.
+// One product's lines in a batch: its barcode in the replace step, and its values in the insert.
+function gtinLine(r) {
+  return `    (${r.fdc_id}, ${sqlText(r.gtin)})`;
+}
+function valuesLine(r) {
+  return `    (${r.fdc_id}, ${sqlText(r.gtin)}, ${sqlText(r.brand_owner)}, ${sqlText(r.brand_name)}, ${sqlText(r.description)}, ${sqlText(r.category)}, ${num(r.serving_size)}, ${sqlText(r.serving_size_unit)}, ${sqlText(r.household_serving)}, ${num(r.kcal)}, ${num(r.protein_g)}, ${num(r.carbs_g)}, ${num(r.fat_g)}, ${num(r.fiber_g)}, ${num(r.sugars_g)}, ${num(r.sodium_mg)}, ${r.published_date ? `${sqlText(r.published_date)}::date` : "null"})`;
+}
+
+// Splits the rows into batches whose SQL stays under maxBytes (a batch must fit in one database call): each row's share is its own lines, in bytes, as they are written; the
+// statement around them (comment, guard, the two statements' heads and the marker) is well under the fixed allowance.
 export function planBrandedBatches(rows, maxBytes = 1_400_000) {
-  const overhead = 2_000;
+  const overhead = 4_000;
   const groups = [];
   let current = [];
   let size = overhead;
   for (const r of rows) {
-    const one = toBrandedBatchSql("x", [r]).length - toBrandedBatchSql("x", []).length;
+    const one = Buffer.byteLength(valuesLine(r)) + 2 + (r.gtin ? Buffer.byteLength(gtinLine(r)) + 2 : 0);
     if (current.length > 0 && size + one > maxBytes) {
       groups.push(current);
       current = [];
