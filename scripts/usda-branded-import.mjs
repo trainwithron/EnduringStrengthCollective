@@ -2,7 +2,10 @@
 // atomic, resumable SQL batches. Ron, Nov 23: the food search rebuild, part B.
 //
 //   node scripts/usda-branded-import.mjs <folder with the Branded Foods CSV files>                       (dry run: reads the files, prints what it WOULD load, writes nothing)
-//   node scripts/usda-branded-import.mjs <folder> --name branded-2026-10 --out <dir> [--max-bytes 1400000]
+//   node scripts/usda-branded-import.mjs <folder> --name branded-2026-10 --out <dir> [--max-bytes 1400000] [--json]
+//
+// --json writes batch-0001.json, ... instead: one body each for public.load_usda_branded_batch (the same rules and markers, one call per batch), which
+// scripts/usda-branded-load.mjs sends in order with the server key. That is the way to load the full release: 100 MB of SQL cannot be pasted.
 //
 // Download "Branded Foods" (CSV) from https://fdc.nal.usda.gov/download-datasets.html, unzip it into a folder of its own OUTSIDE the repo so it holds branded_food.csv, food.csv,
 // nutrient.csv and food_nutrient.csv, and point this at it (never run anything from inside that folder). Every file is streamed: food_nutrient.csv has tens of millions of lines.
@@ -14,10 +17,11 @@ import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } 
 import { createInterface } from "node:readline";
 import { join } from "node:path";
 import { parseCsv } from "./usda-lib.mjs";
-import { addBranded, addFoodRow, addNutrientRow, buildBrandedNutrientIndex, createRecordReader, finalizeBranded, planBrandedBatches, toBrandedBatchSql } from "./usda-branded-lib.mjs";
+import { addBranded, addFoodRow, addNutrientRow, buildBrandedNutrientIndex, createRecordReader, finalizeBranded, planBrandedBatches, planBrandedJsonBatches, toBrandedBatchSql, toBrandedJsonBatch } from "./usda-branded-lib.mjs";
 
 const args = process.argv.slice(2);
 const FLAGS_WITH_VALUE = ["--out", "--name", "--max-bytes"];
+const asJson = args.includes("--json");
 const folder = args.find((a, i) => !a.startsWith("--") && !FLAGS_WITH_VALUE.includes(args[i - 1]));
 const valueOf = (flag) => {
   const i = args.indexOf(flag);
@@ -87,20 +91,22 @@ for (const w of warnings) console.warn(`warning: ${w}`);
 
 if (outDir) {
   mkdirSync(outDir, { recursive: true });
-  const groups = planBrandedBatches(rows, maxBytes);
+  const groups = asJson ? planBrandedJsonBatches(rows, maxBytes) : planBrandedBatches(rows, maxBytes);
   const files = [];
   let totalBytes = 0;
   let largest = 0;
   groups.forEach((group, i) => {
-    const file = `batch-${String(i + 1).padStart(4, "0")}.sql`;
-    const sql = toBrandedBatchSql(`${name}-${String(i + 1).padStart(4, "0")}`, group);
+    const file = `batch-${String(i + 1).padStart(4, "0")}.${asJson ? "json" : "sql"}`;
+    const batchName = `${name}-${String(i + 1).padStart(4, "0")}`;
+    const sql = asJson ? toBrandedJsonBatch(batchName, group) : toBrandedBatchSql(batchName, group);
     writeFileSync(join(outDir, file), sql);
     files.push(file);
     totalBytes += Buffer.byteLength(sql);
     largest = Math.max(largest, Buffer.byteLength(sql));
   });
-  writeFileSync(join(outDir, "index.json"), JSON.stringify({ name, maxBytes, products: rows.length, skipped, files, totalBytes, largestBatchBytes: largest }, null, 1));
-  console.log(`Wrote ${files.length} batch files to ${outDir} (${(totalBytes / 1e6).toFixed(1)} MB in all, the largest ${(largest / 1e6).toFixed(2)} MB). Run them in order; each is all-or-nothing and a finished one is skipped if run again.`);
+  const batches = files.map((file, i) => ({ file, name: `${name}-${String(i + 1).padStart(4, "0")}` }));
+  writeFileSync(join(outDir, "index.json"), JSON.stringify({ name, format: asJson ? "json" : "sql", maxBytes, products: rows.length, skipped, files, batches, totalBytes, largestBatchBytes: largest }, null, 1));
+  console.log(`Wrote ${files.length} batch files to ${outDir} (${(totalBytes / 1e6).toFixed(1)} MB in all, the largest ${(largest / 1e6).toFixed(2)} MB). ${asJson ? "Load them with: node scripts/usda-branded-load.mjs <that folder>" : "Run them in order"}; each is all-or-nothing and a finished one is skipped if run again.`);
 } else {
   console.log("Dry run only. Nothing was written. Add --name <label> --out <dir> to write the SQL batches.");
 }

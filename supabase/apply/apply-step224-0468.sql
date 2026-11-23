@@ -1,5 +1,5 @@
 -- PASTE: step 224 (brand-name packaged foods from USDA Branded Foods: the table the barcode lookup and the "Packaged foods" search read, and its search). Paste all of it into the Supabase SQL editor and run. Last result: one row, all true.
--- The products themselves are NOT in this paste: they are loaded afterwards by the import batches (scripts/usda-branded-import.mjs), run separately.
+-- The products themselves are NOT in this paste: they are loaded afterwards, one batch per call, with node scripts/usda-branded-load.mjs (it uses load_usda_branded_batch below).
 
 begin;
 
@@ -76,6 +76,60 @@ $function$;
 revoke all on function public.search_branded_foods(text[], integer) from public, anon;
 grant execute on function public.search_branded_foods(text[], integer) to authenticated, service_role;
 
+-- Loading the products (Spot Commander, Nov 23): one batch per call, from scripts/usda-branded-load.mjs with the server key, so 100 MB of products never has to be pasted.
+-- The same rules as a batch file (scripts/usda-branded-lib.mjs toBrandedBatchSql), in one transaction: nothing when the batch's marker is already in usda_load_batches;
+-- otherwise a product USDA republished under a new fdc_id replaces the old row with the same barcode, a product already there is updated in place, then the marker is written.
+-- Any bad row (a value the table refuses, a wrong type) fails the whole call, so no marker and no half batch. Only the server key may call it. Returns the rows loaded (0 = the
+-- batch was already loaded).
+create or replace function public.load_usda_branded_batch(p_name text, p_rows jsonb)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $function$
+declare
+  v_count integer;
+begin
+  if p_name is null or p_name !~ '^branded-[a-z0-9][a-z0-9-]{1,60}$' then
+    raise exception 'batch_name: must start with branded- (lower case letters, digits and dashes)';
+  end if;
+  if exists (select 1 from public.usda_load_batches where name = p_name) then
+    return 0;
+  end if;
+  if p_rows is null or jsonb_typeof(p_rows) <> 'array' then
+    raise exception 'batch_rows: must be a JSON array of products';
+  end if;
+  v_count := jsonb_array_length(p_rows);
+  if v_count < 1 or v_count > 10000 then
+    raise exception 'batch_rows: 1 to 10000 products a call (got %)', v_count;
+  end if;
+  if exists (select 1 from jsonb_array_elements(p_rows) e where jsonb_typeof(e) <> 'object') then
+    raise exception 'batch_rows: every product must be a JSON object';
+  end if;
+
+  delete from public.usda_branded_foods b
+  using jsonb_to_recordset(p_rows) as r(fdc_id integer, gtin text)
+  where r.gtin is not null and b.gtin = r.gtin and b.fdc_id <> r.fdc_id;
+
+  insert into public.usda_branded_foods (fdc_id, gtin, brand_owner, brand_name, description, category, serving_size, serving_size_unit, household_serving,
+                                         kcal, protein_g, carbs_g, fat_g, fiber_g, sugars_g, sodium_mg, published_date)
+  select r.fdc_id, r.gtin, r.brand_owner, r.brand_name, r.description, r.category, r.serving_size, r.serving_size_unit, r.household_serving,
+         r.kcal, r.protein_g, r.carbs_g, r.fat_g, r.fiber_g, r.sugars_g, r.sodium_mg, r.published_date
+  from jsonb_to_recordset(p_rows) as r(fdc_id integer, gtin text, brand_owner text, brand_name text, description text, category text, serving_size numeric,
+                                       serving_size_unit text, household_serving text, kcal numeric, protein_g numeric, carbs_g numeric, fat_g numeric, fiber_g numeric,
+                                       sugars_g numeric, sodium_mg numeric, published_date date)
+  on conflict (fdc_id) do update set gtin = excluded.gtin, brand_owner = excluded.brand_owner, brand_name = excluded.brand_name, description = excluded.description,
+    category = excluded.category, serving_size = excluded.serving_size, serving_size_unit = excluded.serving_size_unit, household_serving = excluded.household_serving,
+    kcal = excluded.kcal, protein_g = excluded.protein_g, carbs_g = excluded.carbs_g, fat_g = excluded.fat_g, fiber_g = excluded.fiber_g, sugars_g = excluded.sugars_g,
+    sodium_mg = excluded.sodium_mg, published_date = excluded.published_date;
+
+  insert into public.usda_load_batches (name, rows_loaded) values (p_name, v_count);
+  return v_count;
+end
+$function$;
+revoke all on function public.load_usda_branded_batch(text, jsonb) from public, anon, authenticated;
+grant execute on function public.load_usda_branded_batch(text, jsonb) to service_role;
+
 commit;
 
 -- Check: one row, all true.
@@ -88,4 +142,10 @@ select
   to_regclass('public.usda_branded_foods_gtin_key') is not null as barcode_index,
   to_regclass('public.usda_branded_foods_search_idx') is not null as search_index,
   to_regprocedure('public.search_branded_foods(text[], integer)') is not null as search_function,
-  not has_function_privilege('anon', 'public.search_branded_foods(text[], integer)', 'execute') as anon_cannot_search;
+  not has_function_privilege('anon', 'public.search_branded_foods(text[], integer)', 'execute') as anon_cannot_search,
+  to_regprocedure('public.load_usda_branded_batch(text, jsonb)') is not null as load_function,
+  (select prosecdef from pg_proc where oid = 'public.load_usda_branded_batch(text, jsonb)'::regprocedure) as load_runs_as_owner,
+  (select coalesce(proconfig, array[]::text[]) @> array['search_path=public'] from pg_proc where oid = 'public.load_usda_branded_batch(text, jsonb)'::regprocedure) as load_search_path_set,
+  has_function_privilege('service_role', 'public.load_usda_branded_batch(text, jsonb)', 'execute') as server_key_can_load,
+  not has_function_privilege('anon', 'public.load_usda_branded_batch(text, jsonb)', 'execute') as anon_cannot_load,
+  not has_function_privilege('authenticated', 'public.load_usda_branded_batch(text, jsonb)', 'execute') as signed_in_cannot_load;

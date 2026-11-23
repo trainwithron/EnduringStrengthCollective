@@ -4,7 +4,7 @@
 //   node scripts/sql-tests/usda-branded.test.mjs
 import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
-import { addBranded, addFoodRow, addNutrientRow, buildBrandedNutrientIndex, finalizeBranded, parseCsvRecords, toBrandedBatchSql } from "../usda-branded-lib.mjs";
+import { addBranded, addFoodRow, addNutrientRow, buildBrandedNutrientIndex, finalizeBranded, parseCsvRecords, toBrandedBatchSql, toBrandedJsonBatch } from "../usda-branded-lib.mjs";
 
 const LF = String.fromCharCode(10);
 const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8").split(String.fromCharCode(13, 10)).join(LF);
@@ -93,6 +93,34 @@ expect("a signed-in person cannot write it", (await as("authenticated", "insert 
 expect("nobody signed in cannot read it", (await as("anon", "select count(*) from public.usda_branded_foods")).error !== null);
 expect("nobody signed in cannot search", (await as("anon", "select * from public.search_branded_foods(array['milk'], 5)")).error !== null);
 expect("one row per barcode is enforced", (await db.query("select count(*)::int n from pg_indexes where indexname = 'usda_branded_foods_gtin_key' and indexdef like '%UNIQUE%'")).rows[0].n === 1);
+
+// Loading through load_usda_branded_batch (one call per batch, the server key; scripts/usda-branded-load.mjs), with the JSON body the importer writes (--json).
+const callLoad = (role, body) => as(role, "select public.load_usda_branded_batch($1, $2::jsonb) as n", [JSON.parse(body).p_name, JSON.stringify(JSON.parse(body).p_rows)]);
+await db.exec("delete from public.usda_branded_foods; delete from public.usda_load_batches;");
+const jsonBody = toBrandedJsonBatch("branded-json-0001", rows);
+const first = await callLoad("service_role", jsonBody);
+expect("the server key loads a JSON batch: its rows, in one call", first.error === null && first.rows[0]?.n === 4 && (await count()) === 4);
+const again = await callLoad("service_role", jsonBody);
+expect("the same batch again does nothing and says 0", again.error === null && again.rows[0]?.n === 0 && (await db.query("select count(*)::int n from public.usda_load_batches where name = 'branded-json-0001'")).rows[0].n === 1);
+const newer = await callLoad("service_role", toBrandedJsonBatch("branded-json-0002", [{ ...milk, fdc_id: 1000099, published_date: "2027-01-01" }, { ...bar, kcal: 320 }]));
+const milkNow = (await db.query("select fdc_id from public.usda_branded_foods where gtin = '811620020121'")).rows;
+expect("through the function too: a new fdc_id for the same barcode replaces the old row", newer.error === null && milkNow.length === 1 && milkNow[0].fdc_id === 1000099);
+expect("and the same fdc_id is updated in place", (await db.query("select kcal from public.usda_branded_foods where fdc_id = 1000004")).rows[0].kcal === "320" && (await count()) === 4);
+const badCall = await callLoad("service_role", toBrandedJsonBatch("branded-json-0003", [{ ...bar, fdc_id: 1000300, gtin: "77777" }, { ...bar, fdc_id: 1000301, gtin: "77776", kcal: 5000 }]));
+expect("a bad row fails the whole call: no rows, no marker", badCall.error !== null && (await count()) === 4 && (await db.query("select count(*)::int n from public.usda_load_batches where name = 'branded-json-0003'")).rows[0].n === 0);
+const wrongType = await callLoad("service_role", toBrandedJsonBatch("branded-json-0004", [{ ...bar, fdc_id: 1000400, kcal: "lots" }]));
+expect("a value of the wrong type fails the whole call", wrongType.error !== null && (await db.query("select count(*)::int n from public.usda_load_batches where name = 'branded-json-0004'")).rows[0].n === 0);
+expect("anyone signed in cannot call it", (await callLoad("authenticated", toBrandedJsonBatch("branded-json-0005", [bar]))).error !== null);
+expect("nobody signed in cannot call it", (await callLoad("anon", toBrandedJsonBatch("branded-json-0006", [bar]))).error !== null);
+const shape = (name, rowsJson) => as("service_role", "select public.load_usda_branded_batch($1, $2::jsonb) as n", [name, rowsJson]);
+expect("rows that are not an array are refused", /must be a JSON array/.test(String((await shape("branded-json-0007", '{"fdc_id": 1}')).error?.message)));
+expect("an array of things that are not products is refused", /JSON object/.test(String((await shape("branded-json-0008", "[1, 2]")).error?.message)));
+expect("an empty batch is refused", /1 to 10000/.test(String((await shape("branded-json-0009", "[]")).error?.message)));
+expect("more than 10000 products a call is refused", /1 to 10000/.test(String((await shape("branded-json-0010", JSON.stringify(Array.from({ length: 10001 }, () => ({}))))).error?.message)));
+expect("a batch name that does not start with branded- is refused", /must start with branded-/.test(String((await shape("fdc-2026-04-001", JSON.stringify([bar]))).error?.message)));
+expect("no marker was written by any refused call", (await db.query("select count(*)::int n from public.usda_load_batches")).rows[0].n === 2);
+const definer = (await db.query("select prosecdef, proconfig from pg_proc where proname = 'load_usda_branded_batch'")).rows[0];
+expect("it runs as its owner with its search path set", definer?.prosecdef === true && (definer?.proconfig ?? []).includes("search_path=public"));
 
 // The paste and its undo.
 const apply = read("../../supabase/apply/apply-step224-0468.sql");

@@ -205,3 +205,39 @@ describe("the importer reads the Branded Foods CSV (hand-made sample: scripts/sq
     for (const g of groups.slice(0, -1)) expect(Buffer.byteLength(toBrandedBatchSql("branded-x-0001", g))).toBeGreaterThan(90_000);
   });
 });
+
+describe("JSON batches for load_usda_branded_batch, and the loader's helpers (scripts/usda-branded-load.mjs)", () => {
+  it("a body is {p_name, p_rows}: every column the function reads, nulls written out; the name must start with branded-", async () => {
+    const { toBrandedJsonBatch } = await import("../scripts/usda-branded-lib.mjs");
+    const body = JSON.parse(toBrandedJsonBatch("branded-2026-10-0001", [{ fdc_id: 1, gtin: "5", description: "X", kcal: 10, protein_g: 1 }]));
+    expect(body.p_name).toBe("branded-2026-10-0001");
+    expect(Object.keys(body.p_rows[0])).toEqual(["fdc_id", "gtin", "brand_owner", "brand_name", "description", "category", "serving_size", "serving_size_unit", "household_serving", "kcal", "protein_g", "carbs_g", "fat_g", "fiber_g", "sugars_g", "sodium_mg", "published_date"]);
+    expect(body.p_rows[0].carbs_g).toBeNull();
+    expect(() => toBrandedJsonBatch("fdc-2026-04-001", [])).toThrow(/branded-/);
+  });
+  it("splits under the size given and under the function's 10000 a call", async () => {
+    const { planBrandedJsonBatches, toBrandedJsonBatch, JSON_ROWS_MAX } = await import("../scripts/usda-branded-lib.mjs");
+    const r = { fdc_id: 1, gtin: "5", brand_owner: "B", brand_name: "B", description: "A product", category: "C", serving_size: 10, serving_size_unit: "g", household_serving: "1", kcal: 10, protein_g: 1, carbs_g: 1, fat_g: 1, fiber_g: null, sugars_g: null, sodium_mg: null, published_date: "2026-01-01" };
+    const many = Array.from({ length: 2000 }, (_, i) => ({ ...r, fdc_id: i + 1, gtin: String(i + 10) }));
+    const groups = planBrandedJsonBatches(many, 50_000);
+    expect(groups.flat()).toHaveLength(2000);
+    for (const g of groups) expect(Buffer.byteLength(toBrandedJsonBatch("branded-x-0001", g))).toBeLessThan(50_000);
+    expect(JSON_ROWS_MAX).toBe(10000);
+    const tiny = Array.from({ length: 25 }, (_, i) => ({ fdc_id: i, description: "x", kcal: 1, protein_g: 1 }));
+    expect(planBrandedJsonBatches(tiny, 5_000_000).every((g: unknown[]) => g.length <= JSON_ROWS_MAX)).toBe(true);
+  });
+  it("reads KEY=value lines (quotes off, comments skipped) and loads only the batches with no marker, in order", async () => {
+    const { parseEnvText, pendingBatches } = await import("../scripts/usda-branded-lib.mjs");
+    expect(parseEnvText('# c\nNEXT_PUBLIC_SUPABASE_URL="https://x.supabase.co"\nexport KEY=abc=def\n\nBAD\n')).toEqual({ NEXT_PUBLIC_SUPABASE_URL: "https://x.supabase.co", KEY: "abc=def" });
+    const batches = [1, 2, 3].map((n) => ({ file: `batch-000${n}.json`, name: `branded-x-000${n}` }));
+    expect(pendingBatches(batches, ["branded-x-0001", "branded-x-0003"])).toEqual([batches[1]]);
+  });
+  it("the loader sends each file to the function with the server key, stops at the first error, never prints the key", () => {
+    const loader = readFileSync(join(__dirname, "..", "scripts/usda-branded-load.mjs"), "utf8");
+    expect(loader).toContain("/rest/v1/rpc/load_usda_branded_batch");
+    expect(loader).toContain("const todo = pendingBatches(index.batches, loaded);");
+    expect(loader).toContain("process.exit(1);");
+    expect(loader).toContain('args.includes("--dry-run")');
+    expect(loader).not.toMatch(/console\.(log|error)\([^)]*\bkey\b/);
+  });
+});

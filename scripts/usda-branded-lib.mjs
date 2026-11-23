@@ -281,3 +281,57 @@ export function planBrandedBatches(rows, maxBytes = 1_400_000) {
   if (current.length > 0) groups.push(current);
   return groups;
 }
+
+// ---- JSON batches, loaded through public.load_usda_branded_batch (migration 0468) ----
+// The same products as a JSON body for one call: {"p_name": "...", "p_rows": [...]}. The function applies the same rules as a batch file, in one transaction, and records the same
+// marker, so a batch loaded either way is never loaded twice.
+const JSON_FIELDS = ["fdc_id", "gtin", "brand_owner", "brand_name", "description", "category", "serving_size", "serving_size_unit", "household_serving", "kcal", "protein_g", "carbs_g", "fat_g", "fiber_g", "sugars_g", "sodium_mg", "published_date"];
+const jsonRow = (r) => JSON.stringify(Object.fromEntries(JSON_FIELDS.map((k) => [k, r[k] ?? null])));
+export const JSON_ROWS_MAX = 10000;
+
+export function toBrandedJsonBatch(batchName, rows) {
+  if (!/^branded-[a-z0-9][a-z0-9-]{1,60}$/.test(batchName)) throw new Error(`batch name ${batchName} must start with branded-`);
+  return `{"p_name":${JSON.stringify(batchName)},"p_rows":[\n${rows.map(jsonRow).join(",\n")}\n]}\n`;
+}
+
+// Splits the rows into JSON bodies under maxBytes and at most JSON_ROWS_MAX products each (the function's own limit).
+export function planBrandedJsonBatches(rows, maxBytes = 1_400_000) {
+  const overhead = 200;
+  const groups = [];
+  let current = [];
+  let size = overhead;
+  for (const r of rows) {
+    const one = Buffer.byteLength(jsonRow(r)) + 2;
+    if (current.length > 0 && (size + one > maxBytes || current.length >= JSON_ROWS_MAX)) {
+      groups.push(current);
+      current = [];
+      size = overhead;
+    }
+    current.push(r);
+    size += one;
+  }
+  if (current.length > 0) groups.push(current);
+  return groups;
+}
+
+// KEY=value lines of an env file (quotes around a value are removed; comments and blank lines skipped). Only what the loader asks for is used, and nothing is ever printed.
+export function parseEnvText(text) {
+  const out = {};
+  for (const raw of String(text).split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    const eq = line.indexOf("=");
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim().replace(/^export\s+/, "");
+    let value = line.slice(eq + 1).trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
+    out[key] = value;
+  }
+  return out;
+}
+
+// The batches still to load, in order: every file whose batch name has no marker yet.
+export function pendingBatches(batches, loadedNames) {
+  const loaded = new Set(loadedNames);
+  return batches.filter((b) => !loaded.has(b.name));
+}
