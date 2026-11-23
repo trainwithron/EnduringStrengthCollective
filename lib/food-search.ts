@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FoodPortion, NutrientMap } from "@/lib/food-serving";
 
-// Searching the USDA foods already stored in the database (about 8,200 Foundation and SR Legacy foods). No AI, no outside service, no cost: this is the free default way to log
+// Searching the USDA foods already stored in the database (Foundation and SR Legacy, and from step 223 the everyday FNDDS foods with plain names; the ranking, the synonyms and one
+// row per name are in search_usda_foods, migration 0467). No AI, no outside service, no cost: this is the free default way to log
 // food. A query is split into words; a food matches when its name contains every word; matches are ranked so the food the person means comes first (USDA names put the food
 // first: "Chicken, broilers or fryers, breast, meat only, cooked, roasted").
 
@@ -20,6 +21,8 @@ export interface FoodRow {
 export interface FoodHit {
   fdcId: number;
   description: string;
+  // The name a person says ("Whole milk"), shown big above USDA's own name (step 223: the everyday FNDDS foods). Null when there is none: then USDA's name is the one shown.
+  plainName?: string | null;
   category: string | null;
   dataType: string | null;
   // Per 100 g; a key is absent when the food does not report it.
@@ -80,6 +83,7 @@ interface SearchRpcRow {
   protein_g: number | string | null;
   carbs_g: number | string | null;
   fat_g: number | string | null;
+  plain_name?: string | null;
 }
 
 // The ranking happens in the database (search_usda_foods, migration 0300): a common word matches hundreds of foods, so the best must be chosen there, not from whatever rows come
@@ -96,7 +100,7 @@ export async function searchFoods(supabase: SupabaseClient, query: string, limit
       if (r.protein_g != null) per100g.protein_g = Number(r.protein_g);
       if (r.carbs_g != null) per100g.carbs_g = Number(r.carbs_g);
       if (r.fat_g != null) per100g.fat_g = Number(r.fat_g);
-      return { fdcId: r.fdc_id, description: r.description, category: r.food_category ?? null, dataType: r.data_type ?? null, per100g };
+      return { fdcId: r.fdc_id, description: r.description, plainName: r.plain_name ?? null, category: r.food_category ?? null, dataType: r.data_type ?? null, per100g };
     });
   }
   const missing = ranked.error && (ranked.error.code === "PGRST202" || ranked.error.code === "42883" || /search_usda_foods/.test(ranked.error.message ?? ""));

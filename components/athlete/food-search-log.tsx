@@ -7,7 +7,19 @@ import { loadFoodDetail, searchFoods, type FoodDetail, type FoodHit } from "@/li
 import { defaultServing, formatAmount, gramsFor, macrosOf, quantityProblem, scaleNutrients, servingOptions } from "@/lib/food-serving";
 import { MEAL_SLOTS, MEAL_SLOT_LABEL, defaultMealSlot, insertUsdaEntry, type MealSlot } from "@/lib/food-entry";
 import { completeness, formatNutrientAmount, panelRows } from "@/lib/nutrient-panel";
+import { PACKAGED_RESULT_LIMIT, packagedDetail, packagedTitle, searchPackaged, type PackagedHit } from "@/lib/packaged-foods";
+import type { NutrientMap } from "@/lib/food-serving";
 import { Search } from "lucide-react";
+
+// "Per 100 g (3.5 oz): 61 kcal · 3.3p / 4.6c / 3.2f" (a value the food does not report is left out; missing calories say so).
+export function per100Line(per100g: NutrientMap): string {
+  return (
+    `Per 100 g (3.5 oz): ${per100g.kcal != null ? `${Math.round(per100g.kcal)} kcal` : "calories not reported"}` +
+    (per100g.protein_g != null ? ` · ${formatNutrientAmount(per100g.protein_g)}p` : "") +
+    (per100g.carbs_g != null ? ` / ${formatNutrientAmount(per100g.carbs_g)}c` : "") +
+    (per100g.fat_g != null ? ` / ${formatNutrientAmount(per100g.fat_g)}f` : "")
+  );
+}
 
 // The free, default way to log food: search the USDA foods, pick a serving (household measure, grams or ounces), see the full nutrient panel for that amount, choose the meal and
 // add it. No AI, no cost. Both units are shown everywhere; a nutrient the food does not report says "not reported", never zero.
@@ -38,24 +50,32 @@ export function FoodSearchLog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [added, setAdded] = useState<string | null>(null);
+  // The "Packaged foods" group under the everyday results (step 223): brand-name products, shown only when there are some.
+  const [packagedHits, setPackagedHits] = useState<PackagedHit[]>([]);
+  // What was picked: the name shown big (the plain name, or the brand and product), USDA's own name small under it, and, for a packaged food, its code (it is logged as a barcode food).
+  const [picked, setPicked] = useState<{ title: string; usdaName: string | null; packaged: { barcode: string | null } | null } | null>(null);
   const seq = useRef(0);
 
-  // Search as the person types (after a short pause); the latest search wins.
+  // Search as the person types (after a short pause); the latest search wins. The everyday foods and the packaged ones are read at the same time; a packaged search that fails simply
+  // shows no packaged group (the everyday results are the search).
   useEffect(() => {
     if (!open) return;
     const q = query.trim();
     if (q.length < 2) {
       setHits(null);
+      setPackagedHits([]);
       setSearching(false);
       return;
     }
     setSearching(true);
     const mine = ++seq.current;
     const timer = setTimeout(async () => {
-      const found = await searchFoods(createBrowserClient(), q);
+      const supabase = createBrowserClient();
+      const [found, packaged] = await Promise.all([searchFoods(supabase, q), searchPackaged(supabase, q, PACKAGED_RESULT_LIMIT).catch(() => null)]);
       if (mine !== seq.current) return;
       setSearchFailed(found === null);
       setHits(found ?? []);
+      setPackagedHits(packaged ?? []);
       setSearching(false);
     }, 250);
     return () => clearTimeout(timer);
@@ -83,6 +103,19 @@ export function FoodSearchLog({
     }
     const start = defaultServing(servingOptions(d.portions));
     setDetail(d);
+    setPicked({ title: hit.plainName || d.description, usdaName: hit.plainName ? d.description : null, packaged: null });
+    setOptionKey(start.option.key);
+    setQtyText(String(start.qty));
+  }
+
+  // A packaged food carries everything it needs in the hit itself (no read).
+  function pickPackaged(hit: PackagedHit) {
+    setError(null);
+    setAdded(null);
+    const d = packagedDetail(hit);
+    const start = defaultServing(servingOptions(d.portions));
+    setDetail(d);
+    setPicked({ title: d.description, usdaName: null, packaged: { barcode: hit.gtinUpc } });
     setOptionKey(start.option.key);
     setQtyText(String(start.qty));
   }
@@ -97,11 +130,13 @@ export function FoodSearchLog({
       logDate,
       mealSlot: slot,
       fdcId: detail.fdcId,
-      description: detail.description,
+      // logged under the name shown (the plain name, or the brand and product); USDA's own name stays on the food
+      description: picked?.title ?? detail.description,
       servingLabel: option.label,
       servingQty: qty,
       grams,
       per100g: detail.per100g,
+      packaged: picked?.packaged ?? null,
     });
     setSaving(false);
     if (!entry) {
@@ -109,10 +144,12 @@ export function FoodSearchLog({
       return;
     }
     onLogged(entry);
-    setAdded(`${detail.description} added to ${MEAL_SLOT_LABEL[slot].toLowerCase()}.`);
+    setAdded(`${picked?.title ?? detail.description} added to ${MEAL_SLOT_LABEL[slot].toLowerCase()}.`);
     setDetail(null);
+    setPicked(null);
     setQuery("");
     setHits(null);
+    setPackagedHits([]);
   }
 
   if (!open) {
@@ -159,25 +196,42 @@ export function FoodSearchLog({
               Couldn&apos;t search just now. Check your connection and try again.
             </p>
           )}
-          {!searching && !searchFailed && hits && hits.length === 0 && (
+          {!searching && !searchFailed && hits && hits.length === 0 && packagedHits.length === 0 && (
             <p className="font-body text-xs text-steel mt-2">No foods found for that. Try a simpler word, like &quot;chicken&quot; instead of &quot;grilled chicken&quot;.</p>
           )}
-          {hits && hits.length > 0 && (
-            <ul className="mt-2 divide-y divide-steel/15 border border-steel/15 max-h-80 overflow-y-auto">
-              {hits.map((h) => (
-                <li key={h.fdcId}>
-                  <button type="button" onClick={() => pick(h)} disabled={loadingDetail} className="w-full text-left px-3 py-2 min-h-[44px] disabled:opacity-60">
-                    <span className="block font-body text-sm text-chalk">{h.description}</span>
-                    <span className="block font-body text-xs text-steel [font-variant-numeric:tabular-nums]">
-                      Per 100 g (3.5 oz): {h.per100g.kcal != null ? `${Math.round(h.per100g.kcal)} kcal` : "calories not reported"}
-                      {h.per100g.protein_g != null ? ` · ${formatNutrientAmount(h.per100g.protein_g)}p` : ""}
-                      {h.per100g.carbs_g != null ? ` / ${formatNutrientAmount(h.per100g.carbs_g)}c` : ""}
-                      {h.per100g.fat_g != null ? ` / ${formatNutrientAmount(h.per100g.fat_g)}f` : ""}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+          {((hits && hits.length > 0) || packagedHits.length > 0) && (
+            <div className="mt-2 border border-steel/15 max-h-80 overflow-y-auto" data-food-results>
+              {hits && hits.length > 0 && (
+                <ul className="divide-y divide-steel/15">
+                  {hits.map((h) => (
+                    <li key={h.fdcId}>
+                      <button type="button" onClick={() => pick(h)} disabled={loadingDetail} className="w-full text-left px-3 py-2 min-h-[44px] disabled:opacity-60">
+                        {/* the name a person says big, USDA's own name small under it (step 223) */}
+                        <span className="block font-body text-sm text-chalk">{h.plainName || h.description}</span>
+                        {h.plainName && <span className="block font-body text-xs text-steel" data-usda-name>{h.description}</span>}
+                        <span className="block font-body text-xs text-steel [font-variant-numeric:tabular-nums]">{per100Line(h.per100g)}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {/* Brand-name products, below the everyday foods, only when there are some (step 223) */}
+              {packagedHits.length > 0 && (
+                <section aria-label="Packaged foods" data-packaged-foods>
+                  <p className="px-3 pt-3 pb-1 font-body text-xs font-semibold text-steel uppercase tracking-wide border-t border-steel/15">Packaged foods</p>
+                  <ul className="divide-y divide-steel/15">
+                    {packagedHits.map((p) => (
+                      <li key={`packaged-${p.fdcId}`}>
+                        <button type="button" onClick={() => pickPackaged(p)} className="w-full text-left px-3 py-2 min-h-[44px]">
+                          <span className="block font-body text-sm text-chalk">{packagedTitle(p)}</span>
+                          <span className="block font-body text-xs text-steel [font-variant-numeric:tabular-nums]">{per100Line(p.per100g)}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+            </div>
           )}
           {loadingDetail && <p className="font-body text-xs text-steel mt-2">Loading…</p>}
         </>
@@ -185,10 +239,18 @@ export function FoodSearchLog({
 
       {detail && option && (
         <div>
-          <button type="button" onClick={() => setDetail(null)} className="min-h-[44px] font-body text-xs text-steel">
+          <button
+            type="button"
+            onClick={() => {
+              setDetail(null);
+              setPicked(null);
+            }}
+            className="min-h-[44px] font-body text-xs text-steel"
+          >
             &larr; Back to results
           </button>
-          <p className="font-body text-sm text-chalk">{detail.description}</p>
+          <p className="font-body text-sm text-chalk">{picked?.title ?? detail.description}</p>
+          {picked?.usdaName && <p className="font-body text-xs text-steel">{picked.usdaName}</p>}
 
           <div className="mt-3 flex flex-wrap items-end gap-2">
             <label className="block">

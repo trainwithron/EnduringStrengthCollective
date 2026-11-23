@@ -1,4 +1,4 @@
-// Imports USDA FoodData Central (Foundation Foods + SR Legacy): the foods, EVERY nutrient the app shows (the fuller vitamin and mineral panel) and the household portions
+// Imports USDA FoodData Central (Foundation Foods, SR Legacy, and the everyday foods of FNDDS, the "Survey (FNDDS)" download, step 223): the foods, EVERY nutrient the app shows (the fuller vitamin and mineral panel) and the household portions
 // ("1 cup, chopped" = 140 g), as atomic, resumable SQL batches.
 //
 //   node scripts/usda-import.mjs <folder with the USDA CSV files>                       (dry run: reads the files, prints what it WOULD load, writes nothing)
@@ -6,7 +6,8 @@
 //   node scripts/usda-import.mjs <folder> --name fdc-2026-04 --out <dir> [--compare-live] [--mode add|refresh] [--refresh-keys folate_mcg] [--batch-size 150]
 //
 // Download the CSV zips from https://fdc.nal.usda.gov/download-datasets.html (Foundation Foods and SR Legacy), unzip them into one folder so it holds food.csv, food_category.csv,
-// nutrient.csv, food_nutrient.csv, and (for portions) food_portion.csv and measure_unit.csv, and point this at it.
+// nutrient.csv, food_nutrient.csv, and (for portions) food_portion.csv and measure_unit.csv, and point this at it. For FNDDS also wweia_food_category.csv (the categories) and
+// food_attribute.csv + food_attribute_type.csv (the other names a food goes by); each FNDDS food gets a plain name (scripts/usda-fndds-lib.mjs). Step 223 must be applied first.
 //
 // --compare-live reads the foods, nutrient values and portions already in the database (GET requests only, with NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY from the
 // environment) and writes BEFORE_AFTER_REPORT.md: counts of new and already-there values, which would change, which keys are new, and the biggest changes to the four macros. Read
@@ -22,6 +23,7 @@ import { createInterface } from "node:readline";
 import { join } from "node:path";
 import { buildFoods, buildNutrientIndex, chunk, createNutrientCollector, parseCsv, parseCsvLine, NUTRIENT_SOURCES } from "./usda-lib.mjs";
 import { buildPortions, compareWithExisting, formatReport, toBatchSql } from "./usda-batch-lib.mjs";
+import { addEverydayNames, buildExtraNames } from "./usda-fndds-lib.mjs";
 
 const args = process.argv.slice(2);
 const FLAGS_WITH_VALUE = ["--out", "--name", "--batch-size", "--mode", "--refresh-keys"];
@@ -71,7 +73,19 @@ const warn = (m) => warnings.push(m);
 // food.csv and food_category.csv are small enough to read whole; food_nutrient.csv has millions of lines, so it is streamed.
 const foodRows = parseCsv(readFileSync(join(folder, "food.csv"), "utf8"));
 const categoryRows = existsSync(join(folder, "food_category.csv")) ? parseCsv(readFileSync(join(folder, "food_category.csv"), "utf8")) : [];
-const foods = buildFoods(foodRows, categoryRows);
+// FNDDS foods carry a WWEIA category number instead (wweia_food_category.csv: wweia_food_category, wweia_food_category_description)
+const wweiaRows = existsSync(join(folder, "wweia_food_category.csv"))
+  ? parseCsv(readFileSync(join(folder, "wweia_food_category.csv"), "utf8")).map((r) => ({ id: r.wweia_food_category, description: r.wweia_food_category_description }))
+  : [];
+const foods = buildFoods(foodRows, [...categoryRows, ...wweiaRows]);
+const everydayCount = [...foods.values()].filter((f) => f.data_type === "Survey (FNDDS)").length;
+let unmatchedOverrides = [];
+if (everydayCount > 0) {
+  const attributeRows = existsSync(join(folder, "food_attribute.csv")) ? parseCsv(readFileSync(join(folder, "food_attribute.csv"), "utf8")) : [];
+  const attributeTypeRows = existsSync(join(folder, "food_attribute_type.csv")) ? parseCsv(readFileSync(join(folder, "food_attribute_type.csv"), "utf8")) : [];
+  if (attributeRows.length === 0) warnings.push("food_attribute.csv not found: the everyday foods get no extra names (the search still finds them by their USDA and plain names).");
+  unmatchedOverrides = addEverydayNames(foods, buildExtraNames(attributeRows, attributeTypeRows, foods));
+}
 const nutrientIndex = buildNutrientIndex(parseCsv(readFileSync(join(folder, "nutrient.csv"), "utf8")), warn);
 const collector = createNutrientCollector(foods, nutrientIndex);
 
@@ -95,7 +109,8 @@ if (existsSync(join(folder, "food_portion.csv")) && existsSync(join(folder, "mea
   warn("food_portion.csv / measure_unit.csv not found: no household portions will be loaded (grams and ounces still work in the app).");
 }
 
-console.log(`Foods to import: ${foods.size}`);
+console.log(`Foods to import: ${foods.size}${everydayCount ? ` (${everydayCount} everyday FNDDS foods, ${[...foods.values()].filter((x) => x.plain_name).length} with a plain name, ${[...foods.values()].filter((x) => x.extra_names).length} with other names)` : ""}`);
+if (unmatchedOverrides.length > 0) console.log(`Hand-named foods not found in these files (check the spelling against this release): ${unmatchedOverrides.join(" | ")}`);
 console.log(`Nutrient rows to import: ${nutrientRows.length}`);
 console.log(`Household portions to import: ${portionRows.length}`);
 const perKey = new Map();

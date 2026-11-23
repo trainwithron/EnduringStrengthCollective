@@ -45,7 +45,8 @@ export const NUTRIENT_SOURCES = {
   iodine_mcg: { numbers: ["314"], unit: "UG" },
 };
 
-export const DATA_TYPES = { foundation_food: "Foundation", sr_legacy_food: "SR Legacy" };
+// The everyday foods (FNDDS, step 223) are the "Survey (FNDDS)" foods; their category is the WWEIA category (wweia_food_category.csv), read in as an ordinary category.
+export const DATA_TYPES = { foundation_food: "Foundation", sr_legacy_food: "SR Legacy", survey_fndds_food: "Survey (FNDDS)" };
 
 // One CSV line to its fields. Handles quotes, doubled quotes and commas inside quotes.
 export function parseCsvLine(line) {
@@ -82,7 +83,7 @@ export function parseCsv(text) {
   });
 }
 
-// Foods to keep: Foundation and SR Legacy only. Returns Map fdc_id -> { fdc_id, description, data_type, food_category }.
+// Foods to keep: Foundation, SR Legacy and the everyday (FNDDS) foods. Returns Map fdc_id -> { fdc_id, description, data_type, food_category }.
 export function buildFoods(foodRows, categoryRows) {
   const categories = new Map(categoryRows.map((c) => [c.id, c.description]));
   const foods = new Map();

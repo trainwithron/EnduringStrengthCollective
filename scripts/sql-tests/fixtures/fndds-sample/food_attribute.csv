@@ -1,0 +1,7 @@
+"id","fdc_id","seq_num","food_attribute_type_id","name","value"
+"1","2707646","1","1001","","sourdough bread"
+"2","2707646","2","1001","","sourdough roll"
+"3","2705386","1","1001","","2% milk"
+"4","2705388","1","1001","","nonfat milk"
+"5","2705388","2","1001","","Nonfat milk"
+"6","2709100","1","999","","not a name (another kind of attribute)"

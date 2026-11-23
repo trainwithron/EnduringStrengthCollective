@@ -84,6 +84,9 @@ export interface UsdaEntryInput {
   servingQty: number;
   grams: number;
   per100g: NutrientMap;
+  // A packaged (brand-name) food from the search's "Packaged foods" group (step 223): it is not one of the USDA foods table's foods, so it is logged as a barcode food with its
+  // code, and no fdc_id.
+  packaged?: { barcode: string | null } | null;
 }
 
 const MAX_DESCRIPTION = 160;
@@ -104,8 +107,9 @@ export function usdaEntryRow(input: UsdaEntryInput) {
     protein_g: m.proteinG,
     carbs_g: m.carbsG,
     fat_g: m.fatG,
-    food_source: "usda" as const,
-    fdc_id: input.fdcId,
+    food_source: input.packaged ? ("barcode" as const) : ("usda" as const),
+    fdc_id: input.packaged ? null : input.fdcId,
+    ...(input.packaged ? { barcode: input.packaged.barcode ? input.packaged.barcode.slice(0, 32) : null } : {}),
     amount_g: input.grams,
     serving_label: input.servingLabel,
     serving_qty: input.servingQty,

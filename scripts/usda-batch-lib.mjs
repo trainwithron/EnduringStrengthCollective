@@ -71,7 +71,7 @@ export function toBatchSql(batchName, foods, nutrientRows, portionRows, opts = {
   const refreshKeys = new Set(opts.refreshKeys ?? []);
   const foodList = [...foods.values()].sort((a, b) => a.fdc_id - b.fdc_id);
   // The statement is wrapped in a dollar-quote tag; refuse any text that contains the tag (it would end the statement early and the rest would run outside the batch).
-  const texts = [batchName, ...foodList.flatMap((f) => [f.description, f.data_type, f.food_category]), ...portionRows.map((p) => p.description), ...nutrientRows.map((n) => n.nutrient_key)];
+  const texts = [batchName, ...foodList.flatMap((f) => [f.description, f.data_type, f.food_category, f.plain_name, f.extra_names]), ...portionRows.map((p) => p.description), ...nutrientRows.map((n) => n.nutrient_key)];
   for (const t of texts) {
     if (t != null && String(t).includes(BATCH_TAG)) throw new Error(`refusing to write batch ${batchName}: the text "${String(t).slice(0, 60)}" contains ${BATCH_TAG}`);
   }
@@ -85,12 +85,23 @@ export function toBatchSql(batchName, foods, nutrientRows, portionRows, opts = {
     "  end if;",
   ];
   if (foodList.length > 0) {
-    const rows = foodList.map((f) => `    (${f.fdc_id}, ${sqlText(f.description)}, ${sqlText(f.data_type)}, ${sqlText(f.food_category)})`).join(",\n");
+    // plain_name, extra_names and common (step 223) are written only by a batch that holds everyday (FNDDS) foods, so a Foundation / SR Legacy batch reads exactly as before (and runs
+    // on a database without step 223).
+    const everyday = foodList.some((f) => f.data_type === "Survey (FNDDS)");
+    const rows = foodList
+      .map((f) =>
+        everyday
+          ? `    (${f.fdc_id}, ${sqlText(f.description)}, ${sqlText(f.data_type)}, ${sqlText(f.food_category)}, ${sqlText(f.plain_name ?? null)}, ${sqlText(f.extra_names ?? null)}, ${f.common === true})`
+          : `    (${f.fdc_id}, ${sqlText(f.description)}, ${sqlText(f.data_type)}, ${sqlText(f.food_category)})`
+      )
+      .join(",\n");
     const tail =
       mode === "refresh"
-        ? "\n  on conflict (fdc_id) do update set description = excluded.description, data_type = excluded.data_type, food_category = excluded.food_category;"
+        ? "\n  on conflict (fdc_id) do update set description = excluded.description, data_type = excluded.data_type, food_category = excluded.food_category" +
+          (everyday ? ", plain_name = excluded.plain_name, extra_names = excluded.extra_names, common = excluded.common;" : ";")
         : "\n  on conflict (fdc_id) do nothing;";
-    parts.push("  insert into public.usda_foods (fdc_id, description, data_type, food_category) values\n" + rows + tail);
+    const columns = everyday ? "fdc_id, description, data_type, food_category, plain_name, extra_names, common" : "fdc_id, description, data_type, food_category";
+    parts.push(`  insert into public.usda_foods (${columns}) values\n` + rows + tail);
   }
   const nutrientInsert = (rows, update) =>
     "  insert into public.usda_food_nutrients (fdc_id, nutrient_key, amount_per_100g) values\n" +
