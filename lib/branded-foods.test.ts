@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { barcodeCandidates, brandedBarcodeResult, brandedHitFromRow, expandUpcE, lookupBrandedBarcode, searchBranded, type BrandedRow } from "./branded-foods";
+import { barcodeCandidates, brandedBarcodeResult, brandedHitFromRow, expandUpcE, lookupBrandedBarcode, pickBarcodeRow, searchBranded, type BrandedRow } from "./branded-foods";
 import { lookupBarcodeInOrder, NOT_FOUND, UNREACHABLE } from "./barcode-lookup";
 import { normalizeBarcode } from "./food-barcode";
 // the importer's pure parts (scripts/usda-branded-lib.mjs)
@@ -114,6 +114,13 @@ describe("the barcode answer from USDA's label", () => {
     expect(calls[0]).toEqual({ col: "gtin", vals: ["16000275287"] });
     expect(await lookupBrandedBarcode(db({ data: null, error: { message: "relation does not exist" } }), "016000275287")).toBeNull();
     expect(await lookupBrandedBarcode(db({ data: [], error: null }), "016000275287")).toBeNull();
+    // an 8-digit code: the product with exactly that code wins over the UPC-A it would stand for as a UPC-E, whatever order the rows come in (review of a4bd9194)
+    const ean8 = row({ fdc_id: 1, gtin: "4252614", description: "EIGHT DIGIT PRODUCT", brand_name: "E8" });
+    const upca = row({ fdc_id: 2, gtin: "42100005264", description: "UPC A PRODUCT", brand_name: "UA" });
+    expect((await lookupBrandedBarcode(db({ data: [upca, ean8], error: null }), "04252614"))?.description).toBe("E8 EIGHT DIGIT PRODUCT");
+    expect((await lookupBrandedBarcode(db({ data: [upca], error: null }), "04252614"))?.description).toBe("UA UPC A PRODUCT");
+    expect(pickBarcodeRow([upca], "042100005264")).toBe(upca);
+    expect(pickBarcodeRow([upca], "99999999")).toBeNull();
   });
 });
 

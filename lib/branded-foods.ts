@@ -139,15 +139,22 @@ export function brandedBarcodeResult(row: BrandedRow): BarcodeLookupResult | nul
   return { description, calories: round(p.kcal), proteinG: round(p.protein_g), carbsG: round(p.carbs_g), fatG: round(p.fat_g), basis: perServing ? "serving" : "100g" };
 }
 
-/** USDA's label for a barcode: the most recently published row under any of its stored forms. null when USDA does not have it, or the table cannot be read (then the caller asks
- *  Open Food Facts, as before). */
+/** The row for a code: the code exactly as scanned first (an 8-digit EAN-8 is its own product), the UPC-A a UPC-E stands for only when nothing has the exact code. */
+export function pickBarcodeRow<T extends { gtin: string | null }>(rows: T[], code: string): T | null {
+  const [exact, ...others] = barcodeCandidates(code);
+  return rows.find((r) => r.gtin === exact) ?? rows.find((r) => r.gtin !== null && others.includes(r.gtin)) ?? null;
+}
+
+/** USDA's label for a barcode (one row per barcode: pickBarcodeRow chooses between the exact code and a UPC-E's expansion). null when USDA does not have it, or the table cannot be
+ *  read (then the caller asks Open Food Facts, as before). */
 export async function lookupBrandedBarcode(supabase: SupabaseClient, code: string): Promise<BarcodeLookupResult | null> {
   const candidates = barcodeCandidates(code);
   if (candidates.length === 0) return null;
   try {
-    const { data, error } = await supabase.from("usda_branded_foods").select(BRANDED_SELECT).in("gtin", candidates).order("published_date", { ascending: false, nullsFirst: false }).limit(1);
+    const { data, error } = await supabase.from("usda_branded_foods").select(BRANDED_SELECT).in("gtin", candidates).order("published_date", { ascending: false, nullsFirst: false }).limit(candidates.length);
     if (error || !data || data.length === 0) return null;
-    return brandedBarcodeResult(data[0] as unknown as BrandedRow);
+    const row = pickBarcodeRow(data as unknown as BrandedRow[], code);
+    return row ? brandedBarcodeResult(row) : null;
   } catch {
     return null;
   }

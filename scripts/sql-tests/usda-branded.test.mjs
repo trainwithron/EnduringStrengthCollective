@@ -86,6 +86,20 @@ expect("the last word may be the start of a word", names(await search(["fairlife
 expect("words like 2% are cleaned, not passed through", names(await search(["2%", "milk"])).includes("REDUCED FAT 2% ULTRA-FILTERED MILK"));
 expect("text-search operators cannot reach the query", (await search(["milk:*|!", "&(bar)"])).error === null);
 expect("nothing searchable is nothing", names(await search(["", "!!"])).length === 0);
+// The order (review of a4bd9194, timed on the full October 2026 release): only the last word is a prefix; whole words before a prefix match; the plain short name first; a "2" counts
+// as a word of the name; a name that repeats the words does not jump ahead.
+await db.exec(`insert into public.usda_branded_foods (fdc_id, gtin, brand_name, description, kcal, protein_g) values
+  (9000001, '9000001', 'MILKITA', 'MILKITA, MILKSHAKE CANDY', 400, 1),
+  (9000002, '9000002', 'DAIRY', 'WHOLE MILK', 61, 3.2),
+  (9000003, '9000003', 'DAIRY', '2% MILK', 50, 3.3),
+  (9000004, '9000004', 'GALBANI', 'RICOTTA CHEESE, WHOLE MILK, WHOLE MILK', 150, 7),
+  (9000005, '9000005', 'DAIRY', 'MILK CHOCOLATE CANDY BAR WITH ALMONDS AND A LONG NAME', 500, 7)`);
+expect("a whole-word match comes before a prefix match", names(await search(["milk"])).indexOf("WHOLE MILK") < names(await search(["milk"])).indexOf("MILKITA, MILKSHAKE CANDY"));
+expect("only the last word is a prefix: 'milks' as a first word needs the whole word", names(await search(["milks", "candy"])).length === 0);
+expect("the 2 of '2% milk' picks the 2% milk first", names(await search(["2%", "milk"]))[0] === "2% MILK");
+expect("the plain name beats one that repeats the words", names(await search(["whole", "milk"]))[0] === "WHOLE MILK");
+expect("a lone short word is not searched on its own", names(await search(["2"])).length === 0);
+await db.exec("delete from public.usda_branded_foods where fdc_id between 9000001 and 9000005");
 const limited = await search(["a", "b", "c", "d", "e", "f", "g", "h"], 500);
 expect("the limit is capped and long queries are cut, without an error", limited.error === null);
 expect("a signed-in person can read the table", (await as("authenticated", "select count(*)::int n from public.usda_branded_foods")).rows[0]?.n === 4);

@@ -8,8 +8,11 @@ begin;
 --  * usda_branded_foods: one compact row per packaged product (the label's brand, name, barcode, serving and the nutrients the app shows, per 100 g or 100 ml as USDA publishes
 --    them). Public reference data: read by any signed-in person, written only by the import batches (scripts/usda-branded-import.mjs, run on purpose by a person, never by the app).
 --    gtin is the barcode with its leading zeros removed (lib/food-barcode.ts normalizeBarcode), so a UPC-A, its EAN-13 and its GTIN-14 are one value; one row per barcode.
---  * search_branded_foods(p_tokens, p_limit): the "Packaged foods" group of the food search. Every word must be in the brand or the name (whole words, the last one may be the start
---    of a word); best matches first. Words are cleaned to letters and digits here, so nothing else can reach the text search. At most 50 rows.
+--  * search_branded_foods(p_tokens, p_limit): the "Packaged foods" group of the food search. Every word of two or more characters must be in the brand or the name, as a whole word,
+--    except the LAST, which may be the start of a word ("2% milk": milk must be there; the "2" only helps the order). Words are cleaned to letters and digits here, so nothing else can
+--    reach the text search. At most 2,000 matches are ranked (a common word matches tens of thousands of products): whole-word matches and the shortest names. Best first: the
+--    name holding the whole phrase (at its start first), then the short words ("2") as words of the name, whole words before a prefix, then the shorter name, then text rank.
+--    At most 50 rows come back.
 -- A packaged food is logged the way a scanned one is (food_source 'barcode', its barcode in the barcode column), so nothing about food_log_entries changes here.
 
 create table if not exists public.usda_branded_foods (
@@ -42,6 +45,7 @@ drop policy if exists "usda_branded_foods_select_all" on public.usda_branded_foo
 create policy "usda_branded_foods_select_all" on public.usda_branded_foods for select to authenticated using (true);
 revoke all on public.usda_branded_foods from anon;
 revoke insert, update, delete, truncate, references, trigger on public.usda_branded_foods from authenticated;
+grant select on public.usda_branded_foods to authenticated;
 
 create or replace function public.search_branded_foods(p_tokens text[], p_limit integer default 10)
 returns table(fdc_id integer, gtin text, brand_owner text, brand_name text, description text, category text, serving_size numeric, serving_size_unit text, household_serving text,
@@ -55,22 +59,44 @@ as $function$
     from unnest(coalesce(p_tokens, array[]::text[])) with ordinality as u(t, n)
   ),
   clean as (select r.t, r.n from raw r where r.t <> '' order by r.n limit 6),
+  -- the words the text search needs: two or more characters (a lone "2" or "a" matches far too much); the last of them may be the start of a word
+  words as (select c.t, c.n from clean c where length(c.t) > 1),
   q as (
-    select to_tsquery('simple'::regconfig, string_agg(c.t || ':*', ' & ' order by c.n)) as query,
-           string_agg(c.t, ' ' order by c.n) as phrase
-    from clean c
+    select to_tsquery('simple'::regconfig, string_agg(case when w.n = (select max(x.n) from words x) then w.t || ':*' else w.t end, ' & ' order by w.n)) as query,
+           -- the same words, all whole: "milk" itself before "milkshake"
+           to_tsquery('simple'::regconfig, string_agg(w.t, ' & ' order by w.n)) as whole
+    from words w
+  ),
+  -- every word as typed (the short ones too: the "2" of "2% milk"), for "the name holds the whole phrase" and "the name has the short word"
+  phrase as (select ' ' || string_agg(c.t, ' ' order by c.n) || ' ' as p from clean c),
+  shorts as (select c.t from clean c where length(c.t) = 1),
+  -- The matches to rank: at most 2,000, whole-word matches first, then the shortest names (the plain products: "2% MILK" before a long candy name). Only the cheap
+  -- checks run over every match; the ranking below runs over these.
+  hits as (
+    select b.*
+    from public.usda_branded_foods b, q
+    where exists (select 1 from words)
+      and b.search @@ q.query
+    order by (b.search @@ q.whole) desc, length(b.description) asc
+    limit 2000
+  ),
+  scored as (
+    select h.*, ' ' || regexp_replace(lower(h.description), '[^a-z0-9]+', ' ', 'g') || ' ' as plain
+    from hits h
   )
-  select b.fdc_id, b.gtin, b.brand_owner, b.brand_name, b.description, b.category, b.serving_size, b.serving_size_unit, b.household_serving,
-         b.kcal, b.protein_g, b.carbs_g, b.fat_g, b.fiber_g, b.sugars_g, b.sodium_mg
-  from public.usda_branded_foods b, q
-  where exists (select 1 from clean)
-    and b.search @@ q.query
+  select s.fdc_id, s.gtin, s.brand_owner, s.brand_name, s.description, s.category, s.serving_size, s.serving_size_unit, s.household_serving,
+         s.kcal, s.protein_g, s.carbs_g, s.fat_g, s.fiber_g, s.sugars_g, s.sodium_mg
+  from scored s, q, phrase
   order by
-    (position(q.phrase in lower(b.description)) > 0) desc,
-    ts_rank(b.search, q.query, 1) desc,
-    length(b.description) asc,
-    b.published_date desc nulls last,
-    b.fdc_id asc
+    (position(phrase.p in s.plain) > 0) desc,
+    (position(phrase.p in s.plain) = 1) desc,
+    (select count(*) from shorts x where position(' ' || x.t || ' ' in s.plain) > 0) desc,
+    (s.search @@ q.whole) desc,
+    -- a short name is the plain product ("WHOLE MILK"); the text rank only breaks ties (it favours a name that repeats the words)
+    length(s.description) asc,
+    ts_rank(s.search, q.query, 1) desc,
+    s.published_date desc nulls last,
+    s.fdc_id asc
   limit least(greatest(coalesce(p_limit, 10), 1), 50);
 $function$;
 revoke all on function public.search_branded_foods(text[], integer) from public, anon;
@@ -137,11 +163,13 @@ select
   to_regclass('public.usda_branded_foods') is not null as branded_table,
   (select relrowsecurity from pg_class where oid = 'public.usda_branded_foods'::regclass) as row_security_on,
   exists (select 1 from pg_policy where polrelid = 'public.usda_branded_foods'::regclass and polname = 'usda_branded_foods_select_all' and polcmd = 'r') as signed_in_can_read,
+  has_table_privilege('authenticated', 'public.usda_branded_foods', 'select') as signed_in_has_select,
   not has_table_privilege('anon', 'public.usda_branded_foods', 'select') as anon_cannot_read,
   not has_table_privilege('authenticated', 'public.usda_branded_foods', 'insert') as signed_in_cannot_write,
   to_regclass('public.usda_branded_foods_gtin_key') is not null as barcode_index,
   to_regclass('public.usda_branded_foods_search_idx') is not null as search_index,
   to_regprocedure('public.search_branded_foods(text[], integer)') is not null as search_function,
+  has_function_privilege('authenticated', 'public.search_branded_foods(text[], integer)', 'execute') as signed_in_can_search,
   not has_function_privilege('anon', 'public.search_branded_foods(text[], integer)', 'execute') as anon_cannot_search,
   to_regprocedure('public.load_usda_branded_batch(text, jsonb)') is not null as load_function,
   (select prosecdef from pg_proc where oid = 'public.load_usda_branded_batch(text, jsonb)'::regprocedure) as load_runs_as_owner,
