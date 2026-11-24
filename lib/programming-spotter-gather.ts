@@ -10,6 +10,8 @@ import {
   isRepRange,
   detectMissingPatternCoverage,
   detectBiomechRedundancy,
+  detectTooManyLiftingDays,
+  type ProgramDayEntry,
   type SpotterExerciseEntry,
   type SpotterCategory,
   type SpotterTier,
@@ -19,7 +21,9 @@ import {
 import { shouldPromptStopSuggesting } from "./spotter-feedback";
 
 export interface SpotterFlag {
-  checkKind: "volume_concentration" | "redundancy" | "flat_repeat" | "missing_pattern" | "biomech_redundancy";
+  // lifting_days (Nov 24): more main lifting days in a week than the client's goal sheet says they can train. Shown only in this panel: it has no cornerstone in
+  // lib/spotter-expert-report.ts, so the Tier-1 sync never carries it anywhere else (no push, no bell; Ron: "I don't want to be getting spammed").
+  checkKind: "volume_concentration" | "redundancy" | "flat_repeat" | "missing_pattern" | "biomech_redundancy" | "lifting_days";
   patternKey: string;
   headline: string;
   // spotter_feedback_learning_loop_research_sept19.md, Part 2/3: once this
@@ -53,9 +57,11 @@ export async function gatherProgrammingSpotterFlags(
   const { programId, programName, coachId } = params;
 
   // The program's days and its dismissals do not depend on each other: read together (the dismissals are simply unused if there are no days).
-  const [{ data: workouts }, { data: dismissalRows }] = await Promise.all([
+  const [{ data: workouts }, { data: dismissalRows }, { data: programRow }] = await Promise.all([
     supabase.from("workouts").select("id, week_number").eq("program_id", programId),
     supabase.from("programming_spotter_dismissals").select("check_kind, pattern_key, dismissed_count").eq("program_id", programId),
+    // whose program it is: the lifting-days check is for a program of ONE client
+    supabase.from("programs").select("athlete_id, group_id").eq("id", programId).maybeSingle(),
   ]);
   if (!workouts || workouts.length === 0) return [];
 
@@ -216,6 +222,34 @@ export async function gatherProgrammingSpotterFlags(
       headline: `"${programName}" reads as a full program, but ${CATEGORY_LABELS[f.category]} never shows up anywhere in it — worth a look?`,
       promptStopSuggesting: false,
     });
+  }
+
+  // More lifting days than the client can do (Nov 24): only for a program of one client whose goal sheet says how many days a week they can realistically train.
+  const clientId = (programRow as { athlete_id: string | null; group_id: string | null } | null)?.athlete_id ?? null;
+  const clientGroupId = (programRow as { athlete_id: string | null; group_id: string | null } | null)?.group_id ?? null;
+  if (clientId && clientGroupId) {
+    const [{ data: sheet }, { data: client }] = await Promise.all([
+      supabase.from("client_goal_sheets").select("days_per_week").eq("athlete_id", clientId).eq("group_id", clientGroupId).maybeSingle(),
+      supabase.from("profiles").select("full_name").eq("id", clientId).maybeSingle(),
+    ]);
+    const dayEntries: ProgramDayEntry[] = [];
+    for (const e of exerciseRows as any[]) {
+      const week = weekByWorkoutId.get(e.workout_id);
+      if (!week) continue;
+      dayEntries.push({ workoutId: e.workout_id as string, weekNumber: week, category: categoryByName.get(e.exercise_name) ?? null });
+    }
+    const f = detectTooManyLiftingDays(dayEntries, (sheet as { days_per_week: number | null } | null)?.days_per_week ?? null);
+    // keyed by the number on the sheet, so a changed sheet gets a fresh look even after the coach said no to this one
+    const key = f ? `sheet_${f.daysPerWeek}` : "";
+    if (f && !isDismissed("lifting_days", key)) {
+      const first = ((client as { full_name: string | null } | null)?.full_name ?? "").trim().split(/\s+/)[0] || "This client";
+      flags.push({
+        checkKind: "lifting_days",
+        patternKey: key,
+        headline: `Week ${f.weekNumber} has ${f.liftingDays} lifting days, and ${first}'s goal sheet says ${f.daysPerWeek} a week is realistic. Keep it, or trim to ${f.daysPerWeek}?`,
+        promptStopSuggesting: false,
+      });
+    }
   }
 
   const biomechFlags = detectBiomechRedundancy(biomechEntries).filter(
