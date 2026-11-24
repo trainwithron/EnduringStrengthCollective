@@ -29,6 +29,8 @@ import { readRowsByIds } from "@/lib/read-by-ids";
 import { AboutYouCard } from "@/components/athlete/about-you-card";
 import { GoalSheetPromptCard } from "@/components/athlete/goal-sheet-prompt-card";
 import { WeeklyCheckinCard } from "@/components/athlete/weekly-checkin-card";
+import { FoodCheckinCard } from "@/components/athlete/food-checkin-card";
+import { loadOpenFoodCheckin, type OpenFoodCheckin } from "@/lib/food-checkin-server";
 import { GoalReviewCard } from "@/components/athlete/goal-review-card";
 import { loadClientHomeAsks } from "@/lib/client-home-asks";
 import { aboutYouComplete, rowToBodyProfile } from "@/lib/client-body-profile";
@@ -609,6 +611,8 @@ export default async function GroupHubPage(
   let goalSheetNeeded = false;
   let goalReview: { text: string | null } | null = null;
   let checkinCard: CheckinCardState = false;
+  // The coach's food check-in waiting on the client (Nov 24): with the week's asks, only for the client themselves.
+  let foodCheckin: OpenFoodCheckin | null = null;
   // Once the goal sheet is done: the offer to join the organization's shared group (never two prompts at once). Only for the client themselves, in their one-on-one space.
   let sharedGroupOffer: SharedGroupOffer | null = null;
   let wellnessCheckin: WellnessCheckinValues | null = null;
@@ -848,10 +852,12 @@ export default async function GroupHubPage(
       if (isToday && todayReads) {
         if (!isCoach && !isActingAsOther) {
           // The goal sheet, with the 90-day goal look and the weekly check-in card read beside it (lib/client-home-asks.ts; Ron, Nov 20).
-          const [{ data: sheetRow, error: sheetError }, asks] = await Promise.all([
+          const [{ data: sheetRow, error: sheetError }, asks, openCheckin] = await Promise.all([
             supabase.from("client_goal_sheets").select("filled_at").eq("athlete_id", athleteId).eq("group_id", params.groupId).maybeSingle(),
             loadClientHomeAsks(supabase, { athleteId, groupId: params.groupId }),
+            foodTrackingOn ? loadOpenFoodCheckin(supabase, athleteId, params.groupId) : Promise.resolve(null),
           ]);
+          foodCheckin = openCheckin;
           goalReview = asks.goalReview;
           checkinCard = asks.checkinCard;
           goalSheetNeeded = !sheetError && !sheetRow?.filled_at;
@@ -1064,8 +1070,9 @@ export default async function GroupHubPage(
                 resume={openOwnSession && openIsTodays && openWorkoutId ? { sessionId: (openOwnSession as { id: string }).id, workoutId: openWorkoutId } : null}
                 // The week's asks right under the workout and the tiles (CL8, Nov 21: they sat below the fold)
                 asks={
-                  isToday && (checkinCard || goalReview) ? (
+                  isToday && (checkinCard || goalReview || foodCheckin) ? (
                     <>
+                      {foodCheckin && <FoodCheckinCard id={foodCheckin.id} coachFirstName={foodCheckin.coachFirstName} message={foodCheckin.message} />}
                       {checkinCard && <WeeklyCheckinCard groupId={params.groupId} coachName={clientsCoachName} sent={checkinCard === "sent"} />}
                       {goalReview && <GoalReviewCard groupId={params.groupId} athleteId={athleteId} goalText={goalReview.text} />}
                     </>

@@ -47,6 +47,10 @@ export const FILTER_OF_TYPE: Record<string, NoticeFilter> = {
   weekly_checkin: "clients",
   // a client changed an exercise for every week of their own program (B5, step 219)
   exercise_swap: "clients",
+  // the food check-in (step 227): the client's from their coach, and the coach's two (sent, answered)
+  food_checkin: "clients",
+  food_checkin_answered: "clients",
+  food_checkin_sent: "clients",
   // training and nutrition plans
   program_assigned: "programs",
   macros_assigned: "programs",
