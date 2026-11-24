@@ -92,6 +92,8 @@ describe("the goal sheet (Ron, Nov 2)", () => {
 
   it("sits on the client's goal page and on the coach's view of that client", () => {
     expect(read("app/(coach)/groups/[groupId]/goal/page.tsx")).toContain('viewer="client"');
-    expect(read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx")).toContain('viewer="coach"');
+    // inside the one Goals card (goals, all in one, Nov 23)
+    expect(read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx")).toContain("<GoalsCard");
+    expect(read("components/coach/goals-card.tsx")).toContain('viewer="coach"');
   });
 });

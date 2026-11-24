@@ -83,9 +83,12 @@ describe("C3 a Join that needs a session says what to do", () => {
 describe("C4 / C12 the goal sheet opens for writing", () => {
   it("Update my goal and the coach's notice open it with ?edit=1; it also opens that way while the coach's request waits", () => {
     expect(read("components/athlete/goal-review-card.tsx")).toContain("href={`/groups/${groupId}/goal?edit=1#goal-sheet`}");
-    expect(read("app/api/goal-sheet/send/route.ts")).toContain("const path = `/groups/${groupId}/goal?edit=1#goal-sheet`;");
-    expect(read("app/(coach)/groups/[groupId]/goal/page.tsx")).toContain('const startEditing = (await props.searchParams)?.edit === "1";');
-    expect(read("components/shared/goal-sheet-section.tsx")).toContain('useState(viewer === "client" && (!hasAnswers || startEditing || waiting))');
+    // goals, all in one (Nov 23): the notice opens the one goals page, which is always open for writing (answers already saved show filled in)
+    expect(read("app/api/goal-sheet/send/route.ts")).toContain("const path = goalsPagePath(groupId);");
+    expect(read("lib/goals-all-in-one.ts")).toContain("export const goalsPagePath = (groupId: string) => `/groups/${groupId}/goal?edit=1`;");
+    const page = read("app/(coach)/groups/[groupId]/goal/page.tsx");
+    expect(page).toContain('<section id="goal-sheet"');
+    expect(page).toContain("<GoalsForm");
   });
 });
 

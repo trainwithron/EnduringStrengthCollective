@@ -154,10 +154,11 @@ describe("Elsewhere in the client app", () => {
     expect(c).toContain("Change what I log");
     expect(c).not.toMatch(/>\s*Edit metrics\s*</);
   });
-  it("CL19: the goal page puts an empty sheet first, folds Propose a change, and words the history", () => {
+  it("CL19 (since goals, all in one, Nov 23): the goal page is one form, and words the history", () => {
     const g = read("app/(coach)/groups/[groupId]/goal/page.tsx");
-    expect(g).toContain("{sheetFirst && <GoalSheetSection");
-    expect(g).toContain("data-goal-propose");
+    expect(g).toContain("<GoalsForm");
+    expect(g).not.toContain("data-goal-propose");
+    expect(g).toContain("Earlier goals");
     expect(goalStatusWords("proposed")).toBe("Waiting on your coach");
     expect(goalStatusWords("declined")).toBe("Not approved");
     expect(goalStatusWords("confirmed")).toBe("Confirmed");
