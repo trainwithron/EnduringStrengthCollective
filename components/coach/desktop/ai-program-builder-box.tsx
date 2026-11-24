@@ -15,6 +15,7 @@ import { appliedLine, type AppliedRule } from "@/lib/learned-for-prompt";
 import { LikeClientSuggestion } from "@/components/coach/desktop/like-client";
 import { PastAiNotes } from "@/components/coach/desktop/past-ai-notes";
 import { fixTargetFrom, parseBuildRequest, planSlots, scopeLimitFrom } from "@/lib/ai-day-request";
+import { mergeFlags } from "@/lib/constraint-scan";
 import { WHICH_WEEKS_QUESTION, isEditRequest, isYes, parseWeekRange, type PlannedDay, type WeekRange } from "@/lib/ai-week-edit";
 import type { DaySlot } from "@/lib/ai-day-slots";
 import type { BuilderDay } from "@/lib/types";
@@ -147,7 +148,7 @@ export function AiProgramBuilderBox({
         return;
       }
       await show(result.workoutId);
-      if (result.flags.length > 0) setFlags((prev) => [...prev, ...result.flags].slice(-6));
+      if (result.flags.length > 0) setFlags((prev) => mergeFlags(prev, result.flags));
       if (result.applied.length > 0) setApplied((prev) => [...prev.filter((a) => !result.applied.some((n) => n.id === a.id)), ...result.applied]);
       lastBuilt.current = slot;
       finishedWeeks.current.add(slot.week);
@@ -347,7 +348,7 @@ export function AiProgramBuilderBox({
           return;
         }
         await show(fixed.workoutId);
-        if (fixed.flags.length > 0) setFlags((prev) => [...prev, ...fixed.flags].slice(-6));
+        if (fixed.flags.length > 0) setFlags((prev) => mergeFlags(prev, fixed.flags));
         if (fixed.applied.length > 0) setApplied((prev) => [...prev.filter((a) => !fixed.applied.some((n) => n.id === a.id)), ...fixed.applied]);
       }
     }
@@ -475,7 +476,7 @@ export function AiProgramBuilderBox({
             ))}
           </ul>
           {preview.skipped.length > 0 && <p className="font-body text-xs text-steel mt-2">{preview.skipped.join(". ")}.</p>}
-          {preview.flags.length > 0 && <p className="font-body text-xs text-steel mt-1">Worth a look: {preview.flags.join(" · ")}</p>}
+          {preview.flags.length > 0 && <p className="font-body text-xs text-steel mt-1">Worth a look: {mergeFlags([], preview.flags).join(" · ")}</p>}
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <button type="button" onClick={() => void applyEdit()} disabled={editBusy !== null} className="min-h-11 px-5 bg-rust text-graphite font-display font-bold uppercase tracking-wide disabled:opacity-40">
               {editBusy === "apply" ? "Applying…" : "Apply"}
@@ -496,7 +497,7 @@ export function AiProgramBuilderBox({
         </div>
       )}
       {flags.length > 0 && (
-        <p className="font-body text-xs text-steel mt-1">Worth a look: {flags.slice(-3).join(" · ")}</p>
+        <p className="font-body text-xs text-steel mt-1">Worth a look: {mergeFlags([], flags).slice(-3).join(" · ")}</p>
       )}
     </section>
     <AiRunPanel programId={programId} request={shownRequest} corrections={shownCorrections} />
