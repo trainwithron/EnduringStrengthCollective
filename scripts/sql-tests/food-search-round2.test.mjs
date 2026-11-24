@@ -105,9 +105,11 @@ expect("names: a name the same as USDA's is no plain name ('Coffee, brewed')", J
 
 // ---- 1. forgiving spelling ----
 // the live-size counts around the words tested (a fixture of 900 foods has a few hundred of each word; live has thousands)
-await db.query(`insert into public.food_search_words (word, uses) select x.w, x.n from jsonb_to_recordset($1::jsonb) as x(w text, n integer) on conflict (word) do update set uses = excluded.uses`, [
-  JSON.stringify(fixture.words.map(([w, n]) => ({ w, n }))),
-]);
+await db.query(
+  `insert into public.food_search_words (word, uses, everyday) select x.w, x.n, x.e from jsonb_to_recordset($1::jsonb) as x(w text, n integer, e integer)
+   on conflict (word) do update set uses = excluded.uses, everyday = excluded.everyday`,
+  [JSON.stringify(fixture.words.map(([w, n, e]) => ({ w, n, e })))]
+);
 await insertBranded(misspelled);
 expect("the trigger added 'chiken' from the 3 misspelled products", (await db.query(`select uses from public.food_search_words where word = 'chiken'`)).rows[0]?.uses >= 3);
 const TYPOS = { "chiken breast": "chicken breast", brocoli: "broccoli", bananna: "banana", yogrt: "yogurt", cheerois: "cheerios" };
@@ -133,6 +135,14 @@ for (const [typed, meant] of Object.entries(OFFERED)) {
   expect(`"${typed}": Did you mean "${meant}"`, (await correct(typed)) === meant, await correct(typed));
 }
 for (const kept of ["whole milk", "2% milk", "chicken breast", "greek yogurt"]) expect(`"${kept}" is never changed`, (await correct(kept)) === tokenize(kept).join(" "), await correct(kept));
+// the Assistant's review of 17ddf1b4: words spelled right were swapped for a close word used 20 times as often (live: creatine 1 -> creative 367, whites 181 -> white 11,604).
+// A word of the everyday foods is never swapped; a word on some products only gives way to an everyday word; never to its own singular.
+for (const kept of ["creatine", "egg whites", "grapes", "goose", "dal"]) expect(`"${kept}" is spelled right: no change, so no "Did you mean"`, (await correct(kept)) === tokenize(kept).join(" "), await correct(kept));
+// ... and among one-slip words, the same first letter, then the everyday word, beat a brand or a filler word (live: brest -> "best" of Best Choice, wite -> "with", bagle -> "eagle")
+const PICKED = { "chicken brest": "chicken breast", "turkey brest": "turkey breast", "wite rice": "white rice", bagle: "bagel" };
+for (const [typed, meant] of Object.entries(PICKED)) expect(`"${typed}" is read as "${meant}"`, (await correct(typed)) === meant, await correct(typed));
+const everydayOf = async (w) => (await db.query(`select everyday from public.food_search_words where word = $1`, [w])).rows[0]?.everyday ?? null;
+expect("'tumeric' is not an everyday word (USDA's foods spell it turmeric), so it is offered as turmeric", (await everydayOf("tumeric")) === 0 && (await everydayOf("turmeric")) > 0);
 expect("a number stays a number ('2% milk')", (await correct("2% milk")) === "2 milk");
 expect("gibberish stays as typed (so it still finds nothing)", (await correct("xqzv")) === "xqzv" && (await everydayCount("xqzv")) === 0);
 expect("swaps the misspelled word only", (await correct("chiken xqzv breast")) === "chicken xqzv breast");
@@ -150,6 +160,9 @@ await db.exec(`update public.usda_branded_foods set description = 'QUUXBERRY ZOR
 expect("a changed product adds its new words, without counting the old ones twice", (await uses("zorblat")) === 1 && (await uses("quuxberry")) === 1);
 await db.exec(`insert into public.usda_foods (fdc_id, description, data_type, plain_name, common) values (990000002, 'Quuxfruit, raw', 'Survey (FNDDS)', 'Quuxfruit', true)`);
 expect("a new USDA food's words are in the list at once", (await uses("quuxfruit")) === 2);
+expect("a USDA food's words are everyday words; a product's are not", (await everydayOf("quuxfruit")) === 2 && (await everydayOf("quuxberry")) === 0);
+await db.exec(`update public.usda_foods set extra_names = 'zorblat' where fdc_id = 990000002`);
+expect("a word a changed USDA food now uses becomes an everyday word", (await everydayOf("zorblat")) === 1 && (await uses("zorblat")) === 1);
 const refreshed = (await db.query(`select public.refresh_food_search_words() n`)).rows[0].n;
 expect("refresh rebuilds the whole list from the tables", refreshed === (await db.query(`select count(*)::int n from public.food_search_words`)).rows[0].n && (await uses("quuxberry")) === 1 && (await uses("chiken")) >= 3);
 await db.exec(`delete from public.usda_branded_foods where fdc_id = 990000001; delete from public.usda_foods where fdc_id = 990000002;`);

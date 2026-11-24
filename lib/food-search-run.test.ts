@@ -119,6 +119,23 @@ describe("Did you mean: something was found as typed, but a word looks misspelle
       expect(calls.filter((c) => c.fn === "search_usda_foods").map((c) => c.words)).toEqual([typed.replace(/[^a-z0-9]+/g, " ").trim()]);
     });
   }
+  // the review of 17ddf1b4: words spelled right (the real function keeps them, food-search-round2.test.mjs) show no "Did you mean"; brand and filler look-alikes lose
+  const REVIEW: Record<string, string> = { brest: "breast", wite: "white", bagle: "bagel" };
+  const reviewWords = (t: string[]) => t.map((w) => REVIEW[w] ?? w);
+  for (const kept of ["creatine", "egg whites", "grapes", "goose", "dal"]) {
+    it(`${kept}: spelled right, so no "Did you mean"`, async () => {
+      const { client } = fakeDb({ packaged: { [kept]: [brandedRow(kept.toUpperCase())] }, correct: reviewWords });
+      expect(await runFoodSearch(client, kept)).toMatchObject({ correctedTo: null, suggestion: null });
+    });
+  }
+  for (const [typed, meant] of [["chicken brest", "chicken breast"], ["wite rice", "white rice"], ["bagle", "bagel"]]) {
+    it(`${typed}: "Did you mean ${meant}?" (or searched again when nothing was found)`, async () => {
+      const found = fakeDb({ packaged: { [typed]: [brandedRow(typed.toUpperCase())] }, correct: reviewWords });
+      expect((await runFoodSearch(found.client, typed)).suggestion).toBe(meant);
+      const empty = fakeDb({ everyday: { [meant]: [everydayRow(meant)] }, correct: reviewWords });
+      expect((await runFoodSearch(empty.client, typed)).correctedTo).toBe(meant);
+    });
+  }
   for (const kept of ["whole milk", "2% milk", "chicken breast"]) {
     it(`${kept}: nothing extra shown`, async () => {
       const { client } = fakeDb({ everyday: { "whole milk": [everydayRow("Milk, whole", "Whole milk")], "2 milk": [everydayRow("Milk, reduced fat (2%)", "2% milk")], "chicken breast": [everydayRow("Chicken breast, baked", "Chicken breast, cooked (no skin)")] }, correct: liveWords });

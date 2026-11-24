@@ -11,10 +11,13 @@ begin;
 --       packaged foods (brand and name), with how often it is used. Read by any signed-in person, like the foods.
 --     * Kept current by triggers: each insert or update of usda_foods or usda_branded_foods adds its words (a 1,000-product batch adds about 40 ms), so the loaders need no extra
 --       step. public.refresh_food_search_words() rebuilds the whole list from the tables (about 20 s live; the SQL editor only, too long for the 8 s server calls).
---     * public.correct_food_search_words(words): the words with the misspelled ones swapped. A word with a digit ("2" of "2% milk") or under 3 letters stays. A word stays unless a
---       close word is used at least 20 times as often (a few packaged foods are misspelled themselves: "chiken" is on 3 products, "chicken" on 14,006). Close = one typing
---       slip (a letter missing, extra, wrong, or two letters swapped: food_word_distance), two for words of 8 or more letters; among those the most used wins. Candidates come
---       from the trigram index (similarity 0.3 or more: 0.4 would miss "cheerois", 0.385 from "cheerios", and keep "cheers", 0.45; the slip count picks the right one).
+--     * public.correct_food_search_words(words): the words with the misspelled ones swapped. Stays as typed: a word with a digit ("2" of "2% milk") or under 3 letters; a word
+--       of the everyday foods or the synonyms ("creatine", "grapes", "goose": spelled right by definition); and any word unless a close word is used at least 20 times as often
+--       (a few packaged foods are misspelled themselves: "chiken" is on 3 products, "chicken" on 14,006). A word already on some products is only swapped for a word of the
+--       everyday foods, never for its own singular ("whites" stays "whites"), and never for a filler word ("with", "and", "inc", ...). Close = one typing slip (a letter missing,
+--       extra, wrong, or two letters swapped: food_word_distance), two for words of 8 or more letters; among those, the same first letter first ("bagle" is "bagel", not
+--       "eagle"), then the word most used in the everyday foods ("brest" is "breast", not the brand "Best"), then the most used anywhere. Candidates come from the trigram
+--       index (similarity 0.3 or more: 0.4 would miss "cheerois", 0.385 from "cheerios", and keep "cheers", 0.45; the slip count picks the right one).
 -- 2. The plain version first. Live, "egg whites" put the egg white omelet with meat first. search_usda_foods gets one new tier ahead of the others: an everyday food named by hand
 --    (common) whose own name, or its first part, is the search ("Egg whites, cooked" for "egg whites", "Tomato" for "tomato"; a plural and its singular count as the same name,
 --    food_words_singular). The names and the common flag of 31 everyday foods change to match scripts/usda-fndds-lib.mjs (so a reload gives the same), and three synonyms let the
@@ -129,7 +132,9 @@ grant execute on function public.search_usda_foods(text[], integer) to authentic
 
 create table if not exists public.food_search_words (
   word text primary key check (word ~ '^[a-z]{3,40}$'),
-  uses integer not null default 0 check (uses >= 0)
+  uses integer not null default 0 check (uses >= 0),
+  -- how often it is used in the everyday foods (USDA names, plain names, other names) and the synonyms: a word of these is spelled right and never swapped
+  everyday integer not null default 0 check (everyday >= 0)
 );
 create index if not exists food_search_words_trgm_idx on public.food_search_words using gin (word extensions.gin_trgm_ops);
 alter table public.food_search_words enable row level security;
@@ -150,14 +155,14 @@ declare
   v_count integer;
 begin
   delete from public.food_search_words;
-  insert into public.food_search_words (word, uses)
-  select x.w, count(*)::integer
+  insert into public.food_search_words (word, uses, everyday)
+  select x.w, count(*)::integer, (count(*) filter (where x.everyday))::integer
   from (
-    select regexp_split_to_table(lower(f.description || ' ' || coalesce(f.plain_name, '') || ' ' || coalesce(f.extra_names, '')), '[^a-z]+') as w from public.usda_foods f
+    select regexp_split_to_table(lower(f.description || ' ' || coalesce(f.plain_name, '') || ' ' || coalesce(f.extra_names, '')), '[^a-z]+') as w, true as everyday from public.usda_foods f
     union all
-    select regexp_split_to_table(lower(s.phrase || ' ' || s.alternative), '[^a-z]+') from public.food_search_synonyms s
+    select regexp_split_to_table(lower(s.phrase || ' ' || s.alternative), '[^a-z]+'), true from public.food_search_synonyms s
     union all
-    select regexp_split_to_table(lower(coalesce(b.brand_owner, '') || ' ' || coalesce(b.brand_name, '') || ' ' || b.description), '[^a-z]+') from public.usda_branded_foods b
+    select regexp_split_to_table(lower(coalesce(b.brand_owner, '') || ' ' || coalesce(b.brand_name, '') || ' ' || b.description), '[^a-z]+'), false from public.usda_branded_foods b
   ) x
   where length(x.w) between 3 and 40
   group by x.w;
@@ -168,7 +173,8 @@ $function$;
 revoke all on function public.refresh_food_search_words() from public, anon, authenticated;
 grant execute on function public.refresh_food_search_words() to service_role;
 
--- The triggers: the words of the rows just added (counted) or changed (new words only, so a monthly refresh does not double every count).
+-- The triggers: the words of the rows just added (counted) or changed (new words only, so a monthly refresh does not double every count; a word a changed USDA food now uses
+-- counts as an everyday word).
 create or replace function public.food_search_words_from_foods()
 returns trigger
 language plpgsql
@@ -177,19 +183,19 @@ set search_path = public, pg_temp
 as $function$
 begin
   if tg_op = 'INSERT' then
-    insert into public.food_search_words (word, uses)
-    select x.w, count(*)::integer
+    insert into public.food_search_words (word, uses, everyday)
+    select x.w, count(*)::integer, count(*)::integer
     from (select regexp_split_to_table(lower(n.description || ' ' || coalesce(n.plain_name, '') || ' ' || coalesce(n.extra_names, '')), '[^a-z]+') as w from new_rows n) x
     where length(x.w) between 3 and 40
     group by x.w
-    on conflict (word) do update set uses = public.food_search_words.uses + excluded.uses;
+    on conflict (word) do update set uses = public.food_search_words.uses + excluded.uses, everyday = public.food_search_words.everyday + excluded.everyday;
   else
-    insert into public.food_search_words (word, uses)
-    select x.w, count(*)::integer
+    insert into public.food_search_words (word, uses, everyday)
+    select x.w, count(*)::integer, count(*)::integer
     from (select regexp_split_to_table(lower(n.description || ' ' || coalesce(n.plain_name, '') || ' ' || coalesce(n.extra_names, '')), '[^a-z]+') as w from new_rows n) x
     where length(x.w) between 3 and 40
     group by x.w
-    on conflict (word) do nothing;
+    on conflict (word) do update set everyday = greatest(public.food_search_words.everyday, 1);
   end if;
   return null;
 end
@@ -282,6 +288,7 @@ declare
   v_tok text;
   v_out text[] := array[]::text[];
   v_own integer;
+  v_own_everyday integer;
   v_word text;
   v_uses integer;
 begin
@@ -293,18 +300,29 @@ begin
       v_out := v_out || v_tok;
       continue;
     end if;
-    select coalesce(max(w.uses), 0) into v_own from public.food_search_words w where w.word = v_tok;
+    select coalesce(max(w.uses), 0), coalesce(max(w.everyday), 0) into v_own, v_own_everyday from public.food_search_words w where w.word = v_tok;
+    -- a word of the everyday foods or the synonyms is spelled right: never swapped ("creatine", "grapes", "goose")
+    if v_own_everyday > 0 then
+      v_out := v_out || v_tok;
+      continue;
+    end if;
     v_word := null;
     select c.word, c.uses into v_word, v_uses
     from (
-      select w.word, w.uses, similarity(w.word, v_tok) as sim
+      select w.word, w.uses, w.everyday, similarity(w.word, v_tok) as sim
       from public.food_search_words w
       where w.word % v_tok and w.word <> v_tok
-      order by similarity(w.word, v_tok) desc, w.uses desc, w.word
+        -- never a filler word, never the word's own singular ("whites" is not a misspelled "white")
+        and w.word not in ('with', 'and', 'the', 'for', 'from', 'inc', 'llc', 'nfs', 'not', 'made')
+        and v_tok not in (w.word || 's', w.word || 'es')
+        -- a word already on some products only gives way to a word of the everyday foods
+        and (v_own = 0 or w.everyday > 0)
+      order by similarity(w.word, v_tok) desc, w.everyday desc, w.uses desc, w.word
       limit 50
     ) c
     where public.food_word_distance(c.word, v_tok) <= case when length(v_tok) >= 8 then 2 else 1 end
-    order by public.food_word_distance(c.word, v_tok), c.uses desc, c.sim desc, c.word
+    -- the fewest slips, then the same first letter ("bagle": bagel, not eagle), then the most used in the everyday foods ("brest": breast, not the brand Best), then anywhere
+    order by public.food_word_distance(c.word, v_tok), (left(c.word, 1) = left(v_tok, 1)) desc, c.everyday desc, c.uses desc, c.sim desc, c.word
     limit 1;
     if v_word is not null and v_uses > v_own and v_uses >= v_own * 20 then
       v_out := v_out || v_word;
@@ -375,7 +393,7 @@ select
   (select count(*) from public.food_search_words) > 1000 or not exists (select 1 from public.usda_foods) as word_list_built,
   (select count(*) from pg_trigger where not tgisinternal and tgname in ('usda_foods_words_added', 'usda_foods_words_changed', 'usda_branded_foods_words_added', 'usda_branded_foods_words_changed')) = 4 as word_list_kept_current,
   public.correct_food_search_words(array['chiken', 'breast']) = array['chicken', 'breast'] or not exists (select 1 from public.usda_foods) as chiken_breast_is_chicken_breast,
-  public.correct_food_search_words(array['whole', 'milk', '2']) = array['whole', 'milk', '2'] as known_words_stay,
+  public.correct_food_search_words(array['whole', 'milk', '2', 'egg', 'whites', 'grapes']) = array['whole', 'milk', '2', 'egg', 'whites', 'grapes'] as known_words_stay,
   (select description from public.search_usda_foods(array['egg', 'whites'], 1)) = 'Egg, white, cooked, no added fat'
     or not exists (select 1 from public.usda_foods where data_type = 'Survey (FNDDS)') as egg_whites_plain_first,
   (select fdc_id from public.search_usda_foods(array['whole', 'milk'], 1)) = (select fdc_id from public.usda_foods where description = 'Milk, whole' and data_type = 'Survey (FNDDS)')
