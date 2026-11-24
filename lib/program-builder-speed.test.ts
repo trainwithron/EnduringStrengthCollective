@@ -37,6 +37,7 @@ describe("the builder page and the Spotter", () => {
     expect(page).toContain("const [data, { data: roleRow, error: roleError }, { data: askedRule }, { data: progressionRules }] = await Promise.all([");
   });
   it("the Spotter reads the days and the dismissals together", () => {
-    expect(read("lib/programming-spotter-gather.ts")).toContain("const [{ data: workouts }, { data: dismissalRows }] = await Promise.all([");
+    // (and, since Nov 24, whose program it is, for the lifting-days check: the same one round trip)
+    expect(read("lib/programming-spotter-gather.ts")).toContain("const [{ data: workouts }, { data: dismissalRows }, { data: programRow }] = await Promise.all([");
   });
 });

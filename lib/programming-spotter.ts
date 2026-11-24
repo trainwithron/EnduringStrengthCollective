@@ -274,6 +274,40 @@ export function detectBiomechRedundancy(entries: BiomechTaggedEntry[]): BiomechR
   return flags;
 }
 
+// More main lifting days in a week than the client said they can train (Ron, Nov 24: "A lot of times they'll say 3 days a week. And that'll be big lifts, but I'll assign
+// at-home mobility stuff ... for the in-between days, which are more or less optional ... So I don't want to be getting spammed."). Only for a program of ONE client whose goal
+// sheet gives days_per_week. A lifting day is a day (one workout) with at least one Push, Pull, Legs or Full Body exercise: a day of only Core, Cardio or Mobility work (the
+// optional in-between days), or of exercises with no category, never counts. One flag per program, for its busiest week (the earliest of equals), never one per week.
+export const LIFTING_DAY_CATEGORIES: ReadonlySet<SpotterCategory> = new Set<SpotterCategory>(["Push", "Pull", "Legs", "Full Body"]);
+
+export interface ProgramDayEntry {
+  workoutId: string;
+  weekNumber: number;
+  category: SpotterCategory | null;
+}
+
+export interface LiftingDaysFlag {
+  weekNumber: number;
+  liftingDays: number;
+  daysPerWeek: number;
+}
+
+export function detectTooManyLiftingDays(entries: ProgramDayEntry[], daysPerWeek: number | null | undefined): LiftingDaysFlag | null {
+  if (daysPerWeek == null || !Number.isInteger(daysPerWeek) || daysPerWeek < 1 || daysPerWeek > 7) return null;
+  const liftingDaysByWeek = new Map<number, Set<string>>();
+  for (const e of entries) {
+    if (!e.category || !LIFTING_DAY_CATEGORIES.has(e.category)) continue;
+    const days = liftingDaysByWeek.get(e.weekNumber) ?? new Set<string>();
+    days.add(e.workoutId);
+    liftingDaysByWeek.set(e.weekNumber, days);
+  }
+  let worst: LiftingDaysFlag | null = null;
+  for (const [weekNumber, days] of [...liftingDaysByWeek.entries()].sort((a, b) => a[0] - b[0])) {
+    if (days.size > daysPerWeek && (!worst || days.size > worst.liftingDays)) worst = { weekNumber, liftingDays: days.size, daysPerWeek };
+  }
+  return worst;
+}
+
 // Missing-pattern coverage — deliberately scoped to this app's existing
 // 7-category system (exercise_library.category), not a new movement-
 // pattern taxonomy. Push/Pull/Legs are the three "training" categories
