@@ -52,11 +52,17 @@ export interface ExistingDay {
 // The days to build, in order: every (week, day) in the target shape that has no exercises yet, never one that does. The shape: days per week from the request, else the program's training days,
 // else the days the program already shows (when more than one), else 3; weeks from the request, else just the week that is already under way ("finish the week"), else ONE week for an empty program (never a longer program than the coach's words ask for).
 // At most MAX_DAYS_PER_RUN, so one run stays inside what one run is charged for.
+// The days of each week of the run: the request's own number, else the program's training days, else the days the program already shows (when more than one), else 3. The box
+// sends it with every day it builds, so the day being written knows the week it belongs to (where its mobility days go: lib/ai-day-rules.ts mobilityDayPlan).
+export function weekDaysFor(existing: ExistingDay[], request: Pick<BuildRequest, "daysPerWeek">, trainingDaysCount: number | null): number {
+  const shown = daysPerWeekOf(existing);
+  return request.daysPerWeek ?? (trainingDaysCount && trainingDaysCount > 0 ? trainingDaysCount : shown > 1 ? shown : 3);
+}
+
 export function planSlots(existing: ExistingDay[], request: BuildRequest, trainingDaysCount: number | null): DaySlot[] {
   const built = existing.filter((d) => d.hasExercises);
   const lastBuiltWeek = built.length > 0 ? Math.max(...built.map((d) => d.week)) : 0;
-  const shown = daysPerWeekOf(existing);
-  const dpw = request.daysPerWeek ?? (trainingDaysCount && trainingDaysCount > 0 ? trainingDaysCount : shown > 1 ? shown : 3);
+  const dpw = weekDaysFor(existing, request, trainingDaysCount);
   let weeks: number;
   if (request.weeks != null) weeks = request.weeks;
   else if (request.finishWeek || lastBuiltWeek > 0) weeks = Math.max(1, lastBuiltWeek);
@@ -67,6 +73,33 @@ export function planSlots(existing: ExistingDay[], request: BuildRequest, traini
     for (let d = 1; d <= dpw; d++) {
       if (!hasAt.has(`${w}:${d}`)) slots.push({ week: w, day: d });
     }
+  }
+  return slots.slice(0, MAX_DAYS_PER_RUN);
+}
+
+// Resuming a paused run (Ron, Nov 24: a 5-day request built only days 3 to 5). The run was paused after days 1 and 2; he deleted the week, typed his new request and it went in as
+// a correction to the OLD run, which carried on with its queue (days 3 to 5). Two rules:
+//  * nothing the run built is still there (the week was deleted or cleared): what is typed is a NEW request, planned from scratch (`isFreshStart`);
+//  * otherwise the queue is planned again over the run's weeks from what is there NOW, so a day deleted meanwhile is built again, in order (`replanQueue`).
+// Words that are a request in their own right ("5 day split ...", "4 weeks of ...", "build ...", a program or a split), not a change to the one already given ("less volume").
+// A fresh start takes them as the new request; anything else keeps the run's request and goes along as a change (review of 54e68c07).
+export function isNewRequest(text: string): boolean {
+  const parsed = parseBuildRequest(text);
+  if (parsed.daysPerWeek != null || parsed.weeks != null) return true;
+  // not the bare words "program" or "split": "less volume in the program" is a change (a real one is caught by its days or weeks: "4 week program", "5-day split")
+  return /\b(?:build|create|write|make me|full[\s-]*body (?:days?|workouts?|program))\b/i.test(text);
+}
+
+export function isFreshStart(existing: ExistingDay[], builtByRun: DaySlot[]): boolean {
+  if (builtByRun.length === 0) return false;
+  return !builtByRun.some((s) => existing.some((d) => d.week === s.week && d.day === s.day && d.hasExercises));
+}
+
+export function replanQueue(existing: ExistingDay[], run: { weeks: number[]; daysPerWeek: number }): DaySlot[] {
+  const has = new Set(existing.filter((d) => d.hasExercises).map((d) => `${d.week}:${d.day}`));
+  const slots: DaySlot[] = [];
+  for (const w of [...new Set(run.weeks)].sort((a, b) => a - b)) {
+    for (let d = 1; d <= run.daysPerWeek; d++) if (!has.has(`${w}:${d}`)) slots.push({ week: w, day: d });
   }
   return slots.slice(0, MAX_DAYS_PER_RUN);
 }
