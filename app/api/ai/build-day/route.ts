@@ -199,7 +199,7 @@ export async function POST(request: Request) {
     const youthPass = youthBlock ? clampYouthRows(timed) : { rows: timed, flags: [] as string[] };
     const tidy = youthPass.rows;
     // The coach's own named exercises are never flagged or replaced by the "worth a look" checks.
-    const scan = scanConstraints(sayings, tidy.filter((r) => !r.coachNamed).map((r) => ({ week: `Week ${week}`, day: `Day ${day}`, exerciseName: r.exerciseName, sets: r.sets, reps: r.reps, weight: r.weight, rpe: r.rpe, rest: r.rest, timeSeconds: r.timeSeconds }) as never));
+    const scan = scanConstraints(sayings, tidy.filter((r) => !r.coachNamed).map((r) => ({ week: `Week ${week}`, day: `Day ${day}`, exerciseName: r.exerciseName, sets: r.sets, reps: r.reps, weight: r.weight, rpe: r.rpe, rest: r.rest, timeSeconds: r.timeSeconds }) as never), { weekCount: false });
     return { result: { ...parsed, exercises: tidy }, rows: tidy, scan, youthFlags: youthPass.flags };
   }
   // A flag that says a chosen exercise breaks something the coach said to leave out (not the softer "check this" notes).
@@ -311,7 +311,7 @@ export async function POST(request: Request) {
     if (oldIds.length > 0) await supabase.from("group_workout_exercises").delete().in("id", oldIds);
 
     const longDay = longDayFlag(week, day, rows.length, exercisesWanted(sayings));
-    const flags = scanConstraints(`${instruction}. ${corrections.join(". ")}`, rows.filter((r) => !r.coachNamed).map((r) => ({ week: `Week ${week}`, day: `Day ${day}`, exerciseName: r.exerciseName, sets: r.sets, reps: r.reps, weight: r.weight, rpe: r.rpe, rest: r.rest, timeSeconds: r.timeSeconds }) as never));
+    const flags = scanConstraints(`${instruction}. ${corrections.join(". ")}`, rows.filter((r) => !r.coachNamed).map((r) => ({ week: `Week ${week}`, day: `Day ${day}`, exerciseName: r.exerciseName, sets: r.sets, reps: r.reps, weight: r.weight, rpe: r.rpe, rest: r.rest, timeSeconds: r.timeSeconds }) as never), { weekCount: false });
     if (longDay) flags.push(longDay);
     flags.push(...(first.youthFlags ?? []));
     // Exercises the AI chose that are not in the coach's library are said so (they are kept as written; the coach decides).

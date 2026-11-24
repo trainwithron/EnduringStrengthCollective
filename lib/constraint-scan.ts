@@ -29,7 +29,19 @@ function singular(w: string): string {
   return w.length > 4 && w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w;
 }
 
-export function scanConstraints(brief: string, rows: ParsedImportRow[]): string[] {
+// The same flags once each, newest last, at most `max` (each built day sends its own flags: the coach's screen must not show one line three times; Ron, Nov 23).
+export function mergeFlags(prev: string[], next: string[], max = 6): string[] {
+  const out: string[] = [];
+  for (const f of [...prev, ...next]) {
+    const i = out.indexOf(f);
+    if (i >= 0) out.splice(i, 1);
+    out.push(f);
+  }
+  return out.slice(-max);
+}
+
+// `weekCount: false` for a scan of ONE built day (the AI builder builds a day at a time): a single day always has "1 training day", so the days-a-week check needs the whole week.
+export function scanConstraints(brief: string, rows: ParsedImportRow[], opts: { weekCount?: boolean } = {}): string[] {
   const text = brief.toLowerCase();
   const out: string[] = [];
   const add = (s: string) => {
@@ -73,10 +85,13 @@ export function scanConstraints(brief: string, rows: ParsedImportRow[]): string[
     }
   }
 
-  // "3x a week", "3x/week", "4 days a week", "five days per week".
+  // "3x a week", "3x/week", "4 days a week", "five days per week"; a named "5-day split / program / week" wins (it is the whole week's shape, and an "N days a week" beside it
+  // can be about part of it: Ron, Nov 23, "5-day split ... 3 days a week full body ... core, cardio and mobility on the days in between").
   const words: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7 };
-  const per = /\b(\d|one|two|three|four|five|six|seven)\s*(?:x|times|days?)\s*(?:a|per|\/|each)?\s*(?:week|wk)\b/.exec(text);
-  if (per) {
+  const per =
+    /\b(\d|one|two|three|four|five|six|seven)\s*[- ]?\s*days?\s*(?:program|split|week)\b/.exec(text) ??
+    /\b(\d|one|two|three|four|five|six|seven)\s*(?:x|times|days?)\s*(?:a|per|\/|each)?\s*(?:week|wk)\b/.exec(text);
+  if (per && opts.weekCount !== false) {
     const want = words[per[1]] ?? Number(per[1]);
     const daysByWeek = new Map<string, Set<string>>();
     for (const r of rows) {
