@@ -17,7 +17,9 @@ const LIVE_TYPES = ["booking_request", "client_request", "client_request_answer"
   // step 215 (migration 0459, Nov 20): a client sent their weekly check-in
   "weekly_checkin",
   // step 219 (migration 0463, Nov 20): a client changed an exercise for every week of their own program
-  "exercise_swap"];
+  "exercise_swap",
+  // step 227 (migration 0471, Nov 24): the food check-in, to the client in their coach's name, and the coach's "sent" and "answered"
+  "food_checkin", "food_checkin_answered", "food_checkin_sent"];
 function allowedTypes(): string[] {
   return LIVE_TYPES;
 }
@@ -167,6 +169,9 @@ const WRITTEN: Record<string, Case[]> = {
   waitlist_slot_offered: [{ link: `${G}/calendar/2026-11-19`, to: "client" }],
   weekly_checkin: [{ link: "/clients/check-ins", to: "coach" }],
   exercise_swap: [{ link: `${G}/programs/p1?swap=s1`, to: "coach" }],
+  food_checkin: [{ link: `${G}/nutrition#food-checkin`, to: "client" }],
+  food_checkin_answered: [{ link: `${G}/nutrition?athleteId=${A}#food-checkin`, to: "coach" }],
+  food_checkin_sent: [{ link: `${G}/nutrition?athleteId=${A}#food-checkin`, to: "coach" }],
 };
 
 // Pages only a coach can open (a client sent there gets "only coaches...").
@@ -174,8 +179,8 @@ const COACH_ONLY = [/^\/dashboard/, /^\/requests/, /^\/recurring-conflicts/, /^\
 
 describe("every notice type opens something real", () => {
   const types = allowedTypes();
-  it("the database's own list of types (46 on Nov 19, 47 with step 215, 48 with step 219), and every type code writes is on it", () => {
-    expect(types.length).toBe(48);
+  it("the database's own list of types (46 on Nov 19, 47 with step 215, 48 with step 219, 51 with step 227), and every type code writes is on it", () => {
+    expect(types.length).toBe(51);
     const written = typesWrittenInCode();
     expect(written.length).toBeGreaterThan(5);
     for (const t of written) expect(types, t).toContain(t);

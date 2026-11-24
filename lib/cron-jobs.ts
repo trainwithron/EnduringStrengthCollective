@@ -24,6 +24,8 @@ export const CRON_JOBS: CronJob[] = [
   { job: "requests-digest", path: "/api/cron/requests-digest", maxAgeHours: FREQUENT * 3 },
   { job: "nutrition-checkin-suggestions", path: "/api/cron/nutrition-checkin-suggestions", maxAgeHours: WEEKLY },
   { job: "rest-day-nudge", path: "/api/cron/rest-day-nudge", maxAgeHours: DAILY },
+  // Nov 24: the food check-in, sent at 10 in the morning of each client's own day (so every hour).
+  { job: "food-checkins", path: "/api/cron/food-checkins", maxAgeHours: FREQUENT * 3 },
   { job: "withings-sync", path: "/api/withings/sync", maxAgeHours: DAILY },
   { job: "google-health-sync", path: "/api/google-health/sync", maxAgeHours: DAILY },
   { job: "coach-chat-cleanup", path: "/api/cron/coach-chat-cleanup", maxAgeHours: DAILY },
@@ -65,6 +67,8 @@ export const JOB_ADDED: Record<string, Date> = {
   "sessions-to-mark": new Date("2026-11-21T01:40:00Z"),
   // Wave 3 C10 went live 06:19 UTC Nov 21 (hourly)
   "requests-digest": new Date("2026-11-21T06:19:00Z"),
+  // the food check-in (Nov 24, hourly): judged once it has been deployed
+  "food-checkins": new Date("2026-11-24T00:00:00Z"),
 };
 export const NEW_JOB_GRACE_HOURS = 48;
 

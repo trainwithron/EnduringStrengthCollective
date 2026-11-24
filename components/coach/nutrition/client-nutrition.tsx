@@ -19,6 +19,8 @@ import { GroceryListSection } from "@/components/coach/nutrition/grocery-list-se
 import { FoodTrackingSwitch } from "@/components/coach/nutrition/food-tracking-switch";
 import { MacrosOffSwitch } from "@/components/coach/nutrition/macros-off-switch";
 import { AutoSuggestOffSwitch } from "@/components/coach/nutrition/auto-suggest-off-switch";
+import { FoodCheckinsSwitch } from "@/components/coach/nutrition/food-checkins-switch";
+import { FoodCheckinPanel, type CoachFoodCheckin } from "@/components/coach/nutrition/food-checkin-panel";
 import { ClientAnswersPanel } from "@/components/coach/nutrition/client-answers-panel";
 import { PlanTriesPanel, type PlanTryView } from "@/components/coach/nutrition/plan-tries-panel";
 import { FoldSection } from "@/components/coach/nutrition/fold-section";
@@ -99,6 +101,20 @@ export async function ClientNutrition({
   const recallRead = Promise.resolve(
     supabase.from("client_goal_sheets").select("food_day_1, food_day_2, food_day_3, filled_at").eq("athlete_id", athleteId).eq("group_id", groupId).maybeSingle()
   ).then(({ data }) => (data as FoodRecall | null) ?? null, () => null);
+  // The latest food check-in still for the coach to see (Nov 24): sent, answered or gone unanswered, not yet marked handled, in the last 30 days. A failed read (the step 227 paste
+  // is pending) shows nothing.
+  const checkinRead = Promise.resolve(
+    supabase
+      .from("client_food_checkins")
+      .select("id, trigger, avg_diff_kcal, days_logged, sent_at, status, reasons, note, answered_at")
+      .eq("athlete_id", athleteId)
+      .eq("group_id", groupId)
+      .neq("status", "handled")
+      .gte("sent_at", new Date(Date.now() - 30 * 86400000).toISOString())
+      .order("sent_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+  ).then(({ data, error }) => (error ? null : ((data as CoachFoodCheckin | null) ?? null)), () => null);
   // The last 30 days of the food log with each food's vitamins and minerals (the day bars), and what the client really burns; read alongside everything below.
   const nutrientReads = Promise.all([fetchNutrientLog(supabase, athleteId, todayKey), fetchAgeAndSex(supabase, athleteId, todayKey)]).catch(() => null);
 
@@ -520,6 +536,7 @@ export async function ClientNutrition({
   const glance = glanceDays(week, fullTargetFor);
   const nutrientData = await nutrientReads;
   const recall = await recallRead;
+  const foodCheckin = await checkinRead;
   const nutrientsByDay: Record<string, NutrientBar[]> = {};
   if (nutrientData) {
     const [{ entries }, { age, sex }] = nutrientData;
@@ -681,6 +698,7 @@ export async function ClientNutrition({
           )}
 
           <NutritionSpotterPanel findings={findings} />
+          {foodCheckin && <FoodCheckinPanel checkin={foodCheckin} groupId={groupId} athleteId={athleteId} clientFirstName={firstName} />}
         </FoldSection>
 
         <FoldSection
@@ -769,6 +787,7 @@ export async function ClientNutrition({
                   <FoodTrackingSwitch athleteId={athleteId} groupId={groupId} clientName={clientName} />
                   <MacrosOffSwitch athleteId={athleteId} groupId={groupId} clientName={clientName} />
                   <AutoSuggestOffSwitch athleteId={athleteId} groupId={groupId} clientName={clientName} />
+                  <FoodCheckinsSwitch athleteId={athleteId} groupId={groupId} clientName={clientName} />
                 </div>
                 <BodyProfileEditor
                   athleteId={athleteId}

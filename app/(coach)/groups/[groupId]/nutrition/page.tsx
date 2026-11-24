@@ -53,6 +53,8 @@ import { NOT_IMPORTED } from "@/lib/imported-food";
 import { AiBudgetMeter } from "@/components/coach/ai-budget-meter";
 import { retryState as retryStateFor, type RetryState } from "@/lib/meal-plan-retry";
 import { ClientGroceryList } from "@/components/athlete/client-grocery-list";
+import { FoodCheckinCard } from "@/components/athlete/food-checkin-card";
+import { loadOpenFoodCheckin } from "@/lib/food-checkin-server";
 
 export const metadata = { title: "Nutrition" };
 
@@ -404,6 +406,8 @@ export default async function NutritionPage(
   let planRetry: RetryState | null = null;
   // The coach in their own space is themself (Release 2), not someone acting for a client.
   const viewingOther = isActingAsOther && athleteId !== user.id;
+  // The coach's food check-in, if one is waiting on this client (Nov 24): at the top of the page, only for the client themselves.
+  const foodCheckin = !viewingOther && trackingOn ? await loadOpenFoodCheckin(supabase, athleteId, params.groupId) : null;
   if (macrosEnabled && !viewingOther && savedPlanMeals) {
     const { data: futurePlanDays, error: futurePlanError } = await supabase.from("meal_plans").select("log_date, rationale").eq("athlete_id", athleteId).gte("log_date", todayKey).limit(62);
     if (futurePlanError) console.error("[nutrition] could not read the plan days:", futurePlanError.message);
@@ -548,6 +552,7 @@ export default async function NutritionPage(
       {/* Every client can track what they eat here, whatever their tier and whether or not a coach has set a target. Targets, meal plans, food rules and the weekly
           check-in are a coach-run feature and show only for clients on a tier that has them. */}
       <div className="px-5 pt-4 space-y-6">
+          {foodCheckin && <FoodCheckinCard id={foodCheckin.id} coachFirstName={foodCheckin.coachFirstName} message={foodCheckin.message} />}
           {/* Asked once while they have never answered (Oct 21): allergies or foods they avoid. Blocks nothing; a clash with an assigned plan is swapped right away. */}
           {macrosEnabled && !viewingOther && !prefsRow && !prefsError && <NutritionFirstVisitPrompt athleteId={athleteId} />}
           {recalcPrompt && (
