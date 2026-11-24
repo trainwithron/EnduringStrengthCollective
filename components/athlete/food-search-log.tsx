@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { FoodLogEntry } from "./meal-checkoff-list";
-import { loadFoodDetail, searchFoods, type FoodDetail, type FoodHit } from "@/lib/food-search";
+import { loadFoodDetail, type FoodDetail, type FoodHit } from "@/lib/food-search";
+import { runFoodSearch } from "@/lib/food-search-run";
 import { defaultServing, formatAmount, gramsFor, macrosOf, quantityProblem, scaleNutrients, servingOptions } from "@/lib/food-serving";
 import { MEAL_SLOTS, MEAL_SLOT_LABEL, defaultMealSlot, insertUsdaEntry, type MealSlot } from "@/lib/food-entry";
 import { completeness, formatNutrientAmount, panelRows } from "@/lib/nutrient-panel";
-import { PACKAGED_RESULT_LIMIT, mlServingOptions, packagedDetail, packagedTitle, searchPackaged, type PackagedHit } from "@/lib/packaged-foods";
+import { mlServingOptions, packagedDetail, packagedTitle, type PackagedHit } from "@/lib/packaged-foods";
 import type { NutrientMap } from "@/lib/food-serving";
 import { Search } from "lucide-react";
 
@@ -52,30 +53,33 @@ export function FoodSearchLog({
   const [added, setAdded] = useState<string | null>(null);
   // The "Packaged foods" group under the everyday results (step 223): brand-name products, shown only when there are some.
   const [packagedHits, setPackagedHits] = useState<PackagedHit[]>([]);
+  // The words searched instead of the ones typed, when what was typed found nothing and a likely spelling did (step 226): "Showing results for chicken breast".
+  const [correctedTo, setCorrectedTo] = useState<string | null>(null);
   // What was picked: the name shown big (the plain name, or the brand and product), USDA's own name small under it, and, for a packaged food, its code (it is logged as a barcode food).
   const [picked, setPicked] = useState<{ title: string; usdaName: string | null; packaged: { barcode: string | null } | null } | null>(null);
   const seq = useRef(0);
 
   // Search as the person types (after a short pause); the latest search wins. The everyday foods and the packaged ones are read at the same time; a packaged search that fails simply
-  // shows no packaged group (the everyday results are the search).
+  // shows no packaged group (the everyday results are the search). When both find nothing, the likely spelling is tried once (lib/food-search-run.ts, step 226).
   useEffect(() => {
     if (!open) return;
     const q = query.trim();
     if (q.length < 2) {
       setHits(null);
       setPackagedHits([]);
+      setCorrectedTo(null);
       setSearching(false);
       return;
     }
     setSearching(true);
     const mine = ++seq.current;
     const timer = setTimeout(async () => {
-      const supabase = createBrowserClient();
-      const [found, packaged] = await Promise.all([searchFoods(supabase, q), searchPackaged(supabase, q, PACKAGED_RESULT_LIMIT).catch(() => null)]);
+      const found = await runFoodSearch(createBrowserClient(), q);
       if (mine !== seq.current) return;
-      setSearchFailed(found === null);
-      setHits(found ?? []);
-      setPackagedHits(packaged ?? []);
+      setSearchFailed(found.hits === null);
+      setHits(found.hits ?? []);
+      setPackagedHits(found.packaged);
+      setCorrectedTo(found.correctedTo);
       setSearching(false);
     }, 250);
     return () => clearTimeout(timer);
@@ -152,6 +156,7 @@ export function FoodSearchLog({
     setQuery("");
     setHits(null);
     setPackagedHits([]);
+    setCorrectedTo(null);
   }
 
   if (!open) {
@@ -200,6 +205,12 @@ export function FoodSearchLog({
           )}
           {!searching && !searchFailed && hits && hits.length === 0 && packagedHits.length === 0 && (
             <p className="font-body text-xs text-steel mt-2">No foods found for that. Try a simpler word, like &quot;chicken&quot; instead of &quot;grilled chicken&quot;.</p>
+          )}
+          {/* what was typed found nothing; these are the results for the likely spelling (step 226) */}
+          {!searching && correctedTo && ((hits && hits.length > 0) || packagedHits.length > 0) && (
+            <p className="font-body text-xs text-steel mt-2" data-corrected-query>
+              Showing results for <strong className="font-semibold text-chalk">{correctedTo}</strong>
+            </p>
           )}
           {((hits && hits.length > 0) || packagedHits.length > 0) && (
             <div className="mt-2 border border-steel/15 max-h-80 overflow-y-auto" data-food-results>

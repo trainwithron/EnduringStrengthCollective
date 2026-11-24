@@ -4,12 +4,14 @@
 // Anything else failing means a migration file does not apply from scratch.
 //   node scripts/sql-tests/chain.mjs
 import { PGlite } from "@electric-sql/pglite";
+import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { readFileSync, readdirSync } from "node:fs";
 const dir = new URL("../../supabase/migrations/", import.meta.url);
-const db = new PGlite({ extensions: {} });
+const db = new PGlite({ extensions: { pg_trgm } });
 await db.exec(`
   create role anon nologin; create role authenticated nologin; create role service_role nologin; create role supabase_admin nologin; create role postgres_stub nologin;
   create schema auth; create schema storage; create schema extensions; create schema realtime;
+  create extension pg_trgm with schema extensions;
   create table auth.users (id uuid primary key default gen_random_uuid(), email text, raw_user_meta_data jsonb, created_at timestamptz default now());
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   create function auth.role() returns text language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claim.role', true), ''), 'authenticated') $$;

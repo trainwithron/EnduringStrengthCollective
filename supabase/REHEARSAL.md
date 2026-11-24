@@ -239,3 +239,4 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0467 | yes | applies only | 0 | - |
 | 0468 | yes | applies only | 0 | - |
 | 0469 | yes | applies only | 0 | - |
+| 0470 | yes | applies only | 0 | - |

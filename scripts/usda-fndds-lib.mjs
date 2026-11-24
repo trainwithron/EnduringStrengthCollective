@@ -28,13 +28,47 @@ export const PLAIN_NAME_OVERRIDES = {
   "Yogurt, Greek, nonfat milk, plain": { name: "Greek yogurt, plain, nonfat", common: true },
   // USDA files fish as "Fish, salmon, ..." and potatoes by how they are cooked: the everyday one gets the name people type
   "Fish, salmon, baked or broiled": { name: "Salmon, cooked", common: true },
-  "Fish, tuna, canned": { name: "Canned tuna", common: true },
+  "Fish, tuna, canned": { name: "Tuna, canned", common: true },
   "Potato, baked, peel not eaten": { name: "Baked potato", common: true },
   "Sweet potato, baked, no added fat": { name: "Baked sweet potato", common: true },
   "Broccoli, raw": { name: "Broccoli", common: true },
   "Avocado, raw": { name: "Avocado", common: true },
   "Beef, ground": { name: "Ground beef", common: true },
   "Turkey, ground": { name: "Ground turkey", common: true },
+  // Step 226 (Ron, Nov 23: "the plain version first" for the most common searches; the list of searches is scripts/sql-tests/fixtures/everyday-searches.json). The name, or its
+  // first part, is what a person types for the food ("egg whites", "chicken", "tomato"): an everyday food whose own name is the search comes first (search_usda_foods, 0470).
+  "Egg, white, cooked, no added fat": { name: "Egg whites, cooked", common: true },
+  "Chicken, NS as to part, baked, broiled, or roasted, skin not eaten": { name: "Chicken, roasted (no skin)", common: true },
+  "Chicken thigh, baked, broiled, or roasted, skin not eaten, from raw": { name: "Chicken thigh, cooked (no skin)", common: true },
+  "Steak, NS as to type of meat, NS as to fat eaten": { name: "Steak", common: true },
+  "Bacon, NS as to type of meat, cooked": { name: "Bacon, cooked", common: true },
+  "Pork, chop, NS as to fat eaten": { name: "Pork chop", common: true },
+  "Fish, cod, baked or broiled": { name: "Cod, cooked", common: true },
+  "Fish, tilapia, baked or broiled": { name: "Tilapia, cooked", common: true },
+  "Cheese, NFS": { name: "Cheese", common: true },
+  "Cheese, cottage, NFS": { name: "Cottage cheese", common: true },
+  "Cheese, Mozzarella, NFS": { name: "Mozzarella", common: true },
+  "Cream cheese, regular, plain": { name: "Cream cheese", common: true },
+  "Sour cream, regular": { name: "Sour cream", common: true },
+  "Mayonnaise, regular": { name: "Mayonnaise", common: true },
+  // the same as USDA's name: no plain name, USDA's own first part ("Coffee") is the search
+  "Coffee, brewed": { name: "Coffee, brewed", common: true },
+  "Pasta, cooked": { name: "Pasta, cooked", common: true },
+  "Tea, hot, leaf, black": { name: "Tea, black, hot", common: true },
+  "Tomatoes, raw": { name: "Tomato", common: true },
+  "Onions, raw": { name: "Onion", common: true },
+  "Green peas, NS as to form, cooked": { name: "Peas, cooked", common: true },
+  // USDA lists zucchini and tofu under other names, and gives "zucchini" and "tofu" as their other names (food_attribute.csv)
+  "Summer squash, green, raw": { name: "Zucchini, raw", common: true },
+  "Soybean curd": { name: "Tofu", common: true },
+  "Walnuts, excluding honey roasted": { name: "Walnuts", common: true },
+  "Quinoa, no added fat": { name: "Quinoa, cooked", common: true },
+  "Cereal, granola": { name: "Granola", common: true },
+  "Cereal, ready-to-eat, NFS": { name: "Cereal, ready-to-eat", common: true },
+  "Pizza, cheese, from restaurant or fast food, NS as to type of crust": { name: "Pizza, cheese (restaurant)", common: true },
+  "Potato, mashed, from fresh, made with milk": { name: "Mashed potatoes", common: true },
+  "Nutrition bar or meal replacement bar, NFS": { name: "Nutrition bar", common: true },
+  "Nutritional powder mix, whey based, NFS": { name: "Whey protein, powder", common: true },
   // read against the real list (Spot Commander, Nov 23): the rule would word these badly
   "Liver, paste or pate": { name: "Liver pâté" },
   "Queso Anejo, aged Mexican cheese": { name: "Queso añejo" },
@@ -43,7 +77,8 @@ export const PLAIN_NAME_OVERRIDES = {
 };
 
 // Second parts that are not a kind of the food ("Soup, NS as to type" and "Milk, NFS" say nothing; "Hamburger, on bun" is not an "On bun hamburger"): never moved in front.
-const NOT_A_KIND = /^(ns |ns$|nfs|not |from |made with|with |without |no |on |in |and |or |as |for use|raw$|prepared|ready-to|canned$|frozen$|baby food)/i;
+// "Walnuts, excluding honey roasted" is not an "Excluding honey roasted walnuts" (step 226).
+const NOT_A_KIND = /^(ns |ns$|nfs|not |from |made with|with |without |no |on |in |and |or |as |for use|raw$|prepared|ready-to|canned$|frozen$|baby food|excluding |including )/i;
 
 // The fruit and vegetable categories (WWEIA, as named in wweia_food_category.csv): only there is ", raw" dropped ("Banana, raw" is just a banana). Raw meat or fish keeps USDA's
 // name, so a diary never hides that it was raw.

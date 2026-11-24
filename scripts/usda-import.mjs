@@ -10,6 +10,9 @@
 // nutrient.csv, food_nutrient.csv, and (for portions) food_portion.csv and measure_unit.csv, and point this at it. For FNDDS also wweia_food_category.csv (the categories) and
 // food_attribute.csv + food_attribute_type.csv (the other names a food goes by); each FNDDS food gets a plain name (scripts/usda-fndds-lib.mjs). Step 223 must be applied first.
 //
+// The search's word list (step 226, the spelling help) follows by itself: a trigger adds the words of every food a batch loads (Branded products too). To rebuild the whole list
+// after a big change (a release replaced, foods deleted), run in the SQL editor: select public.refresh_food_search_words();  (about 20 s; too long for the server-key calls)
+//
 // --compare-live reads the foods, nutrient values and portions already in the database (GET requests only, with NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY from the
 // environment) and writes BEFORE_AFTER_REPORT.md: counts of new and already-there values, which would change, which keys are new, and the biggest changes to the four macros. Read
 // it BEFORE running any batch.

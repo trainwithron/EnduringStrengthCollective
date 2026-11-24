@@ -32,7 +32,9 @@ describe("plain names: a re-wording of USDA's own name, never a new fact", () =>
     expect(plainNameFor("Pear, raw", "Pears")).toBe("Pear");
   });
   it("NFS / NS (\"not further specified\") is never turned round", () => {
-    for (const d of ["Milk, NFS", "Bread, NFS", "Cheese, NFS", "Soup, NS"]) expect(plainNameFor(d), d).toBeNull();
+    for (const d of ["Milk, NFS", "Bread, NFS", "Juice, NFS", "Soup, NS"]) expect(plainNameFor(d), d).toBeNull();
+    // only by hand (step 226: what people type for it)
+    expect(plainNameFor("Cheese, NFS")).toBe("Cheese");
   });
   it("raw is dropped only for a fruit or vegetable: raw meat or fish keeps USDA's name", () => {
     expect(plainNameFor("Salmon, raw", "Fish")).toBeNull();
@@ -217,7 +219,9 @@ describe("the Packaged foods group", () => {
     const ui = read("components/athlete/food-search-log.tsx");
     expect(ui.indexOf("{hits.map((h) =>")).toBeLessThan(ui.indexOf("data-packaged-foods"));
     expect(ui).toContain("{packagedHits.length > 0 && (");
-    expect(ui).toContain("searchPackaged(supabase, q, PACKAGED_RESULT_LIMIT).catch(() => null)");
+    // both searches at once (lib/food-search-run.ts since step 226, which adds the second try for a misspelling)
+    expect(read("lib/food-search-run.ts")).toContain("searchPackaged(supabase, q, PACKAGED_RESULT_LIMIT).catch(() => null)");
+    expect(ui).toContain("const found = await runFoodSearch(createBrowserClient(), q);");
     // the everyday name big, USDA's small under it
     expect(ui).toContain("{h.plainName || h.description}");
     expect(ui).toContain("{h.plainName && <span className=\"block font-body text-xs text-steel\" data-usda-name>{h.description}</span>}");
