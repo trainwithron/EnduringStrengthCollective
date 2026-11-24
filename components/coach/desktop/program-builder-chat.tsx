@@ -25,6 +25,9 @@ import {
   decodeMsg,
   encodeMsg,
   KEPT_KINDS,
+  lastRequestIn,
+  rebuildRequest,
+  withKeep,
   messageIntent,
   missingQuestions,
   planSummary,
@@ -135,11 +138,16 @@ export function ProgramBuilderChat({
     }
   }
   const newId = () => `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+  // Saves go one after another, so the thread reads back in the order it was written (review of b60a390f).
+  const saveChain = useRef<Promise<void>>(Promise.resolve());
+  function keep(m: ChatMsg) {
+    saveChain.current = saveChain.current.then(() => save(m)).catch(() => {});
+  }
   // A message on screen; kept with the program at once, except a run's progress, which is kept when the run stops (done or paused).
   function push(m: NewMsg): string {
     const msg = { ...m, id: newId() } as ChatMsg;
     setMsgs((prev) => [...prev, msg]);
-    if (KEPT_KINDS.has(msg.kind) && msg.kind !== "progress") void save(msg);
+    if (KEPT_KINDS.has(msg.kind) && msg.kind !== "progress") keep(msg);
     return msg.id;
   }
   function patch(id: string, change: Partial<ChatMsg>) {
@@ -178,6 +186,8 @@ export function ProgramBuilderChat({
   useEffect(() => {
     threadEl.current?.scrollTo({ top: threadEl.current.scrollHeight });
   }, [msgs]);
+  const msgsRef = useRef(msgs);
+  msgsRef.current = msgs;
 
   // ---- building (the same run as the old box) ----
   const daysRef = useRef(days);
@@ -246,11 +256,12 @@ export function ProgramBuilderChat({
 
   function setProgress(items: ProgressItem[], ended: "done" | "paused" | null) {
     progressItems.current = items;
-    if (!progressId.current) progressId.current = push({ kind: "progress", items, ended });
-    else patch(progressId.current, { items, ended } as Partial<ChatMsg>);
+    const said = request.current;
+    if (!progressId.current) progressId.current = push({ kind: "progress", items, ended, request: said });
+    else patch(progressId.current, { items, ended, request: said } as Partial<ChatMsg>);
     if (ended) {
       const id = progressId.current;
-      void save({ id, kind: "progress", items, ended });
+      keep({ id, kind: "progress", items, ended, request: said });
     }
   }
 
@@ -422,8 +433,9 @@ export function ProgramBuilderChat({
   }
 
   // ---- the plan-first turn ----
-  function planTurn(said: string, rebuild: RebuildTarget | null = null) {
-    const summary = planSummary(said, { existing: existingNow(), trainingDaysCount, trainingDays });
+  // `keep`: a rebuild's own words, which go along as a change to the request (the plan line reads both, so it shows the same split before Do it).
+  function planTurn(said: string, rebuild: RebuildTarget | null = null, keep: string | null = null) {
+    const summary = planSummary(withKeep(said, keep), { existing: existingNow(), trainingDaysCount, trainingDays });
     const builtInWeek = rebuild ? daysRef.current.filter((d) => d.weekNumber === rebuild.week && d.items.some((i) => i.kind === "exercise")).length : 0;
     if (pendingPlan.current) patch(pendingPlan.current.id, { done: true });
     const id = push({
@@ -432,9 +444,15 @@ export function ProgramBuilderChat({
       line: summary.line,
       sheetLine,
       questions: rebuild ? [] : missingQuestions(said),
-      rebuild: rebuild ? { ...rebuild, replaces: replacesLine(rebuild, builtInWeek) } : null,
+      rebuild: rebuild ? { ...rebuild, replaces: replacesLine(rebuild, builtInWeek), said: keep } : null,
     });
     pendingPlan.current = { id, request: said };
+  }
+
+  // "rebuild week 1", "redo day 2": the program's own request is kept (this run's, or after a reload the newest one in the thread) and the words go along as a change.
+  function rebuildTurn(said: string, target: RebuildTarget) {
+    const r = rebuildRequest(request.current || lastRequestIn(msgsRef.current), said);
+    planTurn(r.request, target, r.keep);
   }
 
   async function goFromPlan(msg: Extract<ChatMsg, { kind: "plan" }>, answers: string[]) {
@@ -467,8 +485,9 @@ export function ProgramBuilderChat({
         }
         for (const id of ids) await show(id);
       }
-      const d = planSummary(said, { existing: existingNow(), trainingDaysCount, trainingDays }).daysInWeek;
-      startRun(said, rebuildSlots(target, d));
+      const kept = msg.rebuild.said ?? null;
+      const d = planSummary(withKeep(said, kept), { existing: existingNow(), trainingDaysCount, trainingDays }).daysInWeek;
+      startRun(said, rebuildSlots(target, d), kept ? [kept] : []);
     } finally {
       setBusy(null);
       inFlight.current = false;
@@ -586,7 +605,7 @@ export function ProgramBuilderChat({
     patch(msg.id, { done: true });
     const target = rebuildTargetFrom(msg.change);
     if (target && hasBuilt()) {
-      planTurn(msg.change, target);
+      rebuildTurn(msg.change, target);
       return;
     }
     edit.current = null;
@@ -611,8 +630,9 @@ export function ProgramBuilderChat({
         await explain(said);
         return;
       }
-      if (intent === "rebuild") {
-        planTurn(said, rebuildTargetFrom(said));
+      const target = intent === "rebuild" ? rebuildTargetFrom(said) : null;
+      if (target) {
+        rebuildTurn(said, target);
         return;
       }
       if (intent === "correction") {
@@ -623,8 +643,8 @@ export function ProgramBuilderChat({
         askEdit(said);
         return;
       }
-      // A reply to a plan still open ("60 minutes, 4 weeks, bands only") goes with it; anything else is a new request.
-      planTurn(pendingPlan.current ? withAnswers(pendingPlan.current.request, [said]) : said);
+      // A reply to a plan still open ("60 minutes, 4 weeks, bands only") goes with it; a request in its own right ("actually make it a 4 day upper lower") replaces it.
+      planTurn(pendingPlan.current && !isNewRequest(said) ? withAnswers(pendingPlan.current.request, [said]) : said);
     } finally {
       inFlight.current = false;
     }
@@ -744,7 +764,14 @@ export function ProgramBuilderChat({
                       <button type="button" disabled={busy !== null || building} onClick={() => takeChange(m)} className={solid}>
                         Do it
                       </button>
-                      <button type="button" onClick={() => patch(m.id, { done: true })} className={plain}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          stopAllMics();
+                          patch(m.id, { done: true });
+                        }}
+                        className={plain}
+                      >
                         No thanks
                       </button>
                       <span className="font-body text-xs text-steel">I&apos;ll show the change first.</span>
@@ -772,6 +799,7 @@ export function ProgramBuilderChat({
                       <button
                         type="button"
                         onClick={() => {
+                          stopAllMics();
                           patch(m.id, { done: true });
                           say("Okay. Tell me what to change instead, or leave it as it is.");
                         }}

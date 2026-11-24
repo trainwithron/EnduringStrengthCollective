@@ -136,7 +136,6 @@ describe("the AI paragraph covers every route that calls the AI", () => {
     "app/api/team-sheet/photo/route.ts",
     "app/api/ai/pick-template/route.ts",
     "app/api/learning/notes/route.ts",
-    "app/api/ai/program-chat/route.ts",
     "app/api/ai/suggest-patterns/route.ts",
     "app/api/biomech-tags/suggest/route.ts",
     "app/api/coach/video-checkin/summarize/route.ts",

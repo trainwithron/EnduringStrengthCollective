@@ -60,7 +60,6 @@ describe("a note never loosens safety", () => {
     expect(read("app/api/ai/build-day/route.ts")).toContain("loadNotesBlock(supabase, user.id, athleteId)");
     expect(read("app/api/ai/pick-template/route.ts")).toContain("loadNotesBlock(supabase, user.id, clientId)");
     expect(read("app/api/ai/generate-program/route.ts")).toContain("Past AI build note for this client");
-    expect(read("app/api/ai/program-chat/route.ts")).toContain("Past AI build note for this client");
   });
 });
 

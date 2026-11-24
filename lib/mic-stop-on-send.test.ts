@@ -32,8 +32,13 @@ describe("sending turns the mic off", () => {
       /function takeChange\(/,
     ])
       first(fn);
-    // the plan's Not now and the Import it / Build from it buttons too
+    // the plan's Not now, an answer's No thanks, a preview's Not quite, and the Import it / Build from it buttons too
     expect(src).toContain("onNotNow={() => { stopAllMics();");
-    expect(src.split("stopAllMics();\n                          patch(m.id, { done: true });")).toHaveLength(3);
+    expect(src.split("stopAllMics();\n                          patch(m.id, { done: true });")).toHaveLength(5);
+    for (const label of ["No thanks", "Not quite", "Import it", "Build from it"]) {
+      const at = src.indexOf(`${label}\n`);
+      const button = src.slice(src.lastIndexOf("<button", at), at);
+      expect(button, label).toContain("stopAllMics();");
+    }
   });
 });

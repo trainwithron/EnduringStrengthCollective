@@ -22,7 +22,7 @@ describe("asking why, in the thread", () => {
     expect(chat).toContain("I&apos;ll show the change first.");
     const take = chat.slice(chat.indexOf("function takeChange("), chat.indexOf("// ---- one send ----"));
     expect(take).toContain("askEdit(msg.change)");
-    expect(take).toContain("planTurn(msg.change, target)");
+    expect(take).toContain("rebuildTurn(msg.change, target)");
     expect(take).not.toContain("fetch(");
   });
   it("the route only explains: coach-only, one short call counted with the program chat, no writes", () => {

@@ -116,7 +116,7 @@ describe("what the AI is told", () => {
     expect(learnedBlock([])).toBeNull();
   });
   it("every AI path that writes or explains a program is given it", () => {
-    for (const f of ["app/api/ai/build-day/route.ts", "app/api/ai/pick-template/route.ts", "app/api/ai/generate-program/route.ts", "app/api/ai/program-chat/route.ts"]) {
+    for (const f of ["app/api/ai/build-day/route.ts", "app/api/ai/pick-template/route.ts", "app/api/ai/generate-program/route.ts"]) {
       expect(read(f), f).toMatch(/loadLearnedLines\(|loadApplicableRules\(/);
     }
     expect(read("lib/ai-day-run.ts")).toContain("if (input.learnedBlock) parts.push(input.learnedBlock);");

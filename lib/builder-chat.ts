@@ -1,7 +1,7 @@
 // The AI Program Builder as ONE conversation (Ron, Nov 24: "The program builder should really act as more like a chatbot instead of the what you ask for and ask why"; approved
 // mockup reports/program-builder-chat-mockup.html). The pure parts: the messages, how they are saved with the program, the plan-first turn and its questions, and what a message
 // from the coach is asking for. The conversation itself is components/coach/desktop/program-builder-chat.tsx; the building underneath is the same routes as before.
-import { parseBuildRequest, weekDaysFor, type ExistingDay } from "@/lib/ai-day-request";
+import { isNewRequest, parseBuildRequest, weekDaysFor, type ExistingDay } from "@/lib/ai-day-request";
 import { mobilityDayPlan, mobilityDaysWanted, namedMobilityDays } from "@/lib/ai-day-rules";
 import { isEditRequest } from "@/lib/ai-week-edit";
 import { detectImportKind } from "@/lib/import-input-kind";
@@ -30,8 +30,10 @@ export type ChatMsg = Base &
   (
     | { kind: "coach"; text: string }
     // the plan line from the deterministic parsers, the client's goal sheet line, the questions still missing, and (for "rebuild week 1") what it replaces
-    | { kind: "plan"; request: string; line: string; sheetLine: string | null; questions: PlanQuestion[]; rebuild: (RebuildTarget & { replaces: string }) | null }
-    | { kind: "progress"; items: ProgressItem[]; ended: "done" | "paused" | null }
+    // for a rebuild, `request` is the run's own request and `said` the rebuild words, which go along as a change (review of b60a390f)
+    | { kind: "plan"; request: string; line: string; sheetLine: string | null; questions: PlanQuestion[]; rebuild: (RebuildTarget & { replaces: string; said?: string | null }) | null }
+    // `request`: what the run was built from (the words with the tapped answers), so a rebuild after a reload still knows it
+    | { kind: "progress"; items: ProgressItem[]; ended: "done" | "paused" | null; request?: string }
     | { kind: "say"; text: string; tone?: "info" | "error" }
     | { kind: "warn"; lines: string[] }
     | { kind: "offer_week"; week: number }
@@ -184,4 +186,29 @@ export function rebuildSlots(target: RebuildTarget, daysInWeek: number): { week:
 export function replacesLine(target: RebuildTarget, builtDaysInWeek: number): string {
   if (target.day != null) return `This replaces Week ${target.week}, Day ${target.day}.`;
   return `This replaces Week ${target.week}'s ${builtDaysInWeek} ${builtDaysInWeek === 1 ? "day" : "days"}.`;
+}
+
+// A rebuild keeps what the program was built from (review of b60a390f: "rebuild week 1" alone planned 5 plain days, losing the 3 + 2 split and the focus words; "redo day 2"
+// could turn a mobility day into full body). The run's request stays the request and the rebuild words go along as a change, unless, without the rebuild words, they are a request in
+// their own right ("rebuild week 1 as a 4 day upper lower"), or there is nothing to keep.
+const REBUILD_WORDS = /\b(?:re-?build|re-?do|scrap|replace|start(?:ing)? (?:it |this |that )?over|from scratch)\b|\b(?:week|day)\s*\d{1,2}\b/gi;
+export function rebuildRequest(base: string | null | undefined, said: string): { request: string; keep: string | null } {
+  const own = said.replace(REBUILD_WORDS, " ").replace(/\s+/g, " ").trim();
+  if (!base?.trim() || isNewRequest(own)) return { request: said, keep: null };
+  return { request: base, keep: said };
+}
+
+// The words the plan line and the build read: the request with a rebuild's words added.
+export function withKeep(request: string, keep: string | null | undefined): string {
+  return keep ? withAnswers(request, [keep]) : request;
+}
+
+// The request a rebuild keeps when nothing is running in this sitting (after a reload): the newest run's request, else the newest plan's.
+export function lastRequestIn(msgs: ChatMsg[]): string | null {
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i];
+    if (m.kind === "progress" && m.request) return m.request;
+    if (m.kind === "plan" && m.request) return m.request;
+  }
+  return null;
 }

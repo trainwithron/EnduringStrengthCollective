@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { isNewRequest, parseBuildRequest } from "@/lib/ai-day-request";
+import { mobilityDayPlan, mobilityDaysWanted, namedMobilityDays, planRole } from "@/lib/ai-day-rules";
 import {
   decodeMsg,
   encodeMsg,
@@ -9,8 +11,11 @@ import {
   missingQuestions,
   planSummary,
   PLAN_QUESTIONS,
+  lastRequestIn,
+  rebuildRequest,
   rebuildSlots,
   rebuildTargetFrom,
+  withKeep,
   replacesLine,
   withAnswers,
   type ChatMsg,
@@ -36,12 +41,13 @@ describe("the plan comes first, in one line, from the builder's own parsers", ()
   it("weekday names when the program's schedule has that many days, and the weeks when said", () => {
     expect(planSummary(`${RON_2}, 4 weeks`, { existing: [], trainingDaysCount: 5, trainingDays: [1, 2, 3, 4, 5] }).line).toBe("5 days a week: full body Mon, Wed and Fri, mobility Tue and Thu. 4 weeks.");
     expect(planSummary("upper lower 4 days a week, 6 weeks", none).line).toBe("4 days a week. 6 weeks.");
-    // a count the parsers cannot read shows in the plan before anything is built ("4 day upper lower" reads as the 3-day default)
-    expect(planSummary("4 day upper lower", none).line).toBe("3 days a week.");
+    // a count the parsers cannot read shows in the plan before anything is built (no number: the 3-day default)
+    expect(planSummary("upper lower for a beginner", none).line).toBe("3 days a week.");
+    expect(planSummary("4 day upper lower", none).line).toBe("4 days a week.");
   });
   it("the plan turn is what a new request gets; Build it is what starts building", () => {
     const send = chat.slice(chat.indexOf("async function send("));
-    expect(send).toContain("planTurn(pendingPlan.current ? withAnswers(pendingPlan.current.request, [said]) : said);");
+    expect(send).toContain("planTurn(pendingPlan.current && !isNewRequest(said) ? withAnswers(pendingPlan.current.request, [said]) : said);");
     const go = chat.slice(chat.indexOf("async function goFromPlan("), chat.indexOf("// ---- answers ----"));
     expect(go).toContain("startRun(said);");
     expect(chat.slice(chat.indexOf("function planTurn("), chat.indexOf("async function goFromPlan("))).not.toContain("startRun(");
@@ -166,13 +172,13 @@ describe("rebuild asks first, then replaces the days; Not now changes nothing", 
   });
   it("the message only shows the plan and the confirm; the days are cleared only from its Do it, then built again in order", () => {
     const send = chat.slice(chat.indexOf("async function send("), chat.indexOf("const building = phase"));
-    expect(send).toContain('if (intent === "rebuild") {\n        planTurn(said, rebuildTargetFrom(said));\n        return;');
+    expect(send).toContain('const target = intent === "rebuild" ? rebuildTargetFrom(said) : null;\n      if (target) {\n        rebuildTurn(said, target);\n        return;');
     expect(send).not.toContain(".delete(");
     expect(chat).toContain("{msg.rebuild.replaces} Rebuild?");
     expect(chat).toContain('{msg.rebuild ? "Do it" : "Build it"}');
     const go = chat.slice(chat.indexOf("async function goFromPlan("), chat.indexOf("// ---- answers ----"));
     expect(go.indexOf("if (!msg.rebuild) {")).toBeLessThan(go.indexOf(".delete("));
-    expect(go.indexOf(".delete(")).toBeLessThan(go.indexOf("startRun(said, rebuildSlots(target, d));"));
+    expect(go.indexOf(".delete(")).toBeLessThan(go.indexOf("startRun(said, rebuildSlots(target, d), kept ? [kept] : []);"));
     // a delete that fails or removes nothing stops before anything is built
     expect(go).toContain('{ expectRows: true });\n        if (!cleared.ok) {\n          say("Couldn\'t clear those days, so nothing was changed. Try again.", "error");\n          return;');
   });
@@ -184,7 +190,7 @@ describe("rebuild asks first, then replaces the days; Not now changes nothing", 
   });
   it("a why-answer that offers a rebuild goes to the same confirm", () => {
     const take = chat.slice(chat.indexOf("function takeChange("), chat.indexOf("// ---- one send ----"));
-    expect(take).toContain("const target = rebuildTargetFrom(msg.change);\n    if (target && hasBuilt()) {\n      planTurn(msg.change, target);");
+    expect(take).toContain("const target = rebuildTargetFrom(msg.change);\n    if (target && hasBuilt()) {\n      rebuildTurn(msg.change, target);");
   });
 });
 
@@ -197,5 +203,88 @@ describe("the layout: chat left and program right on a wide screen, full width o
     // 16px text on a phone (no zoom on focus), 44px targets
     expect(chat).toContain("text-base sm:text-sm");
     expect(chat).toContain("min-h-11");
+  });
+});
+
+describe("review of b60a390f: a rebuild keeps the program's request", () => {
+  // what build-day reads for one day: the request and every change, as one text (app/api/ai/build-day/route.ts `sayings`)
+  const roleOf = (request: string, keep: string[], day: number) => {
+    const sayings = `${request}. ${keep.join(". ")}`;
+    const d = parseBuildRequest(sayings).daysPerWeek ?? 3;
+    const named = namedMobilityDays(sayings, d, null);
+    const m = mobilityDaysWanted(sayings, d) ?? (named ? named.length : null);
+    return m != null ? planRole(day, mobilityDayPlan(d, m, named)) : "free";
+  };
+  it("rebuild week 1 after Ron's request: days 1, 3 and 5 stay full body, 2 and 4 mobility, and the plan line says so", () => {
+    const r = rebuildRequest(RON_2, "rebuild week 1");
+    expect(r).toEqual({ request: RON_2, keep: "rebuild week 1" });
+    expect(planSummary(withKeep(r.request, r.keep), none).line).toBe("5 days a week: full body days 1, 3 and 5, mobility days 2 and 4.");
+    expect([1, 2, 3, 4, 5].map((day) => roleOf(r.request, [r.keep!], day))).toEqual(["must_not", "must", "must_not", "must", "must_not"]);
+  });
+  it('"redo day 2" keeps day 2 a mobility day', () => {
+    const r = rebuildRequest(RON_2, "redo day 2");
+    expect(r.keep).toBe("redo day 2");
+    expect(roleOf(r.request, [r.keep!], 2)).toBe("must");
+    expect(rebuildSlots(rebuildTargetFrom("redo day 2")!, 5)).toEqual([{ week: 1, day: 2 }]);
+  });
+  it('"redo week 2 with more glutes" keeps the split and adds the glutes as a change', () => {
+    const r = rebuildRequest(RON_2, "redo week 2 with more glutes");
+    expect(r).toEqual({ request: RON_2, keep: "redo week 2 with more glutes" });
+    expect(planSummary(withKeep(r.request, r.keep), none).mobilityDays).toEqual([2, 4]);
+    expect(withKeep(r.request, r.keep)).toContain("more glutes");
+  });
+  it("a rebuild that is a request in its own right, or with nothing to keep, starts from its own words", () => {
+    expect(rebuildRequest(RON_2, "rebuild week 1 as a 4 day upper lower")).toEqual({ request: "rebuild week 1 as a 4 day upper lower", keep: null });
+    expect(rebuildRequest(null, "rebuild week 1")).toEqual({ request: "rebuild week 1", keep: null });
+    expect(rebuildRequest("  ", "start over")).toEqual({ request: "start over", keep: null });
+  });
+  it("after a reload the request comes from the thread: the newest run's words (with its tapped answers), else the newest plan's", () => {
+    const plan = { id: "p", kind: "plan" as const, request: RON_2, line: "", sheetLine: null, questions: [], rebuild: null };
+    const run = { id: "r", kind: "progress" as const, items: [], ended: "done" as const, request: `${RON_2}. 4 weeks.` };
+    expect(lastRequestIn([plan])).toBe(RON_2);
+    expect(lastRequestIn([plan, run, { id: "s", kind: "say", text: "Done." }])).toBe(`${RON_2}. 4 weeks.`);
+    expect(lastRequestIn([{ id: "c", kind: "coach", text: "hi" }])).toBeNull();
+    // the run's words are kept with its progress, and read back
+    const back = decodeMsg("r", "assistant", encodeMsg(run)!.body)!;
+    expect(lastRequestIn([back])).toBe(`${RON_2}. 4 weeks.`);
+  });
+  it("the chat uses them: the rebuild plan reads the request with the rebuild words, and Do it sends the words along as a change", () => {
+    const turn = chat.slice(chat.indexOf("function rebuildTurn("), chat.indexOf("async function goFromPlan("));
+    expect(turn).toContain("rebuildRequest(request.current || lastRequestIn(msgsRef.current), said)");
+    expect(turn).toContain("planTurn(r.request, target, r.keep);");
+    expect(chat).toContain("const summary = planSummary(withKeep(said, keep),");
+    expect(chat).toContain("said: keep } : null,");
+    expect(chat).toContain('push({ kind: "progress", items, ended, request: said })');
+  });
+});
+
+describe("review of b60a390f: a new request typed while a plan is open replaces it", () => {
+  it('"actually make it a 4 day upper lower" is a new plan with 4 days; "60 minutes, bands only" answers the open one', () => {
+    expect(isNewRequest("actually make it a 4 day upper lower")).toBe(true);
+    expect(messageIntent("actually make it a 4 day upper lower", { phase: "idle", hasBuilt: false, editOpen: false })).toBe("request");
+    expect(planSummary("actually make it a 4 day upper lower", none).line).toBe("4 days a week.");
+    expect(isNewRequest("60 minutes, bands only")).toBe(false);
+    // planTurn closes the open plan before it shows the new one
+    expect(chat.slice(chat.indexOf("function planTurn("), chat.indexOf("function rebuildTurn("))).toContain("if (pendingPlan.current) patch(pendingPlan.current.id, { done: true });");
+  });
+});
+
+describe("review of b60a390f: the thread reads back in the order it was written", () => {
+  it("saves run one after another; every kept message goes through the chain", () => {
+    expect(chat).toContain("saveChain.current = saveChain.current.then(() => save(m)).catch(() => {});");
+    expect(chat).toContain('if (KEPT_KINDS.has(msg.kind) && msg.kind !== "progress") keep(msg);');
+    expect(chat).toContain('keep({ id, kind: "progress", items, ended, request: said });');
+    // nothing saves around the chain
+    expect(chat.split("void save(")).toHaveLength(1);
+    expect(chat.split("save(m)")).toHaveLength(2);
+  });
+  it("in order: a chain of slow and fast saves lands in the order they were started, and read back the same", async () => {
+    const rows: string[] = [];
+    let chain: Promise<void> = Promise.resolve();
+    const save = (id: string, ms: number) => new Promise<void>((done) => setTimeout(() => { rows.push(id); done(); }, ms));
+    for (const [id, ms] of [["coach", 30], ["plan", 1], ["say", 10]] as const) chain = chain.then(() => save(id, ms)).catch(() => {});
+    await chain;
+    expect(rows).toEqual(["coach", "plan", "say"]);
+    expect(chat).toContain('.order("created_at", { ascending: true })');
   });
 });
