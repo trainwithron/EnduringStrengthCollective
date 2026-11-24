@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { readAiJson } from "@/lib/ai-fetch";
-import { MicButton } from "@/components/shared/mic-button";
+import { MicButton, stopAllMics } from "@/components/shared/mic-button";
 import { EXPLAIN_MAX_EXCHANGES, TELL_ME_MORE_QUESTION, type Exchange } from "@/lib/explain-program";
 
 // Beside the AI Program Builder: what the coach asked for in this run (their request and every change they asked for, read-only, collapsible) so they can compare it with what they got, and an
@@ -18,6 +18,7 @@ export function AiRunPanel({ programId, request, corrections }: { programId: str
   if (!request) return null;
 
   async function explain(asked?: string) {
+    stopAllMics();
     const q = (asked ?? question).trim();
     if (!q || busy) return;
     setBusy(true);

@@ -3,6 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { createMicSession } from "@/lib/mic-session";
 
+// Sending what was said turns every listening mic off (Ron, Nov 24: "Submit on the program builder, it should turn the mic off automatically"). Call it at the start of a send; a mic inside a <form> also stops on its own when that form is submitted.
+export const MIC_STOP_EVENT = "spotlight:mic-stop";
+export function stopAllMics() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(MIC_STOP_EVENT));
+}
+
 // A small microphone for any text box: tap, talk, and what was said is handed to onText. It uses the browser's own speech recognition (nothing is uploaded by us, no server),
 // and simply does not appear in a browser without it. Reusable wherever a coach may talk instead of type.
 // Optional: startLabel/stopLabel name the two states for screen readers; continuous keeps listening through pauses until tapped again (it starts again by itself when the browser ends a session on a silence, and
@@ -28,12 +34,30 @@ export function MicButton({
   const sessionRef = useRef<ReturnType<typeof createMicSession> | null>(null);
   const onTextRef = useRef(onText);
   onTextRef.current = onText;
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  // false after a send stopped the mic: words the browser still hands over late are dropped, so nothing lands in the box that was just sent and cleared.
+  const acceptText = useRef(true);
 
   useEffect(() => {
     const w = window as any;
     setSupported(!!(w.SpeechRecognition || w.webkitSpeechRecognition));
     return () => sessionRef.current?.stop();
   }, []);
+
+  // Stop on a send: the app-wide stop event, or the submit of the form this mic sits in.
+  useEffect(() => {
+    const stop = () => {
+      acceptText.current = false;
+      sessionRef.current?.stop();
+    };
+    window.addEventListener(MIC_STOP_EVENT, stop);
+    const form = buttonRef.current?.closest("form") ?? null;
+    form?.addEventListener("submit", stop);
+    return () => {
+      window.removeEventListener(MIC_STOP_EVENT, stop);
+      form?.removeEventListener("submit", stop);
+    };
+  }, [supported]);
 
   if (!supported) {
     if (!unsupportedHint) return null;
@@ -51,10 +75,13 @@ export function MicButton({
     }
     const w = window as any;
     const Rec = w.SpeechRecognition || w.webkitSpeechRecognition;
+    acceptText.current = true;
     sessionRef.current = createMicSession({
       make: () => new Rec(),
       continuous,
-      onText: (text) => onTextRef.current(text),
+      onText: (text) => {
+        if (acceptText.current) onTextRef.current(text);
+      },
       onListening: setListening,
     });
     sessionRef.current.start();
@@ -62,6 +89,7 @@ export function MicButton({
 
   return (
     <button
+      ref={buttonRef}
       type="button"
       onClick={toggle}
       aria-label={listening ? stopLabel ?? "Stop listening" : startLabel ?? label}

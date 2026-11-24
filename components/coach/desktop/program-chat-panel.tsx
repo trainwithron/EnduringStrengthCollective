@@ -4,7 +4,7 @@ import { useRef, useState, useEffect } from "react";
 import { MessageCircleQuestion, ChevronDown, ChevronUp } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import Link from "next/link";
-import { MicButton } from "@/components/shared/mic-button";
+import { MicButton, stopAllMics } from "@/components/shared/mic-button";
 import { TemplateSuggestion } from "@/components/coach/desktop/template-suggestion";
 import { readAiJson } from "@/lib/ai-fetch";
 
@@ -45,6 +45,7 @@ export function ProgramChatPanel({
   }, [messages, sending, open]);
 
   async function handleSend() {
+    stopAllMics();
     const question = input.trim();
     if (!question || sending) return;
     setInput("");

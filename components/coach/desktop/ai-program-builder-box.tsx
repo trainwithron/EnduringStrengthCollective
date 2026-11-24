@@ -6,7 +6,7 @@ import { readAiJson } from "@/lib/ai-fetch";
 import { BUILDER_ONE_WORKOUT_SELECT, mapWorkoutRowToBuilderDay } from "@/lib/program-builder-data";
 import { headersOfWorkouts } from "@/lib/section-headers";
 import { AiRunPanel } from "@/components/coach/desktop/ai-run-panel";
-import { MicButton } from "@/components/shared/mic-button";
+import { MicButton, stopAllMics } from "@/components/shared/mic-button";
 import { ProgramImportLauncher, ProgramImportPanel } from "@/components/coach/desktop/program-import-launcher";
 import { detectImportKind } from "@/lib/import-input-kind";
 import { TemplateSuggestion } from "@/components/coach/desktop/template-suggestion";
@@ -262,6 +262,7 @@ export function AiProgramBuilderBox({
   }
 
   function ask(skipProgramCheck = false) {
+    stopAllMics();
     const said = text.trim();
     if (!said || phase === "building" || editBusy) return;
     if (!skipProgramCheck && phase !== "paused" && detectImportKind({ text: said }).kind === "pasted_program") {
@@ -304,6 +305,7 @@ export function AiProgramBuilderBox({
   }
 
   async function resume() {
+    stopAllMics();
     if (phase === "building" || resuming.current) return;
     resuming.current = true;
     try {
