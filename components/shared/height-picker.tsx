@@ -34,7 +34,7 @@ export function HeightPicker({
   inputClass: string;
 }) {
   if (unit === "kg") {
-    return <input id={id} className={inputClass} value={value} onChange={(e) => onChange(e.target.value)} inputMode="numeric" autoComplete="off" placeholder="cm" />;
+    return <input id={id} aria-label="Height in centimetres" className={inputClass} value={value} onChange={(e) => onChange(e.target.value)} inputMode="numeric" autoComplete="off" placeholder="cm" />;
   }
   const { ft, inches } = heightParts(value, unit);
   return (
