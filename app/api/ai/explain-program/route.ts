@@ -3,7 +3,7 @@ import { MAX_RULE_TEXT } from "@/lib/ai-nutrition-clamp";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, isAiConfigured } from "@/lib/anthropic-client";
 import { AiRateLimitedError, aiInputTooLong } from "@/lib/ai-usage";
-import { answerConcisely, cleanThread, explainSettings, threadText } from "@/lib/explain-program";
+import { answerConcisely, cleanThread, explainSettings, splitChange, threadText } from "@/lib/explain-program";
 
 export const maxDuration = 60;
 
@@ -75,7 +75,9 @@ export async function POST(request: Request) {
       });
     });
     if (!answer) return NextResponse.json({ error: "Couldn't answer that. Try again." }, { status: 502 });
-    return NextResponse.json({ answer });
+    // the change it offers, if any, said as one instruction the builder chat can show as "Here's what I'll change" (lib/explain-program.ts splitChange)
+    const { answer: said, change } = splitChange(answer);
+    return NextResponse.json({ answer: said, change });
   } catch (err) {
     if (err instanceof AiRateLimitedError) return NextResponse.json({ error: err.message }, { status: 429 });
     return NextResponse.json({ error: "Couldn't answer that. Try again." }, { status: 502 });

@@ -59,8 +59,8 @@ describe("old addresses", () => {
 });
 
 describe("on the program builder page", () => {
-  it("Import program sits inside the AI box above the mic and Ask, and the toolbar link is gone", () => {
-    const box = read("components/coach/desktop/ai-program-builder-box.tsx");
+  it("Import program sits in the builder chat's header above the mic and Send, and the toolbar link is gone", () => {
+    const box = read("components/coach/desktop/program-builder-chat.tsx");
     expect(box.indexOf("<ProgramImportLauncher")).toBeLessThan(box.indexOf("<MicButton"));
     expect(read("components/coach/desktop/program-builder-desktop.tsx")).not.toContain("programs/import");
   });
@@ -92,18 +92,22 @@ describe("program text pasted into the AI builder box", () => {
     expect(looksLikePastedProgram(["Day A", "Squat", "Bench", "Row", "Day B", "Deadlift"].join("\n"))).toBe(true);
     expect(looksLikePastedProgram(["## Week 12", "Squat", "Bench", "Row", "## Week 13", "Deadlift"].join("\n"))).toBe(true);
   });
-  it("the box asks first and writes nothing: one plain line with Import it and Build from it", () => {
-    const box = read("components/coach/desktop/ai-program-builder-box.tsx");
-    expect(box).toContain("This looks like a full program. Import it?");
+  it("the chat asks first and writes nothing: one plain line with Import it and Build from it", async () => {
+    const box = read("components/coach/desktop/program-builder-chat.tsx");
+    expect(box).toContain("This looks like a full program. Import it as it is, or build from it?");
     expect(box).toContain("Import it");
     expect(box).toContain("Build from it");
-    // Ask stops at the question before anything is queued; a correction while paused is never mistaken for a program
-    const ask = box.slice(box.indexOf("function ask("), box.indexOf("queue.current = slots;"));
-    expect(ask.indexOf("setProgramChoice(said);")).toBeLessThan(ask.indexOf("request.current = said;"));
-    expect(ask).toContain('phase !== "paused"');
-    // Import it opens the panel on the text; Build from it runs the normal builder
+    // Send stops at the question before anything is planned or queued; a change while building or paused is never mistaken for a program
+    const send = box.slice(box.indexOf("async function send("));
+    expect(send.indexOf('if (intent === "pasted") {\n        push({ kind: "import", text: said });\n        return;')).toBeGreaterThan(-1);
+    expect(send.indexOf('if (intent === "pasted")')).toBeLessThan(send.indexOf("planTurn("));
+    const { messageIntent } = await import("@/lib/builder-chat");
+    expect(messageIntent(spreadsheet, { phase: "idle", hasBuilt: false, editOpen: false })).toBe("pasted");
+    expect(messageIntent(spreadsheet, { phase: "paused", hasBuilt: true, editOpen: false })).toBe("correction");
+    expect(messageIntent(spreadsheet, { phase: "building", hasBuilt: true, editOpen: false })).toBe("correction");
+    // Import it opens the panel on the text; Build from it goes to the plan, like any request
     expect(box).toContain("<ProgramImportPanel groupId={groupId} athleteId={athleteId} orgProgram={orgProgram} programId={programId} text={importText}");
-    expect(box).toContain("onClick={() => ask(true)}");
+    expect(box).toContain("planTurn(m.text);");
     expect(read("components/coach/desktop/import-wizard.tsx")).toContain('handleAiTextImport(initialText.trim(), "Pasted program", "Imported from pasted text (AI)")');
   });
 });

@@ -116,7 +116,7 @@ describe("what the AI is told", () => {
     expect(learnedBlock([])).toBeNull();
   });
   it("every AI path that writes or explains a program is given it", () => {
-    for (const f of ["app/api/ai/build-day/route.ts", "app/api/ai/pick-template/route.ts", "app/api/ai/generate-program/route.ts", "app/api/ai/program-chat/route.ts"]) {
+    for (const f of ["app/api/ai/build-day/route.ts", "app/api/ai/pick-template/route.ts", "app/api/ai/generate-program/route.ts"]) {
       expect(read(f), f).toMatch(/loadLearnedLines\(|loadApplicableRules\(/);
     }
     expect(read("lib/ai-day-run.ts")).toContain("if (input.learnedBlock) parts.push(input.learnedBlock);");
@@ -136,7 +136,7 @@ describe("how it asks", () => {
     expect(line).toContain("Change who this applies to");
     expect(line).toContain("Not now");
     expect(line).toContain("Or tell me in your own words");
-    expect(read("components/coach/desktop/ai-program-builder-box.tsx")).toContain("<LearnLine key={learn.id}");
+    expect(read("components/coach/desktop/program-builder-chat.tsx")).toContain('{m.kind === "learn" && !m.historic && <LearnLine correction={m.correction}');
     expect(read("components/coach/learned-list.tsx")).toContain("{LEARN_INTRO}");
     expect(read("components/coach/learned-section.tsx")).toContain("For clients with");
   });
@@ -197,7 +197,7 @@ describe("the ladder: ask, then apply quietly, always showing why", () => {
     expect(route).toContain("if (match && isSilent(match))");
     expect(route).toContain("return NextResponse.json({ skip: true, known: true });");
     expect(read("app/api/ai/build-day/route.ts")).toContain("applied: toApplied(taughtRules)");
-    const box = read("components/coach/desktop/ai-program-builder-box.tsx");
+    const box = read("components/coach/desktop/program-builder-chat.tsx");
     expect(box).toContain("appliedLine(a)");
     expect(box).toContain("undoApplied(a)");
     expect(read("components/coach/learned-section.tsx")).toContain("I apply it without asking.");

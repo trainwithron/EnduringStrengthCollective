@@ -26,14 +26,17 @@ async function handler(request: Request) {
 
   // Deleting the thread cascades to its messages (on delete cascade) — one
   // statement, not a two-step message-then-thread delete.
+  // A program's builder conversation (program_id set) is kept as long as the program is: deleting the program removes it (programs -> coach_chat_threads -> coach_chat_messages, both on
+  // delete cascade, 0164 and 0153), so only the Collective Intelligence chats (no program) expire here (Commander, Nov 24).
   const { data: expiredThreads } = await supabase
     .from("coach_chat_threads")
     .select("id")
+    .is("program_id", null)
     .lt("last_message_at", cutoff.toISOString());
 
   const expiredIds = (expiredThreads ?? []).map((t) => t.id);
   if (expiredIds.length > 0) {
-    await supabase.from("coach_chat_threads").delete().in("id", expiredIds);
+    await supabase.from("coach_chat_threads").delete().in("id", expiredIds).is("program_id", null);
   }
 
   // Also tidies away any large "Download my data" files older than a day (they are made for a short-lived link and nothing else).

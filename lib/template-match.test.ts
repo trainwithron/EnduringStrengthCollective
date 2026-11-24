@@ -38,9 +38,9 @@ describe("a client named in the words", () => {
 });
 
 describe("where it shows", () => {
-  it("under the AI builder box and the Ask box, as an offer that opens the usual panel with the words filled in", () => {
-    expect(read("components/coach/desktop/ai-program-builder-box.tsx")).toContain('{phase === "idle" && <TemplateSuggestion text={text} />}');
-    expect(read("components/coach/desktop/program-chat-panel.tsx")).toContain("<TemplateSuggestion text={input} />");
+  it("in the builder chat's plan turn (a new request, not a rebuild), as an offer that opens the usual panel with the words filled in", () => {
+    const chat = read("components/coach/desktop/program-builder-chat.tsx");
+    expect(chat).toContain("{live && !msg.rebuild && (\n        <>\n          <TemplateSuggestion text={msg.request} />");
     const s = read("components/coach/desktop/template-suggestion.tsx");
     expect(s).toContain("Use your template");
     expect(s).toContain("Which template?");

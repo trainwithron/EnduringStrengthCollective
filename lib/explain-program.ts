@@ -68,10 +68,28 @@ export function threadText(thread: Exchange[]): string {
   return thread.length === 0 ? "(none)" : thread.map((x) => `Coach asked: ${x.question}\nYou answered: ${x.answer}`).join("\n\n");
 }
 
+// The builder chat (Nov 24, Ron: "Ask why ... couldn't act"): when the answer offers a change, it also says that change as one plain instruction on a last line of its own, so the
+// chat can offer "Do it" straight away (it then shows "Here's what I'll change" first, and nothing changes until the coach says so). The line is taken off the answer the coach reads.
+export const EXPLAIN_CHANGE_RULE = `
+
+One exception to "the answer only": if you offer a change, end with ONE more line that starts with "CHANGE:" and then the change as a plain instruction the program builder can carry out, naming the day and the exercise, for example:
+CHANGE: swap the close-grip bench press on Wednesday for cable tricep pushdowns, 3 sets of 12
+If you do not offer a change, write no CHANGE line.`;
+
 export function explainSettings(thread: Exchange[], strict: boolean): { system: string; maxTokens: number } {
   const followUp = thread.length > 0;
   return {
-    system: (followUp ? EXPLAIN_FOLLOWUP_SYSTEM_PROMPT : EXPLAIN_SYSTEM_PROMPT) + (strict ? (followUp ? EXPLAIN_FOLLOWUP_STRICT_NOTE : EXPLAIN_STRICT_NOTE) : ""),
+    system: (followUp ? EXPLAIN_FOLLOWUP_SYSTEM_PROMPT : EXPLAIN_SYSTEM_PROMPT) + EXPLAIN_CHANGE_RULE + (strict ? (followUp ? EXPLAIN_FOLLOWUP_STRICT_NOTE : EXPLAIN_STRICT_NOTE) : ""),
     maxTokens: followUp ? EXPLAIN_FOLLOWUP_MAX_TOKENS : EXPLAIN_MAX_TOKENS,
   };
+}
+
+// The answer the coach reads, and the change it offers (or null). The CHANGE line may be anywhere after the answer; only the first counts, cut to 300 characters.
+export function splitChange(text: string): { answer: string; change: string | null } {
+  const lines = text.split(/\r?\n/);
+  const at = lines.findIndex((l) => /^\s*CHANGE:\s*\S/i.test(l));
+  if (at < 0) return { answer: text.trim(), change: null };
+  const change = lines[at].replace(/^\s*CHANGE:\s*/i, "").trim().slice(0, 300);
+  const answer = lines.filter((_, i) => i !== at && !/^\s*CHANGE:/i.test(lines[i])).join("\n").trim();
+  return { answer: answer || text.replace(/^\s*CHANGE:.*$/gim, "").trim(), change: change || null };
 }

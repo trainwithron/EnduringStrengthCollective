@@ -24,9 +24,8 @@ import { ProgramProgressionPanel } from "./program-progression-panel";
 import type { Rule } from "@/lib/program-progression";
 import { SaveToastChannelContext } from "./save-toast-channel";
 import { createSaveToastChannel } from "@/lib/save-toast";
-import { ProgramChatPanel } from "./program-chat-panel";
 import { TrainingIntentSelector } from "../training-intent-selector";
-import { AiProgramBuilderBox } from "./ai-program-builder-box";
+import { ProgramBuilderChat } from "./program-builder-chat";
 import { REST_TEMPO_SUGGESTIONS, type TrainingIntent } from "@/lib/training-intent";
 import { ProgramDescriptionEditor } from "@/components/coach/program-description-editor";
 import { ClientSwapsNotice } from "./client-swaps-notice";
@@ -38,7 +37,6 @@ export function ProgramBuilderDesktop({
   canAddSlot = false,
   programName,
   programDescription,
-  aiSequencingNotes,
   initialDays,
   exerciseLibrary,
   exerciseAliases,
@@ -68,9 +66,7 @@ export function ProgramBuilderDesktop({
   canAddSlot?: boolean;
   programName: string;
   programDescription: string | null;
-  // Only set for an AI-generated program — the "Ask the AI" why/correct
-  // chat is grounded in this program's own captured generation notes, so
-  // it only makes sense to offer where those notes actually exist.
+  // Still passed by the page; the separate "Ask the AI" program chat it gated is now part of the builder chat (Nov 24), which explain-program grounds in these notes itself.
   aiSequencingNotes: string | null;
   initialDays: BuilderDay[];
   exerciseLibrary: string[];
@@ -358,24 +354,11 @@ export function ProgramBuilderDesktop({
         <summary className="flex items-center gap-2 min-h-11 px-4 cursor-pointer list-none [&::-webkit-details-marker]:hidden font-body text-sm font-semibold text-chalk">
           <span aria-hidden="true" className="text-steel group-open:rotate-90 transition-transform">&#9656;</span>
           Program settings
-          <span className="font-body text-xs font-normal text-steel">Description, progressions, AI builder, training intent, schedule</span>
+          <span className="font-body text-xs font-normal text-steel">Description, progressions, training intent, schedule</span>
         </summary>
         <div className="px-4 pb-4">
         <ProgramDescriptionEditor programId={programId} initialDescription={programDescription} />
         <ProgramProgressionPanel programId={programId} groupId={groupId} days={days} initialRules={initialProgressions} onDaysChange={setDays} />
-        {!embedded && (
-          <AiProgramBuilderBox
-            programId={programId}
-            groupId={groupId}
-            athleteId={athleteId}
-            days={days}
-            trainingDaysCount={trainingDays && trainingDays.length > 0 ? trainingDays.length : null}
-            demoLibrary={demoLibrary}
-            exerciseTierByName={exerciseTierByName}
-            onDay={handleAiDay}
-            orgProgram={orgProgram}
-          />
-        )}
         <div className="flex flex-wrap gap-4 mt-4">
           <TrainingIntentSelector
             programId={programId}
@@ -383,11 +366,6 @@ export function ProgramBuilderDesktop({
             onChange={setTrainingIntent}
           />
         </div>
-        {aiSequencingNotes && (
-          <div className="mt-4">
-            <ProgramChatPanel programId={programId} groupId={groupId} programName={name} />
-          </div>
-        )}
         <div className="mt-4 border border-steel/20">
           <ProgramScheduleSettings
             programId={programId}
@@ -403,86 +381,106 @@ export function ProgramBuilderDesktop({
         </div>
       </details>
 
-      {/* Adding the next week is at the top of the weeks, not after every one of them (DK20) */}
-      <div className="mb-4">
-        <button
-          type="button"
-          onClick={handleAddWeek}
-          disabled={addWeekBusy}
-          className="w-full h-11 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
-        >
-          + Add Week {nextWeekNumber}
-        </button>
-      </div>
+      {/* The AI Program Builder as ONE conversation (Ron, Nov 24): beside the weeks on a wide screen (it stays in view while the program fills in), above them otherwise. */}
+      <div className={embedded ? "" : "@5xl:grid @5xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] @5xl:gap-6 @5xl:items-start"}>
+        {!embedded && (
+          <div className="mb-6 @5xl:mb-0 @5xl:sticky @5xl:top-4 min-w-0">
+            <ProgramBuilderChat
+              programId={programId}
+              groupId={groupId}
+              athleteId={athleteId}
+              days={days}
+              trainingDays={trainingDays && trainingDays.length > 0 ? trainingDays : null}
+              demoLibrary={demoLibrary}
+              exerciseTierByName={exerciseTierByName}
+              onDay={handleAiDay}
+              orgProgram={orgProgram}
+            />
+          </div>
+        )}
+        <div className="min-w-0">
+          {/* Adding the next week is at the top of the weeks, not after every one of them (DK20) */}
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={handleAddWeek}
+              disabled={addWeekBusy}
+              className="w-full h-11 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
+            >
+              + Add Week {nextWeekNumber}
+            </button>
+          </div>
 
-      {weekNumbers.length === 0 && (
-        <p className="font-body text-sm text-steel py-4">No weeks yet. Add the first one above.</p>
-      )}
+          {weekNumbers.length === 0 && (
+            <p className="font-body text-sm text-steel py-4">No weeks yet. Add the first one above.</p>
+          )}
 
-      <div className="space-y-4">
-        {weekNumbers.map((wn) => (
-          <WeekGrid
-            key={wn}
-            weekNumber={wn}
-            days={days.filter((d) => d.weekNumber === wn)}
-            programId={programId}
-            groupId={groupId}
-            athleteId={athleteId}
-            canAddSlot={canAddSlot}
-            exerciseLibrary={exerciseLibrary}
-            exerciseAliases={exerciseAliases}
-            exerciseTierByName={exerciseTierByName}
-            demoLibrary={demoLibrary}
-            movementPatterns={movementPatterns}
-            laddersByPattern={laddersByPattern}
-            restSuggestions={restSuggestions}
-            expanded={expandedWeeks.has(wn)}
-            scheduledDateByDayId={scheduledDateByDayId}
-            existingWeekNumbers={weekNumbers}
-            onToggle={() => toggleWeek(wn)}
-            onDaysChange={(change) =>
-              setDays((prev) => {
-                const week = prev.filter((d) => d.weekNumber === wn);
-                const weekDays = typeof change === "function" ? change(week) : change;
-                return [...prev.filter((d) => d.weekNumber !== wn), ...weekDays];
-              })
-            }
-            onWeeksGenerated={(newDays) => {
-              setDays((prev) => [...prev, ...newDays]);
-              setExpandedWeeks((prev) => {
-                const next = new Set(prev);
-                newDays.forEach((d) => next.add(d.weekNumber));
-                return next;
-              });
-            }}
-            onWeekRestored={(back) => {
-              setDays((prev) => [...prev.filter((d) => !back.some((b) => b.id === d.id)), ...back]);
-              setExpandedWeeks((prev) => new Set(prev).add(wn));
-            }}
-            onWeekDeleted={() => {
-              setDays((prev) => prev.filter((d) => d.weekNumber !== wn));
-              setExpandedWeeks((prev) => {
-                const next = new Set(prev);
-                next.delete(wn);
-                return next;
-              });
-            }}
-          />
-        ))}
-      </div>
+          <div className="space-y-4">
+            {weekNumbers.map((wn) => (
+              <WeekGrid
+                key={wn}
+                weekNumber={wn}
+                days={days.filter((d) => d.weekNumber === wn)}
+                programId={programId}
+                groupId={groupId}
+                athleteId={athleteId}
+                canAddSlot={canAddSlot}
+                exerciseLibrary={exerciseLibrary}
+                exerciseAliases={exerciseAliases}
+                exerciseTierByName={exerciseTierByName}
+                demoLibrary={demoLibrary}
+                movementPatterns={movementPatterns}
+                laddersByPattern={laddersByPattern}
+                restSuggestions={restSuggestions}
+                expanded={expandedWeeks.has(wn)}
+                scheduledDateByDayId={scheduledDateByDayId}
+                existingWeekNumbers={weekNumbers}
+                onToggle={() => toggleWeek(wn)}
+                onDaysChange={(change) =>
+                  setDays((prev) => {
+                    const week = prev.filter((d) => d.weekNumber === wn);
+                    const weekDays = typeof change === "function" ? change(week) : change;
+                    return [...prev.filter((d) => d.weekNumber !== wn), ...weekDays];
+                  })
+                }
+                onWeeksGenerated={(newDays) => {
+                  setDays((prev) => [...prev, ...newDays]);
+                  setExpandedWeeks((prev) => {
+                    const next = new Set(prev);
+                    newDays.forEach((d) => next.add(d.weekNumber));
+                    return next;
+                  });
+                }}
+                onWeekRestored={(back) => {
+                  setDays((prev) => [...prev.filter((d) => !back.some((b) => b.id === d.id)), ...back]);
+                  setExpandedWeeks((prev) => new Set(prev).add(wn));
+                }}
+                onWeekDeleted={() => {
+                  setDays((prev) => prev.filter((d) => d.weekNumber !== wn));
+                  setExpandedWeeks((prev) => {
+                    const next = new Set(prev);
+                    next.delete(wn);
+                    return next;
+                  });
+                }}
+              />
+            ))}
+          </div>
 
-      {emptyDayIds.length > 0 && (
-        <div className="pt-4">
-          <button
-            type="button"
-            onClick={removeEmptyDays}
-            disabled={sweepBusy}
-            className="w-full min-h-11 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
-          >
-            {sweepBusy ? "Removing…" : `Remove ${emptyDayIds.length} empty ${emptyDayIds.length === 1 ? "day" : "days"}`}
-          </button>
+          {emptyDayIds.length > 0 && (
+            <div className="pt-4">
+              <button
+                type="button"
+                onClick={removeEmptyDays}
+                disabled={sweepBusy}
+                className="w-full min-h-11 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
+              >
+                {sweepBusy ? "Removing…" : `Remove ${emptyDayIds.length} empty ${emptyDayIds.length === 1 ? "day" : "days"}`}
+              </button>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
     </SaveToastChannelContext.Provider>
   );

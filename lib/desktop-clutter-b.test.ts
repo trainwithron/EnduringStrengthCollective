@@ -122,10 +122,14 @@ describe("DK13: Organization > Team puts the team first", () => {
 
 describe("DK19, DK20: the program builder", () => {
   const builder = read("components/coach/desktop/program-builder-desktop.tsx");
-  it("the weeks start under the name and one toolbar: description, progressions, the AI box, intent, the chat and the schedule are one Program settings fold", () => {
+  it("the weeks start under the name and one toolbar: description, progressions, intent and the schedule are one Program settings fold; the builder chat sits beside the weeks", () => {
     const fold = builder.slice(builder.indexOf("data-program-settings>"), builder.indexOf("</details>"));
-    for (const part of ["<ProgramDescriptionEditor", "<ProgramProgressionPanel", "<AiProgramBuilderBox", "<TrainingIntentSelector", "<ProgramChatPanel", "<ProgramScheduleSettings"]) expect(fold, part).toContain(part);
+    for (const part of ["<ProgramDescriptionEditor", "<ProgramProgressionPanel", "<TrainingIntentSelector", "<ProgramScheduleSettings"]) expect(fold, part).toContain(part);
     expect(builder.indexOf("</details>")).toBeLessThan(builder.indexOf("<WeekGrid"));
+    // the chat on the left of the weeks on a wide screen, above them on a phone
+    expect(builder.indexOf("</details>")).toBeLessThan(builder.indexOf("<ProgramBuilderChat"));
+    expect(builder.indexOf("<ProgramBuilderChat")).toBeLessThan(builder.indexOf("<WeekGrid"));
+    expect(builder).toContain("@5xl:grid @5xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]");
     // open only on a program with no weeks, read once
     expect(builder).toContain("const [settingsOpenAtStart] = useState(initialDays.length === 0);");
   });

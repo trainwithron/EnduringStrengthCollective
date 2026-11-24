@@ -66,7 +66,7 @@ describe("it is a look, not a copy; private and inside one organization", () => 
   it("the day builder and the template picker take it, and the screens show one line with Cancel", () => {
     expect(read("app/api/ai/build-day/route.ts")).toContain("loadReferenceBlock(supabase, user.id, referenceId, groupId)");
     expect(read("app/api/ai/pick-template/route.ts")).toContain("loadReferenceBlock(supabase, user.id, referenceId,");
-    expect(read("components/coach/desktop/ai-program-builder-box.tsx")).toContain("<LikeClientSuggestion");
+    expect(read("components/coach/desktop/program-builder-chat.tsx")).toContain("<LikeClientSuggestion");
     expect(read("components/coach/desktop/use-template-panel.tsx")).toContain("<LikeClientSuggestion");
     const ui = read("components/coach/desktop/like-client.tsx");
     expect(ui).toContain("Using how you program for {first} as a reference");

@@ -112,12 +112,9 @@ describe("meal and recipe numbers from the AI are believable", () => {
 });
 
 describe("the builder routes", () => {
-  it("pick-template charges only for a usable answer, program-chat saves only a real answer, coach-conversation has a hard stop", () => {
+  it("pick-template charges only for a usable answer, coach-conversation has a hard stop", () => {
     const pick = src("app/api/ai/pick-template/route.ts");
     expect(pick.indexOf("if (!picks.some((p) => p.exercise))")).toBeLessThan(pick.indexOf("checkAndSpendCoachCredits("));
-    const chat = src("app/api/ai/program-chat/route.ts");
-    expect(chat).toContain("if (answered) {");
-    expect(chat.indexOf("if (answered) {")).toBeLessThan(chat.indexOf('from("coach_chat_messages").insert'));
     expect(src("app/api/ai/coach-conversation/route.ts")).toContain("conv.coach_turns > chapter.maxCoachTurns");
   });
   it("the AI-built names are cleaned and checked, and the AI run secret fails closed in production", () => {

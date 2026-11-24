@@ -61,15 +61,15 @@ describe("the prompt", () => {
   });
 });
 
-import { EXPLAIN_FOLLOWUP_MAX_TOKENS, EXPLAIN_FOLLOWUP_SYSTEM_PROMPT, EXPLAIN_MAX_EXCHANGES, cleanThread, explainSettings, threadText } from "@/lib/explain-program";
+import { EXPLAIN_CHANGE_RULE, EXPLAIN_FOLLOWUP_MAX_TOKENS, EXPLAIN_FOLLOWUP_SYSTEM_PROMPT, EXPLAIN_MAX_EXCHANGES, cleanThread, explainSettings, threadText } from "@/lib/explain-program";
 
 describe("Tell me more (follow-up)", () => {
   it("the first question gets the concise prompt and allowance; once there is an exchange, the deeper prompt and a higher allowance", () => {
     const first = explainSettings([], false);
-    expect(first.system).toBe(EXPLAIN_SYSTEM_PROMPT);
+    expect(first.system).toBe(EXPLAIN_SYSTEM_PROMPT + EXPLAIN_CHANGE_RULE);
     expect(first.maxTokens).toBe(EXPLAIN_MAX_TOKENS);
     const deeper = explainSettings([{ question: "why?", answer: "Because." }], false);
-    expect(deeper.system).toBe(EXPLAIN_FOLLOWUP_SYSTEM_PROMPT);
+    expect(deeper.system).toBe(EXPLAIN_FOLLOWUP_SYSTEM_PROMPT + EXPLAIN_CHANGE_RULE);
     expect(deeper.maxTokens).toBe(EXPLAIN_FOLLOWUP_MAX_TOKENS);
     expect(EXPLAIN_FOLLOWUP_MAX_TOKENS).toBeGreaterThanOrEqual(1200);
     expect(EXPLAIN_FOLLOWUP_SYSTEM_PROMPT).toContain("I don't have a good reason for that");
@@ -88,11 +88,10 @@ describe("Tell me more (follow-up)", () => {
     expect(threadText(t.slice(-1))).toBe("Coach asked: q8\nYou answered: a8");
     expect(cleanThread("nope")).toEqual([]);
   });
-  it("the panel keeps the thread in itself only, offers Tell me more, and sends it with the question; the route uses the thread", () => {
-    const panel = readFileSync(join(__dirname, "..", "components/coach/desktop/ai-run-panel.tsx"), "utf8");
-    expect(panel).toContain("Tell me more");
-    expect(panel).toContain("Start over");
-    expect(panel).toContain("thread })");
+  it("the chat keeps the why-thread in itself only (a follow-up is just the next question typed) and sends it with the question; the route uses the thread", () => {
+    const panel = readFileSync(join(__dirname, "..", "components/coach/desktop/program-builder-chat.tsx"), "utf8");
+    expect(panel).toContain("thread: whyThread.current");
+    expect(panel).toContain(".slice(-EXPLAIN_MAX_EXCHANGES)");
     expect(panel).not.toContain("localStorage");
     const route = readFileSync(join(__dirname, "..", "app/api/ai/explain-program/route.ts"), "utf8");
     expect(route).toContain("cleanThread(body.thread)");

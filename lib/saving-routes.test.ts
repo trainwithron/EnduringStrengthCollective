@@ -57,7 +57,6 @@ const NOT_A_SAVE = new Set([
   "/api/ai/parse-recipe",
   "/api/ai/parse-session-nl",
   "/api/ai/parse-workout",
-  "/api/ai/program-chat",
   "/api/ai/explain-program",
   "/api/assistant/navigate",
   "/api/org/announce", // a message to the team's notifications, not data a pane shows

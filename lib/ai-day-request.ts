@@ -31,7 +31,13 @@ export function parseBuildRequest(text: string): BuildRequest {
   // A named "N-day split / program / week" is the week's shape and wins over an "N days a week" said about part of it (Ron, Nov 23: "5-day split ... 3 days a week full body ...
   // on the days in between ... core, cardio and mobility" is 5 days, not 3).
   // A named "N-day" over 7 is the program's LENGTH ("a 28-day program, 4 days a week"), not its week: then the "N days a week" wording decides.
-  for (const re of [new RegExp(`${word}\\s*[- ]?\\s*days?\\s*(?:program|split|week)\\b`), new RegExp(`${word}\\s*(?:days?|x|sessions?|workouts?)\\s*(?:a|per|/|each|every)\\s*(?:week|wk)`)]) {
+  // Last, "N day" followed by a split's name ("4 day upper lower", "4 day upper/lower", "3 day full body", "6 day PPL", "5 day bro split"): that many days a week (Commander, Nov 24).
+  // It comes after "N days a week", so "5 days a week, a 3 day full body block and 2 mobility days" is still 5.
+  for (const re of [
+    new RegExp(`${word}\\s*[- ]?\\s*days?\\s*(?:program|split|week)\\b`),
+    new RegExp(`${word}\\s*(?:days?|x|sessions?|workouts?)\\s*(?:a|per|/|each|every)\\s*(?:week|wk)`),
+    new RegExp(`${word}\\s*[- ]?\\s*days?\\s*(?:upper\\s*(?:/|-|&|and)?\\s*lower|full[\\s-]*body|ppl|push\\s*(?:/|-|,)?\\s*pull\\s*(?:/|-|,)?\\s*(?:and\\s*|&\\s*)?legs?|bro\\s*split)\\b`),
+  ]) {
     const d = re.exec(t);
     const n = d ? numberFrom(d[1]) : null;
     if (n != null && n >= 1 && n <= 7) {

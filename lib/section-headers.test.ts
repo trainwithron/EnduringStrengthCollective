@@ -143,7 +143,7 @@ describe("a note or a header between two linked exercises ends the link, in the 
     expect(page).toContain("&& !linkEnded.has(se.id),");
   });
   it("an AI-built day redrawn in the builder keeps its headers", () => {
-    expect(src("components/coach/desktop/ai-program-builder-box.tsx")).toContain("headersOfWorkouts(supabase, [workoutId])");
+    expect(src("components/coach/desktop/program-builder-chat.tsx")).toContain("headersOfWorkouts(supabase, [workoutId])");
     expect(src("lib/program-builder-data.ts")).toContain("...(headerIds.has(n.id) ? { header: true } : {})");
   });
 });

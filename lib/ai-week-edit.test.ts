@@ -133,9 +133,10 @@ describe("nothing is written before Apply, and Apply writes only this program", 
     expect(writes[0]).toBeLessThan(route.indexOf("if (!isAiConfigured())"));
     // the days are read only from this program
     expect(route).toContain('.eq("program_id", programId);');
-    const box = read("components/coach/desktop/ai-program-builder-box.tsx");
+    const box = read("components/coach/desktop/program-builder-chat.tsx");
     expect(box).toContain('mode: "preview"');
-    expect(box.indexOf('mode: "apply"')).toBeGreaterThan(box.indexOf("async function applyEdit()"));
+    expect(box.split('mode: "apply"')).toHaveLength(2);
+    expect(box.indexOf('mode: "apply"')).toBeGreaterThan(box.indexOf("async function applyPreview("));
   });
   it("started days are read as the server (a session hidden from the coach's own view still counts), only after the coach check, read only", () => {
     const route = read("app/api/ai/edit-weeks/route.ts");
@@ -242,13 +243,14 @@ describe("one AI use per preview, never for a failed or empty one", () => {
   });
 });
 
-describe("the same box, computer and phone", () => {
-  it("the AI Program Builder box handles a change, with Apply and Cancel", () => {
-    const box = read("components/coach/desktop/ai-program-builder-box.tsx");
-    expect(box).toContain("if (phase !== \"paused\" && askEdit(said)) {");
-    expect(box).toContain("setLine(WHICH_WEEKS_QUESTION);");
-    expect(box).toContain('{editBusy === "apply" ? "Applying…" : "Apply"}');
-    expect(box).toContain("Cancel");
+describe("the same chat, computer and phone", () => {
+  it("the builder chat handles a change: here's what I'll change, then Do it or Not quite", () => {
+    const box = read("components/coach/desktop/program-builder-chat.tsx");
+    expect(box).toContain('if (intent === "edit") {\n        askEdit(said);');
+    expect(box).toContain('push({ kind: "say", text: WHICH_WEEKS_QUESTION });');
+    expect(box).toContain("Here&apos;s what I&apos;ll change:");
+    expect(box).toContain('{busy === "apply" ? "Doing it…" : "Do it"}');
+    expect(box).toContain("Not quite");
     // the phone reaches the same builder through Edit program (?edit=1)
     expect(read("app/(coach)/groups/[groupId]/programs/[programId]/page.tsx")).toContain("if (!searchParams.edit && !searchParams.swap && (await prefersAthleteStyleView())) {");
   });
