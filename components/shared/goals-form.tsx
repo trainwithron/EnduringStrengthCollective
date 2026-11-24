@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { GOAL_TYPE_LABELS, GOAL_TYPE_ORDER, goalTypeHasEventFields } from "@/lib/goal-types";
@@ -59,6 +59,8 @@ export function GoalsForm({
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // set at once on the first tap (busy only shows on the next render): a very fast second tap never sends twice
+  const inFlight = useRef(false);
 
   // A goal the coach suggested that is waiting on the client: shown already filled in, theirs to keep or change.
   const coachSuggested = viewer === "client" && !!start && start.status === "proposed" && start.createdBy !== athleteId;
@@ -68,10 +70,12 @@ export function GoalsForm({
 
   // "Not now" to the goal the coach suggested, as the goal page has always allowed (the database tells the coach).
   async function notNow() {
-    if (busy || !goalId) return;
+    if (busy || inFlight.current || !goalId) return;
+    inFlight.current = true;
     setBusy(true);
     setError(null);
     const { error: updateError } = await createBrowserClient().from("client_goals").update({ status: "declined" }).eq("id", goalId);
+    inFlight.current = false;
     setBusy(false);
     if (updateError) {
       setError("That didn't save. Nothing was changed. Try again.");
@@ -83,11 +87,12 @@ export function GoalsForm({
   }
 
   async function send() {
-    if (busy) return;
+    if (busy || inFlight.current) return;
     if (goalType === "custom" && !customLabel.trim()) {
       setError("Describe your main goal, or pick one from the list.");
       return;
     }
+    inFlight.current = true;
     setBusy(true);
     setError(null);
     setNote(null);
@@ -105,6 +110,7 @@ export function GoalsForm({
     } catch {
       ok = false;
     }
+    inFlight.current = false;
     setBusy(false);
     if (!ok) {
       setError(viewer === "client" ? "Couldn't send your goals. Nothing was lost; try again." : "Couldn't save. Try again.");

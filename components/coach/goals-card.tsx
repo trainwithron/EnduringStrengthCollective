@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { GOAL_TYPE_LABELS, GOAL_TYPE_ORDER } from "@/lib/goal-types";
 import type { GoalType } from "@/lib/goal-reversal";
@@ -54,13 +54,16 @@ export function GoalsCard({
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // set at once on the first tap (busy only shows on the next render): a very fast second tap never sends twice
+  const inFlight = useRef(false);
 
   async function send(remind: boolean) {
-    if (busy) return;
+    if (busy || inFlight.current) return;
     if (!remind && suggestType === "custom" && !suggestLabel.trim()) {
       setError("Describe the goal you suggest, or pick one from the list.");
       return;
     }
+    inFlight.current = true;
     setBusy(true);
     setError(null);
     setNote(null);
@@ -72,6 +75,7 @@ export function GoalsCard({
     } catch {
       ok = false;
     }
+    inFlight.current = false;
     setBusy(false);
     if (!ok) {
       setError("Couldn't send it. Try again.");

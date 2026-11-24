@@ -28,10 +28,10 @@ export async function POST(request: Request) {
   const groupId = body.groupId as string;
   const athleteId = body.athleteId as string;
   const fail = () => NextResponse.json({ error: "Couldn't send it. Try again." }, { status: 500 });
-  const since = new Date(Date.now() - 5000).toISOString();
   const remind = body.remind === true;
 
-  let suggested = false;
+  // The suggested goal's own time: the database's notice about it is made in the same transaction, so it has the same created_at (review of 5d56dd30: never the server's clock).
+  let suggestedAt: string | null = null;
   if (!remind) {
     const suggestion = cleanMainGoal(body.suggestion);
     if (suggestion) {
@@ -47,9 +47,9 @@ export async function POST(request: Request) {
       const waiting = latest?.status === "proposed";
       const alreadyAgreed = latest?.status === "confirmed" && sameMainGoal(suggestion, latest);
       if (!waiting && !alreadyAgreed) {
-        const { error } = await supabase.from("client_goals").insert({ athlete_id: athleteId, group_id: groupId, ...mainGoalColumns(suggestion), created_by: user.id });
-        if (error) return fail();
-        suggested = true;
+        const { data: made, error } = await supabase.from("client_goals").insert({ athlete_id: athleteId, group_id: groupId, ...mainGoalColumns(suggestion), created_by: user.id }).select("created_at").single();
+        if (error || !made) return fail();
+        suggestedAt = made.created_at as string;
       }
     }
     const { error } = await db
@@ -63,12 +63,12 @@ export async function POST(request: Request) {
   const notice = goalsSentNotice(((me?.full_name as string | null) ?? "").trim().split(/\s+/)[0]);
   const path = goalsPagePath(groupId);
   const text = `${notice.title}: ${notice.body}`;
-  const { data: madeNow } = suggested
-    ? await db.from("notifications").select("id").eq("profile_id", athleteId).eq("group_id", groupId).eq("type", "goal_proposed").gte("created_at", since).order("created_at", { ascending: false }).limit(1)
+  const { data: madeNow } = suggestedAt
+    ? await db.from("notifications").select("id").eq("profile_id", athleteId).eq("group_id", groupId).eq("type", "goal_proposed").gte("created_at", suggestedAt).order("created_at", { ascending: false }).limit(1)
     : { data: [] as { id: string }[] };
   const row = ((madeNow ?? []) as { id: string }[])[0];
   if (row) await db.from("notifications").update({ body: text, link_path: path }).eq("id", row.id);
   else await db.from("notifications").insert({ profile_id: athleteId, group_id: groupId, type: "goal_proposed", body: text, link_path: path });
   await sendPushToProfile(db, athleteId, notice.title, notice.body, path).catch(() => 0);
-  return NextResponse.json({ ok: true, suggested });
+  return NextResponse.json({ ok: true, suggested: suggestedAt != null });
 }

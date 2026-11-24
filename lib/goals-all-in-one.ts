@@ -5,7 +5,7 @@
 import { GOAL_TYPE_LABELS, GOAL_TYPE_ORDER, goalTypeHasEventFields } from "@/lib/goal-types";
 import type { GoalType } from "@/lib/goal-reversal";
 import { goalSheetHasAnswers, goalSheetWaitingOnClient, type GoalSheetAnswers, type GoalSheetRow } from "@/lib/goal-sheet";
-import { addDaysToKey } from "@/lib/timezone";
+import { ADHERENCE_WINDOW_DAYS, computeAdherenceDays, loggedDateKeys } from "@/lib/food-log-adherence";
 
 export type GoalsCardState = "new" | "sent" | "done";
 
@@ -168,8 +168,8 @@ export const goalsFilledNotice = (clientName: string) => `${clientName} filled i
 
 // ---- Food logged: X/7 days (replaces "Macro targets set", which was from before clients logged food) ----
 
-// Days among the last 7 (today included, as the client's calendar has it) with at least one food log entry.
-export function foodLoggedDays(logDates: string[], todayKey: string): number {
-  const window = new Set(Array.from({ length: 7 }, (_, i) => addDaysToKey(todayKey, -i)));
-  return new Set(logDates.filter((d) => window.has(d))).size;
+// Days among the last 7 (today included, as the client's calendar has it) the client logged food, by the app's own rule (lib/food-log-adherence.ts, the same as the weekly
+// check-in and Ask Spot's food summary): a skipped meal is not logging, and history brought in from another app never counts (review of 5d56dd30: an imported month read 7/7).
+export function foodLoggedDays(entries: { log_date: string; status?: string | null; food_source?: string | null }[], todayKey: string): number {
+  return computeAdherenceDays(loggedDateKeys(entries), todayKey, ADHERENCE_WINDOW_DAYS);
 }

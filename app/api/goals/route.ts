@@ -13,7 +13,8 @@ import { sendPushToProfile } from "@/lib/send-push";
 //  * The main goal and the smaller goals are written with the caller's own client, so the database's rules decide exactly as before (step 0284: a client's goal is proposed and
 //    the coach confirms; a goal the coach suggested is the client's to confirm, and keeping it as it is confirms it, changing it sends it back; a coach's goal is a suggestion).
 //  * The goal sheet is written by the server, as /api/goal-sheet does (signed-in people cannot write that table).
-//  * The coach who sent the goals gets ONE notice (bell + push) when the client fills them in: the database's own notice about the goal, if it made one just now, says so too.
+//  * The coach who sent the goals gets ONE notice (bell + push) when the client fills them in (at least one sheet answer): the database's own notice about the goal, if it made
+//    one just now, says so too. A goal alone tells the coaches about the goal.
 export async function POST(request: Request) {
   const supabase = await createServerClient();
   const {
@@ -30,8 +31,6 @@ export async function POST(request: Request) {
   const groupId = body.groupId as string;
   const athleteId = body.athleteId as string;
   const fail = () => NextResponse.json({ error: "Couldn't save your goals. Try again." }, { status: 500 });
-  // the database's own notices made by this save are found by their time (a little slack for the two clocks)
-  const since = new Date(Date.now() - 5000).toISOString();
 
   // ---- 1. the main goal ----
   const goal = cleanMainGoal(body.goal);
@@ -73,10 +72,11 @@ export async function POST(request: Request) {
     if (error) return fail();
   }
 
-  // ---- 3. the goal sheet ----
+  // ---- 3. the goal sheet: saved, and marked filled in, only with at least one answer (a client who sends only a main goal has not filled in their goals) ----
   const answers = cleanGoalSheet(body.answers);
   const { data: before } = await db.from("client_goal_sheets").select("requested_by, requested_at, filled_at").eq("athlete_id", athleteId).eq("group_id", groupId).maybeSingle();
-  if (before || goalSheetHasAnswers(answers)) {
+  const sheetFilled = goalSheetHasAnswers(answers);
+  if (sheetFilled) {
     const { error } = await db
       .from("client_goal_sheets")
       .upsert({ athlete_id: athleteId, group_id: groupId, ...answers, filled_by: user.id, filled_at: new Date().toISOString() }, { onConflict: "athlete_id,group_id" });
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
   if (actor.role === "client") {
     const { data: me } = await db.from("profiles").select("full_name").eq("id", athleteId).maybeSingle();
     const name = ((me?.full_name as string | null) ?? "").trim() || "Your client";
-    if (before?.requested_by && goalSheetWaitingOnClient(before)) {
+    if (sheetFilled && before?.requested_by && goalSheetWaitingOnClient(before)) {
       // The coach who sent the goals: one notice. The database's notice about the goal (made just now, if the goal moved) becomes that one notice.
       const coachId = before.requested_by as string;
       const filled = goalsFilledNotice(name);
@@ -98,7 +98,8 @@ export async function POST(request: Request) {
         .eq("profile_id", coachId)
         .eq("group_id", groupId)
         .eq("type", "goal_answered")
-        .gte("created_at", since)
+        // since the coach sent the goals (the database's own time, never the server's clock): the database's notice about the goal made by this save is the newest one
+        .gte("created_at", before.requested_at as string)
         .order("created_at", { ascending: false })
         .limit(1);
       const row = ((madeNow ?? []) as { id: string; body: string | null }[])[0];
@@ -106,11 +107,15 @@ export async function POST(request: Request) {
       else await db.from("notifications").insert({ profile_id: coachId, group_id: groupId, type: "goal_answered", body: filled, link_path: coachPath });
       await sendCoachPush(db, coachId, "client_activity", `${name} filled in their goals`, "Open their page to read them.", coachPath).catch(() => 0);
     } else if (goalMoved && goal) {
-      // Not sent by a coach: the database already put the goal on the coaches' bells; their phones hear it too (as the goal page did).
+      // The goal alone. The database puts a goal the client confirms or changes on the coaches' bells itself (step 0284); a goal the client sets new it does not, so that bell
+      // is made here. Each coach's phone hears it too (as the goal page did).
       const { data: coaches } = await db.from("group_memberships").select("profile_id").eq("group_id", groupId).eq("role", "coach");
+      const label = goalLabel(goal.goalType, goal.customLabel);
       const what = goalMoved === "confirmed" ? `${name} confirmed the goal` : goalMoved === "changed" ? `${name} suggested a change to the goal` : `${name} set a goal`;
       for (const c of (coaches ?? []) as { profile_id: string }[]) {
-        if (c.profile_id !== user.id) await sendCoachPush(db, c.profile_id, "client_activity", what, goalLabel(goal.goalType, goal.customLabel), coachPath).catch(() => 0);
+        if (c.profile_id === user.id) continue;
+        if (goalMoved === "proposed") await db.from("notifications").insert({ profile_id: c.profile_id, group_id: groupId, type: "goal_answered", body: `${what}: ${label}`, link_path: coachPath });
+        await sendCoachPush(db, c.profile_id, "client_activity", what, label, coachPath).catch(() => 0);
       }
     }
   } else if (goalMoved && goal) {

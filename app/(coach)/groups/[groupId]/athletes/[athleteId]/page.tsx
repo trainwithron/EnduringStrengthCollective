@@ -461,7 +461,7 @@ export default async function AthleteProfilePage(
       ? Promise.resolve({ data: null })
       : supabase.from("client_goal_sheets").select(GOAL_SHEET_COLUMNS).eq("athlete_id", params.athleteId).eq("group_id", params.groupId).maybeSingle(),
     // The days the client logged food lately ("Food logged: X/7 days"): a little more than a week, so the client's own last 7 days are inside it whatever their time zone.
-    supabase.from("food_log_entries").select("log_date").eq("athlete_id", params.athleteId).eq("group_id", params.groupId).gte("log_date", addDaysToKey(new Date().toISOString().slice(0, 10), -8)).limit(2000),
+    supabase.from("food_log_entries").select("log_date, status, food_source").eq("athlete_id", params.athleteId).eq("group_id", params.groupId).gte("log_date", addDaysToKey(new Date().toISOString().slice(0, 10), -8)).limit(2000),
     // The coach's own profile lives in their personal space, which is in no organization: the page around it is the normal coach page of the organization they have open.
     selfView ? getActiveAnchor(supabase, user.id) : Promise.resolve(null),
   ]);
@@ -807,9 +807,9 @@ export default async function AthleteProfilePage(
     "0000-01-01",
     todayKey
   );
-  // "Food logged: X/7 days": days among the client's own last 7 (their time zone, else the business's) with at least one food log entry.
+  // "Food logged: X/7 days": days among the client's own last 7 (their time zone, else the business's) they logged food (not skipped, not imported history: lib/food-log-adherence.ts).
   const clientZone = ((profile?.timezone as string | null | undefined) ?? "").trim() || scheduleTimezone;
-  const foodLoggedCount = foodLoggedDays(((foodLogRows ?? []) as { log_date: string }[]).map((r) => String(r.log_date)), todayKeyInZone(clientZone));
+  const foodLoggedCount = foodLoggedDays((foodLogRows ?? []) as { log_date: string; status: string | null; food_source: string | null }[], todayKeyInZone(clientZone));
 
   const thirtyDaysAgoKey = (() => {
     const d = new Date();

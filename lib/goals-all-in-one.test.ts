@@ -40,12 +40,14 @@ function from(table: string) {
   const rows = () => (store.tables[table] ??= []);
   const run = () => {
     if (op === "insert") {
+      const made: Row[] = [];
       for (const p of Array.isArray(payload) ? payload : [payload]) {
         const row = { id: `${table}-${seq++}`, status: table === "client_goals" ? "proposed" : p.status, created_at: now(), ...p };
         rows().push(row);
+        made.push({ ...row });
         dbNotices(table, "insert", row);
       }
-      return { data: null, error: null };
+      return { data: made, error: null };
     }
     if (op === "update") {
       for (const r of rows().filter((x) => filters.every((f) => f(x)))) {
@@ -73,6 +75,10 @@ function from(table: string) {
     insert: (p: any) => ((op = "insert"), (payload = p), b),
     update: (p: any) => ((op = "update"), (payload = p), b),
     upsert: (p: any) => ((op = "upsert"), (payload = p), b),
+    single: async () => {
+      const r = run();
+      return { data: Array.isArray(r.data) ? r.data[0] ?? null : r.data, error: null };
+    },
     maybeSingle: async () => {
       const r = run();
       // newest first, as the routes ask
@@ -193,6 +199,38 @@ describe("one save writes the goal, the smaller goals and the sheet; the coach w
     expect(store.tables.client_goals).toHaveLength(1);
     // an empty sheet is not saved as filled in
     expect(store.tables.client_goal_sheets).toHaveLength(0);
+    // a goal nobody sent: the coach gets a bell (the database makes none for a client's new goal) and a push, once
+    expect(noticesFor("coach-1")).toEqual([expect.objectContaining({ type: "goal_answered", body: "Robyn Smith set a goal: Muscle gain", link_path: `/groups/${G}/athletes/${A}` })]);
+    expect(store.pushes).toEqual(["coach-1: Robyn Smith set a goal"]);
+  });
+  it("a main goal alone, after the coach sent the goals: the sheet stays waiting and nobody is told the goals were filled in", async () => {
+    caller = "coach-1";
+    role = "coach";
+    await (await import("@/app/api/goal-sheet/send/route")).POST(post({ groupId: G, athleteId: A }));
+    caller = A;
+    role = "client";
+    store.pushes = [];
+    await new Promise((r) => setTimeout(r, 5));
+    const { POST } = await import("@/app/api/goals/route");
+    await POST(post({ groupId: G, athleteId: A, goal: { goalType: "weight_loss" }, subGoals: [], answers: { ...EMPTY_GOAL_SHEET, why_matters: "   " } }));
+    const sheet = store.tables.client_goal_sheets[0];
+    expect(sheet.filled_at).toBeUndefined();
+    expect(goalsCardState(sheet as GoalSheetRow)).toBe("sent");
+    expect(noticesFor("coach-1").map((n) => n.body)).toEqual(["Robyn Smith set a goal: Weight loss"]);
+    expect(noticesFor("coach-1").some((n) => /filled in/.test(n.body))).toBe(false);
+    expect(store.pushes).toEqual(["coach-1: Robyn Smith set a goal"]);
+  });
+  it("the send finds the database's notice by the new goal's own time, never the server's clock; both routes guard a double tap", () => {
+    const send = read("app/api/goal-sheet/send/route.ts");
+    expect(send).toContain('.select("created_at").single()');
+    expect(send).toContain('.gte("created_at", suggestedAt)');
+    expect(send).not.toContain("Date.now() - 5000");
+    expect(read("app/api/goals/route.ts")).not.toContain("Date.now() - 5000");
+    for (const c of ["components/coach/goals-card.tsx", "components/shared/goals-form.tsx"]) {
+      const src = read(c);
+      expect(src).toContain("const inFlight = useRef(false);");
+      expect(src).toContain("inFlight.current = true;");
+    }
   });
   it("the routes check who is asking and save through the caller's own rules", () => {
     const src = read("app/api/goals/route.ts");
@@ -303,15 +341,24 @@ describe("cleaning what the page sends", () => {
 });
 
 describe("Food logged: X/7 days (replaces 'Macro targets set ... actual intake isn't logged yet')", () => {
-  it("counts the days among the client's last 7 with at least one food entry", () => {
-    expect(foodLoggedDays(["2026-11-23", "2026-11-23", "2026-11-20", "2026-11-17", "2026-11-16", "2026-11-24"], "2026-11-23")).toBe(3);
+  it("counts the days among the client's last 7 they logged food: never a skipped meal or history imported from another app", () => {
+    const row = (log_date: string, status: string | null = "quick_log", food_source: string | null = null) => ({ log_date, status, food_source });
+    expect(foodLoggedDays([row("2026-11-23"), row("2026-11-23"), row("2026-11-20"), row("2026-11-17"), row("2026-11-16"), row("2026-11-24")], "2026-11-23")).toBe(3);
     expect(foodLoggedDays([], "2026-11-23")).toBe(0);
+    // review of 5d56dd30: a month imported from MyFitnessPal read 7/7
+    const imported = Array.from({ length: 7 }, (_, i) => row(`2026-11-${String(17 + i).padStart(2, "0")}`, "quick_log", "import"));
+    expect(foodLoggedDays(imported, "2026-11-23")).toBe(0);
+    expect(foodLoggedDays([row("2026-11-22", "skipped"), row("2026-11-21", "ate_it", "usda"), row("2026-11-20", "quick_log", "ai")], "2026-11-23")).toBe(2);
+  });
+  it("uses the same rule as the weekly check-in and Ask Spot (lib/food-log-adherence.ts)", () => {
+    expect(read("lib/goals-all-in-one.ts")).toContain("computeAdherenceDays(loggedDateKeys(entries), todayKey, ADHERENCE_WINDOW_DAYS)");
+    expect(read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx")).toContain('supabase.from("food_log_entries").select("log_date, status, food_source")');
   });
   it("is on the client's page, in the client's time zone, and the old line and its comments are gone", () => {
     const page = read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx");
     expect(page).toContain("Food logged: {foodLoggedCount}/7 days");
     expect(page).toContain("todayKeyInZone(clientZone)");
-    expect(page).toContain('supabase.from("food_log_entries").select("log_date")');
+    expect(page).toContain('supabase.from("food_log_entries").select("log_date, status, food_source")');
     expect(page).not.toContain("Macro targets set");
     expect(page).not.toContain("nothing in this app logs");
   });
