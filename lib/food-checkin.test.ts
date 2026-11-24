@@ -92,6 +92,9 @@ describe("the job only checks the clients it should", () => {
   });
   it("sends at 10 in the client's own morning, never within 7 days of the last one, one per client", () => {
     expect(job).toContain("if (hour !== CHECKIN_LOCAL_HOUR)");
+    // a group in another zone (no zone of their own) only skips that group, not the client's other groups
+    expect(job.slice(job.indexOf("if (hour !== CHECKIN_LOCAL_HOUR)"), job.indexOf("if (hour !== CHECKIN_LOCAL_HOUR)") + 120)).toContain("continue;");
+    expect(read("supabase/migrations/0471_food_checkins.sql")).toContain("create unique index if not exists client_food_checkins_one_a_day");
     expect(job).toContain("if (recent.has(athleteId)) return;");
     expect(job).toContain("return; // one per client, even if several groups qualify");
     // the record before the notices, so the limit sees it

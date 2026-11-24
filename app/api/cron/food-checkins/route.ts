@@ -109,9 +109,10 @@ async function handler(request: Request) {
       } catch {
         continue;
       }
+      // another of their groups may be in a different zone (no zone of their own): only this group waits
       if (hour !== CHECKIN_LOCAL_HOUR) {
         notMorning += 1;
-        return;
+        continue;
       }
 
       const standing = standingForDate(await fetchStandingHistory(db, athleteId, groupId), todayKey);

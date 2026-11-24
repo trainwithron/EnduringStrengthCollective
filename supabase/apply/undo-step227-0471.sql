@@ -3,6 +3,7 @@
 
 begin;
 
+drop index if exists public.client_food_checkins_one_a_day;
 drop table if exists public.client_food_checkins;
 alter table public.client_nutrition_flags drop column if exists checkins_off;
 
@@ -77,6 +78,7 @@ commit;
 -- Check: one row, all true.
 select
   to_regclass('public.client_food_checkins') is null as checkins_table_gone,
+  to_regclass('public.client_food_checkins_one_a_day') is null as one_a_day_index_gone,
   not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'client_nutrition_flags' and column_name = 'checkins_off') as switch_gone,
   (select pg_get_constraintdef(oid) from pg_constraint where conname = 'notifications_type_check' and conrelid = 'public.notifications'::regclass) not like '%food_checkin%' as notice_types_gone,
   md5(replace((select prosrc from pg_proc where oid = 'public.notice_kind_of(text)'::regprocedure), chr(13), '')) = '95fa7b1a9e7db12729dbbafd543e0821' as notice_kinds_as_before;

@@ -37,6 +37,8 @@ create table if not exists public.client_food_checkins (
 );
 create index if not exists client_food_checkins_athlete_sent_idx on public.client_food_checkins (athlete_id, sent_at desc);
 create index if not exists client_food_checkins_group_sent_idx on public.client_food_checkins (group_id, sent_at desc);
+-- At most one a day per client, whatever runs at once (two overlapping job runs both reading "nothing sent yet"): the second insert is refused, and the job sends nothing for it.
+create unique index if not exists client_food_checkins_one_a_day on public.client_food_checkins (athlete_id, ((sent_at at time zone 'UTC')::date));
 
 alter table public.client_food_checkins enable row level security;
 revoke all on public.client_food_checkins from anon;
@@ -153,6 +155,7 @@ select
   exists (select 1 from pg_policy where polrelid = 'public.client_food_checkins'::regclass and polname = 'client_food_checkins_read' and polcmd = 'r'
           and polroles @> array[(select oid from pg_roles where rolname = 'authenticated')]) as client_and_coaches_read,
   has_table_privilege('authenticated', 'public.client_food_checkins', 'select') as signed_in_has_select,
+  to_regclass('public.client_food_checkins_one_a_day') is not null as one_a_day_per_client,
   not has_table_privilege('authenticated', 'public.client_food_checkins', 'insert') and not has_table_privilege('authenticated', 'public.client_food_checkins', 'update')
     and not has_table_privilege('authenticated', 'public.client_food_checkins', 'delete') as signed_in_cannot_write,
   not has_table_privilege('anon', 'public.client_food_checkins', 'select') as anon_cannot_read,

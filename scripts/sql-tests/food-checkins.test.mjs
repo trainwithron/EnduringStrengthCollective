@@ -96,6 +96,18 @@ const as = async (who, sql, params = []) => {
 await db.query(`insert into public.client_food_checkins (athlete_id, group_id, coach_id, trigger) values ($1, $2, $3, 'quiet')`, [robyn, group, coach]);
 await db.query(`insert into public.client_food_checkins (athlete_id, group_id, coach_id, trigger, avg_diff_kcal, days_logged, target_kcal) values ($1, $2, $3, 'off', -412, 5, 2000)`, [sam, otherGroup, otherCoach]);
 const count = (rows) => rows.length;
+// Two job runs at once: the second check-in for the same client on the same UTC day is refused (the job then sends nothing for it); another day is fine.
+const refused = async (sql, params) => {
+  try {
+    await db.query(sql, params);
+    return false;
+  } catch {
+    return true;
+  }
+};
+expect("a second check-in the same day is refused", await refused(`insert into public.client_food_checkins (athlete_id, group_id, coach_id, trigger) values ($1, $2, $3, 'quiet')`, [robyn, group, coach]));
+expect("another day's is fine", !(await refused(`insert into public.client_food_checkins (athlete_id, group_id, coach_id, trigger, sent_at) values ($1, $2, $3, 'quiet', now() - interval '8 days')`, [robyn, group, coach])));
+await db.query(`delete from public.client_food_checkins where athlete_id = $1 and sent_at < now() - interval '1 day'`, [robyn]);
 expect("the client reads their own check-in", count((await as(robyn, `select id from public.client_food_checkins`)).rows) === 1);
 expect("the client never reads another client's", count((await as(robyn, `select id from public.client_food_checkins where athlete_id = $1`, [sam])).rows) === 0);
 expect("the group's coach reads the group's", count((await as(coach, `select id from public.client_food_checkins`)).rows) === 1);

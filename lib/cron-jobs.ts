@@ -68,7 +68,7 @@ export const JOB_ADDED: Record<string, Date> = {
   // Wave 3 C10 went live 06:19 UTC Nov 21 (hourly)
   "requests-digest": new Date("2026-11-21T06:19:00Z"),
   // the food check-in (Nov 24, hourly): judged once it has been deployed
-  "food-checkins": new Date("2026-11-24T00:00:00Z"),
+  "food-checkins": new Date("2026-11-25T00:00:00Z"),
 };
 export const NEW_JOB_GRACE_HOURS = 48;
 
