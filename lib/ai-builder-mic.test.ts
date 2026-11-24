@@ -12,7 +12,7 @@ const mic = read("components/shared/mic-button.tsx");
 describe("voice typing in the AI Program Builder", () => {
   it("the builder box and the Ask why box both have the mic, appending what is said", () => {
     for (const src of [box, panel]) {
-      expect(src).toMatch(/import { MicButton(, stopAllMics)? } from "@/components/shared/mic-button";/);
+      expect(src).toMatch(/import \{ MicButton(, stopAllMics)? \} from "@\/components\/shared\/mic-button";/);
       expect(src).toContain('startLabel="Start voice typing"');
       expect(src).toContain('stopLabel="Stop voice typing"');
       expect(src).toContain("continuous");
