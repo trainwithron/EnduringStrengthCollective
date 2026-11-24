@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-// The first thing on a client's Home until their goal sheet is filled in (Ron, Nov 9: "goals sheet needs to be prompted to clients to complete upon sign in").
+// The first thing on a client's Home until their goals (goal sheet) are filled in, linking to the one goals page (goals, all in one, Nov 23) (Ron, Nov 9: "goals sheet needs to be prompted to clients to complete upon sign in").
 // "Not now" hides it for the rest of that day on this device; it comes back the next day and stops for good once the sheet is filled in (the page only renders it while it is not).
 export function GoalSheetPromptCard({ groupId, athleteId }: { groupId: string; athleteId: string }) {
   const key = `spotlight.goalSheetPrompt.notNow.v1:${athleteId}:${groupId}`;
@@ -20,10 +20,10 @@ export function GoalSheetPromptCard({ groupId, athleteId }: { groupId: string; a
   return (
     <div className="tint-accent rounded-card px-4 py-3 flex items-start justify-between gap-3">
       <div>
-        <p className="font-body text-sm text-chalk">Fill out your goal sheet</p>
-        <p className="font-body text-xs text-steel mt-0.5">A few questions so your coach can build your plan around what you want.</p>
+        <p className="font-body text-sm text-chalk">Fill in your goals</p>
+        <p className="font-body text-xs text-steel mt-0.5">Your main goal and a few questions, so your coach can build your plan around what you want.</p>
         <Link href={`/groups/${groupId}/goal#goal-sheet`} className="inline-flex items-center min-h-11 mt-2 font-body text-sm text-rust-ink underline underline-offset-2">
-          Fill it out
+          Fill them in
         </Link>
       </div>
       <button

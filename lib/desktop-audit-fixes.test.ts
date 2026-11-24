@@ -113,7 +113,7 @@ describe("Needs you on Home", () => {
       base
     );
     expect(items.find((i) => i.kind === "goal_review")).toMatchObject({ href: "/groups/g1/athletes/a2#goal-sheet", profileHref: "/groups/g1/athletes/a2" });
-    expect(read(PROFILE)).toMatch(/<div id=\{GOAL_SHEET_ANCHOR\} className="scroll-mt-24">\s*<GoalSheetSection/);
+    expect(read(PROFILE)).toMatch(/<div id=\{GOAL_SHEET_ANCHOR\} className="scroll-mt-24">\s*<GoalsCard/);
   });
 
   it("D5: 'N more' opens the rest of the ranked list in place, every item with its own button, and closes again", () => {

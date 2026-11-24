@@ -23,7 +23,7 @@ export function buildMoreSections(opts: {
   const g = `/groups/${opts.groupId}`;
   // A coach has no goal page of their own, so that one is for clients only. (There is no public progress page any more: Ron turned it off.)
   const training: MoreLink[] = [
-    ...(opts.isCoach ? [] : [{ label: "My goal", hint: "What you are working toward", href: `${g}/goal` }]),
+    ...(opts.isCoach ? [] : [{ label: "My goals", hint: "Your goals and a few questions for your coach", href: `${g}/goal` }]),
     { label: "1RM calculator", hint: "Estimate a max and see your percentages", href: `${g}/tools/one-rep-max` },
     ...(opts.oneOnOne ? [] : [{ label: "Hall of fame", hint: "The best lifts in the group", href: `${g}/records` }]),
   ];

@@ -28,7 +28,7 @@ import { MessageClientButton } from "@/components/coach/desktop/message-client-b
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { PHONE_SPOTLIGHT } from "@/lib/phone-coach-routes";
 import { NoAccess } from "@/components/shared/no-access";
-import { calorieSeriesWithStanding, standingForDate } from "@/lib/macro-resolution";
+import { calorieSeriesWithStanding } from "@/lib/macro-resolution";
 import { fetchStandingHistory } from "@/lib/standing-macros";
 import { ClientNutrition } from "@/components/coach/nutrition/client-nutrition";
 import { ClientFoodLogOnly } from "@/components/coach/nutrition/client-food-log-only";
@@ -48,12 +48,12 @@ import { pageAll } from "@/lib/page-all";
 import { AssignSessionsControl } from "@/components/coach/assign-sessions-control";
 import { SessionLedgerList } from "@/components/coach/session-ledger-list";
 import { ClientSeriesPanel, type SeriesView } from "@/components/coach/client-series-panel";
-import { getGroupCoachTimezone } from "@/lib/timezone";
+import { addDaysToKey, dateKeyInZone as todayKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { getViewerDisplayTimezone } from "@/lib/display-timezone-server";
 import type { LedgerEntry } from "@/lib/session-ledger";
 import { GoalConfirmationControl } from "@/components/coach/goal-confirmation-control";
-import { SubGoalsSection } from "@/components/shared/sub-goals-section";
-import { GoalSheetSection } from "@/components/shared/goal-sheet-section";
+import { GoalsCard } from "@/components/coach/goals-card";
+import { foodLoggedDays } from "@/lib/goals-all-in-one";
 import { GOAL_SHEET_COLUMNS, type GoalSheetRow } from "@/lib/goal-sheet";
 import type { SubGoalStatus, SubGoalView } from "@/lib/sub-goals";
 import { GoalWaitingOnClient } from "@/components/coach/goal-waiting-on-client";
@@ -104,18 +104,6 @@ import { computeStrengthTaperWeek, computeHeavySingleWeight } from "@/lib/streng
 import { MainLiftPicker } from "@/components/coach/main-lift-picker";
 
 export const metadata = { title: "Client profile" };
-
-// Every date key from `startKey` through `endKey`, inclusive.
-function last7DatesForTargets(startKey: string, endKey: string): string[] {
-  const out: string[] = [];
-  const cursor = new Date(`${startKey}T00:00:00Z`);
-  const end = new Date(`${endKey}T00:00:00Z`);
-  while (cursor <= end) {
-    out.push(cursor.toISOString().slice(0, 10));
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
-  return out;
-}
 
 export default async function AthleteProfilePage(
   props: {
@@ -203,6 +191,7 @@ export default async function AthleteProfilePage(
     { data: parqAckRow },
     { data: subGoalRows },
     { data: goalSheetRow },
+    { data: foodLogRows },
     openAnchor,
   ] = await Promise.all([
     supabase
@@ -214,7 +203,7 @@ export default async function AthleteProfilePage(
     supabase
       .from("group_memberships")
       .select(
-        "joined_at, client_tier, private_from_org, profiles ( id, full_name, avatar_url, claimed_at )"
+        "joined_at, client_tier, private_from_org, profiles ( id, full_name, avatar_url, claimed_at, timezone )"
       )
       .eq("group_id", params.groupId)
       .eq("profile_id", params.athleteId)
@@ -273,7 +262,7 @@ export default async function AthleteProfilePage(
     // page, not repeated on this profile.
     supabase
       .from("client_goals")
-      .select("id, goal_type, custom_label, target_date, priority_note, status, created_by, main_lift_movement_pattern_id")
+      .select("id, goal_type, custom_label, target_date, priority_note, status, created_by, main_lift_movement_pattern_id, event_type, event_priority, weight_class_flag")
       .eq("athlete_id", params.athleteId)
       .eq("group_id", params.groupId)
       .order("created_at", { ascending: false })
@@ -328,9 +317,7 @@ export default async function AthleteProfilePage(
       .eq("group_id", params.groupId)
       .order("logged_date", { ascending: false })
       .limit(1000),
-    // Coach-set calorie targets over time — deliberately the target,
-    // not actual intake, since nothing in this app logs what a client
-    // really ate.
+    // Coach-set calorie targets over time (the target; what the client logged to eat is client_daily_intake below).
     supabase
       .from("daily_macros")
       .select("log_date, calories")
@@ -473,6 +460,8 @@ export default async function AthleteProfilePage(
     selfView
       ? Promise.resolve({ data: null })
       : supabase.from("client_goal_sheets").select(GOAL_SHEET_COLUMNS).eq("athlete_id", params.athleteId).eq("group_id", params.groupId).maybeSingle(),
+    // The days the client logged food lately ("Food logged: X/7 days"): a little more than a week, so the client's own last 7 days are inside it whatever their time zone.
+    supabase.from("food_log_entries").select("log_date, status, food_source").eq("athlete_id", params.athleteId).eq("group_id", params.groupId).gte("log_date", addDaysToKey(new Date().toISOString().slice(0, 10), -8)).limit(2000),
     // The coach's own profile lives in their personal space, which is in no organization: the page around it is the normal coach page of the organization they have open.
     selfView ? getActiveAnchor(supabase, user.id) : Promise.resolve(null),
   ]);
@@ -781,13 +770,10 @@ export default async function AthleteProfilePage(
   const overlayWeight = (weightLogs ?? []).map((w: any) => ({ date: w.logged_date as string, value: Number(w.weight) })).sort((a, b) => a.date.localeCompare(b.date));
   const overlayIntake = (intakeRows ?? []).map((r: any) => ({ date: String(r.log_date), value: Number(r.calories) }));
 
-  // Last-7-days habit compliance — the one piece of this that's actually
-  // measurable today. Macro targets are coach-set but nothing logs what
-  // the athlete actually ate yet, so this deliberately reports "days with
-  // a target set" rather than a fabricated "compliance" number for macros.
+  // Last-7-days habit compliance, and the days the client logged food (Goals all in one, Nov 23: this used to count "days with a macro target set", from before
+  // clients logged what they ate).
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-  const weekStartKey = sevenDaysAgo.toISOString().slice(0, 10);
   const todayKey = new Date().toISOString().slice(0, 10);
   const last7Dates = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(sevenDaysAgo);
@@ -811,9 +797,7 @@ export default async function AthleteProfilePage(
   const totalHabitsDue = habitCompliance.reduce((sum, h) => sum + h.due, 0);
   const totalHabitsCompleted = habitCompliance.reduce((sum, h) => sum + h.completed, 0);
 
-  // Coach-set calorie targets over time — deliberately the target, not
-  // actual intake, since nothing in this app logs what a client really
-  // ate. Reads clean because daily_macros is one row per real calendar
+  // Coach-set calorie targets over time (the target; the client's logged intake is overlayIntake above). Reads clean because daily_macros is one row per real calendar
   // day (upserted, never duplicated) — clearing a day via the new "Clear
   // this day" control removes it here too, so a coach testing numbers
   // doesn't leave a fake point behind.
@@ -823,15 +807,9 @@ export default async function AthleteProfilePage(
     "0000-01-01",
     todayKey
   );
-  // Same rows as above, just the last-7-days slice — one query serves
-  // both instead of a second round trip against the same table/filter.
-  // A day counts as having a target if it has its own row, or the standing
-  // target was already in place on it.
-  const daysWithMacroTarget = last7DatesForTargets(weekStartKey, todayKey).filter(
-    (d) =>
-      (calorieRows ?? []).some((r) => r.log_date === d) ||
-      standingForDate(standingHistory, d)?.calories != null
-  ).length;
+  // "Food logged: X/7 days": days among the client's own last 7 (their time zone, else the business's) they logged food (not skipped, not imported history: lib/food-log-adherence.ts).
+  const clientZone = ((profile?.timezone as string | null | undefined) ?? "").trim() || scheduleTimezone;
+  const foodLoggedCount = foodLoggedDays((foodLogRows ?? []) as { log_date: string; status: string | null; food_source: string | null }[], todayKeyInZone(clientZone));
 
   const thirtyDaysAgoKey = (() => {
     const d = new Date();
@@ -1407,7 +1385,7 @@ export default async function AthleteProfilePage(
           </div>
 
           <div data-tab="overview">
-          {(activeHabits.length > 0 || daysWithMacroTarget > 0) && (
+          {(activeHabits.length > 0 || foodLoggedCount > 0) && (
             <section>
               <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
                 Last 7 Days
@@ -1437,11 +1415,8 @@ export default async function AthleteProfilePage(
                     </div>
                   </div>
                 )}
-                <p className="font-body text-sm text-steel">
-                  Macro targets set: {daysWithMacroTarget}/7 days
-                  <span className="block text-xs mt-0.5">
-                    (tracks whether a target was set — actual intake isn&apos;t logged yet)
-                  </span>
+                <p className="font-body text-sm text-steel" data-food-logged>
+                  Food logged: {foodLoggedCount}/7 days
                 </p>
               </div>
             </section>
@@ -1579,7 +1554,7 @@ export default async function AthleteProfilePage(
           </div>
 
           <div data-tab="overview forms">
-          {latestGoalRow?.status === "proposed" && latestGoalRow.created_by !== params.athleteId && (
+          {selfView && latestGoalRow?.status === "proposed" && latestGoalRow.created_by !== params.athleteId && (
             <section>
               <GoalWaitingOnClient
                 clientName={profile?.full_name ?? "the client"}
@@ -1639,30 +1614,61 @@ export default async function AthleteProfilePage(
           </div>
 
           <div data-tab="overview forms">
-          {!selfView && user && (
-            <SubGoalsSection
-              groupId={params.groupId}
-              athleteId={params.athleteId}
-              viewerId={user.id}
-              otherName={(profile?.full_name ?? "").trim().split(/\s+/)[0] || "your client"}
-              items={subGoals}
-              heading="Goals"
-              mainGoalForm={latestGoalRow?.status !== "proposed" ? <GoalProposalForm athleteId={params.athleteId} groupId={params.groupId} suggestedBy={user.id} /> : undefined}
-            />
-          )}
+          {/* Goals, all in one (Ron, Nov 23): the main goal, the smaller goals and the goal sheet in one card, one status, one send. */}
           {!selfView && user && (
             <div id={GOAL_SHEET_ANCHOR} className="scroll-mt-24">
-            <GoalSheetSection
-              groupId={params.groupId}
-              athleteId={params.athleteId}
-              sheet={(goalSheetRow as GoalSheetRow | null) ?? null}
-              viewer="coach"
-              clientFirstName={(profile?.full_name ?? "").trim().split(/\s+/)[0] || undefined}
-              timeZone={displayZone}
-            />
+              <GoalsCard
+                groupId={params.groupId}
+                athleteId={params.athleteId}
+                viewerId={user.id}
+                clientFirstName={(profile?.full_name ?? "").trim().split(/\s+/)[0] || "your client"}
+                timeZone={displayZone}
+                sheet={(goalSheetRow as GoalSheetRow | null) ?? null}
+                goal={
+                  latestGoalRow
+                    ? {
+                        goalType: latestGoalRow.goal_type,
+                        customLabel: latestGoalRow.custom_label,
+                        targetDate: latestGoalRow.target_date,
+                        eventType: (latestGoalRow.event_type as string | null) ?? null,
+                        eventPriority: (latestGoalRow.event_priority as string | null) ?? null,
+                        weightClassFlag: !!latestGoalRow.weight_class_flag,
+                        status: latestGoalRow.status,
+                        createdBy: latestGoalRow.created_by,
+                      }
+                    : null
+                }
+                subGoals={subGoals}
+                goalControl={
+                  latestGoalRow?.status === "proposed" ? (
+                    latestGoalRow.created_by === params.athleteId ? (
+                      <GoalConfirmationControl
+                        goal={{
+                          id: latestGoalRow.id,
+                          goalType: latestGoalRow.goal_type,
+                          customLabel: latestGoalRow.custom_label,
+                          targetDate: latestGoalRow.target_date,
+                          priorityNote: latestGoalRow.priority_note,
+                        }}
+                      />
+                    ) : (
+                      <GoalWaitingOnClient
+                        clientName={profile?.full_name ?? "the client"}
+                        goal={{
+                          id: latestGoalRow.id,
+                          goalType: latestGoalRow.goal_type,
+                          customLabel: latestGoalRow.custom_label,
+                          targetDate: latestGoalRow.target_date,
+                          priorityNote: latestGoalRow.priority_note,
+                        }}
+                      />
+                    )
+                  ) : undefined
+                }
+              />
             </div>
           )}
-          {latestGoalRow?.status === "proposed" && latestGoalRow.created_by === params.athleteId && (
+          {selfView && latestGoalRow?.status === "proposed" && latestGoalRow.created_by === params.athleteId && (
             <section>
               <GoalConfirmationControl
                 goal={{

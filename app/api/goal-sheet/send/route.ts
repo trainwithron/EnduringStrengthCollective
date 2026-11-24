@@ -4,9 +4,14 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { goalSheetActor } from "@/lib/goal-sheet-server";
 import { sendPushToProfile } from "@/lib/send-push";
+import { cleanMainGoal, goalsPagePath, goalsSentNotice, mainGoalColumns, sameMainGoal } from "@/lib/goals-all-in-one";
 
-// A coach sends a client their goal sheet to fill in: the client is told (bell + push) and their goal page asks them to fill it in. Coaches only.
-// The body is { groupId, athleteId }.
+// A coach sends a client their goals to fill in (Ron, Nov 23: goals, all in one): the main goal, the smaller goals and the goal sheet, on one page. Coaches only.
+// The body is { groupId, athleteId, suggestion?, remind? }.
+//  * suggestion: a main goal the coach suggests first, through the coach-suggests path the database already has (step 0284: the caller's own client, a proposed goal the client
+//    confirms or changes). Left out when a goal is already waiting on someone, or it is the goal they already agreed.
+//  * remind: only the notice again; the sheet keeps the date it was sent.
+// ONE notice (bell + push) either way: when the suggestion made the database's own "Your coach suggested a goal" notice, that notice becomes this one.
 export async function POST(request: Request) {
   const supabase = await createServerClient();
   const {
@@ -22,15 +27,48 @@ export async function POST(request: Request) {
   if (actor?.role !== "coach") return NextResponse.json({ error: "Not found." }, { status: 404 });
   const groupId = body.groupId as string;
   const athleteId = body.athleteId as string;
+  const fail = () => NextResponse.json({ error: "Couldn't send it. Try again." }, { status: 500 });
+  const remind = body.remind === true;
 
-  const { error } = await db
-    .from("client_goal_sheets")
-    .upsert({ athlete_id: athleteId, group_id: groupId, requested_by: user.id, requested_at: new Date().toISOString() }, { onConflict: "athlete_id,group_id" });
-  if (error) return NextResponse.json({ error: "Couldn't send it. Try again." }, { status: 500 });
+  // The suggested goal's own time: the database's notice about it is made in the same transaction, so it has the same created_at (review of 5d56dd30: never the server's clock).
+  let suggestedAt: string | null = null;
+  if (!remind) {
+    const suggestion = cleanMainGoal(body.suggestion);
+    if (suggestion) {
+      const { data: latest, error: readError } = await supabase
+        .from("client_goals")
+        .select("goal_type, custom_label, target_date, event_type, event_priority, weight_class_flag, status")
+        .eq("athlete_id", athleteId)
+        .eq("group_id", groupId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (readError) return fail();
+      const waiting = latest?.status === "proposed";
+      const alreadyAgreed = latest?.status === "confirmed" && sameMainGoal(suggestion, latest);
+      if (!waiting && !alreadyAgreed) {
+        const { data: made, error } = await supabase.from("client_goals").insert({ athlete_id: athleteId, group_id: groupId, ...mainGoalColumns(suggestion), created_by: user.id }).select("created_at").single();
+        if (error || !made) return fail();
+        suggestedAt = made.created_at as string;
+      }
+    }
+    const { error } = await db
+      .from("client_goal_sheets")
+      .upsert({ athlete_id: athleteId, group_id: groupId, requested_by: user.id, requested_at: new Date().toISOString() }, { onConflict: "athlete_id,group_id" });
+    if (error) return fail();
+  }
 
-  // Straight to the sheet, open for writing (audit C12, Nov 21; the page also opens it for writing while this request waits).
-  const path = `/groups/${groupId}/goal?edit=1#goal-sheet`;
-  await db.from("notifications").insert({ profile_id: athleteId, group_id: groupId, type: "goal_proposed", body: "Your coach sent you a goal sheet to fill in.", link_path: path });
-  await sendPushToProfile(db, athleteId, "Your coach sent you a goal sheet", "Open My Goal to fill it in.", path).catch(() => 0);
-  return NextResponse.json({ ok: true });
+  // The one notice, straight to the one page, open for writing (audit C12, Nov 21).
+  const { data: me } = await db.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+  const notice = goalsSentNotice(((me?.full_name as string | null) ?? "").trim().split(/\s+/)[0]);
+  const path = goalsPagePath(groupId);
+  const text = `${notice.title}: ${notice.body}`;
+  const { data: madeNow } = suggestedAt
+    ? await db.from("notifications").select("id").eq("profile_id", athleteId).eq("group_id", groupId).eq("type", "goal_proposed").gte("created_at", suggestedAt).order("created_at", { ascending: false }).limit(1)
+    : { data: [] as { id: string }[] };
+  const row = ((madeNow ?? []) as { id: string }[])[0];
+  if (row) await db.from("notifications").update({ body: text, link_path: path }).eq("id", row.id);
+  else await db.from("notifications").insert({ profile_id: athleteId, group_id: groupId, type: "goal_proposed", body: text, link_path: path });
+  await sendPushToProfile(db, athleteId, notice.title, notice.body, path).catch(() => 0);
+  return NextResponse.json({ ok: true, suggested: suggestedAt != null });
 }

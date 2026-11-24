@@ -14,6 +14,7 @@ describe("the goal sheet prompt on a client's Home", () => {
   it("comes first on Home and opens the sheet itself", () => {
     expect(page.indexOf("<GoalSheetPromptCard")).toBeLessThan(page.indexOf("<AboutYouCard"));
     expect(read("components/athlete/goal-sheet-prompt-card.tsx")).toContain("/goal#goal-sheet");
-    expect(read("components/shared/goal-sheet-section.tsx")).toContain('id="goal-sheet"');
+    expect(read("app/(coach)/groups/[groupId]/goal/page.tsx")).toContain('<section id="goal-sheet"');
+    expect(read("components/athlete/goal-sheet-prompt-card.tsx")).toContain("Fill in your goals");
   });
 });

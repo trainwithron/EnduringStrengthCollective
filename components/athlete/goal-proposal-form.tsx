@@ -49,7 +49,7 @@ export function GoalProposalForm({ athleteId, groupId, suggestedBy, fromWords }:
       return;
     }
     if (suggestedBy) {
-      notifyPush(athleteId, "Your coach suggested a goal", "Open My Goal to confirm it, change it, or say not now.", `/groups/${groupId}/goal`);
+      notifyPush(athleteId, "Your coach suggested a goal", "Open your goals to confirm it, change it, or say not now.", `/groups/${groupId}/goal`);
     }
     setSubmitted(true);
     router.refresh();
@@ -59,7 +59,7 @@ export function GoalProposalForm({ athleteId, groupId, suggestedBy, fromWords }:
     return (
       <p className="font-body text-sm text-moss">
         {suggestedBy
-          ? "Suggested. They'll see it on My Goal and can confirm it, change it, or say not now."
+          ? "Suggested. They'll see it on their goals page and can confirm it, change it, or say not now."
           : "Sent to your coach for confirmation — they'll take it from here."}
       </p>
     );

@@ -5,26 +5,23 @@ import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
-import { GoalProposalForm } from "@/components/athlete/goal-proposal-form";
-import { GoalAnswerControl } from "@/components/athlete/goal-answer-control";
-import { GOAL_TYPE_LABELS, goalStatusWords } from "@/lib/goal-types";
+import { goalStatusWords } from "@/lib/goal-types";
 import { inOwnPersonalSpace } from "@/lib/personal-space";
-import { SubGoalsSection } from "@/components/shared/sub-goals-section";
-import { GoalSheetSection } from "@/components/shared/goal-sheet-section";
-import { GOAL_SHEET_COLUMNS, goalSheetHasAnswers, type GoalSheetRow } from "@/lib/goal-sheet";
+import { GoalsForm } from "@/components/shared/goals-form";
+import { sheetAnswers } from "@/components/shared/goal-sheet-fields";
+import { EMPTY_GOAL_SHEET, GOAL_SHEET_COLUMNS, goalSheetWaitingOnClient, type GoalSheetRow } from "@/lib/goal-sheet";
+import { goalLabel } from "@/lib/goals-all-in-one";
 import type { SubGoalStatus, SubGoalView } from "@/lib/sub-goals";
-import type { GoalType } from "@/lib/goal-reversal";
 
-export const metadata = { title: "Goal" };
+export const metadata = { title: "Your goals" };
 
-// Client always sets/owns the goal (goal_date_aware_nutrition_and_
-// programming_idea.md) — this is deliberately an athlete-only page, not
-// a coach-authored one. The coach confirms from the client's profile
-// page instead of proposing here.
+// "Your goals" (Ron, Nov 23: goals, all in one): the client's main goal, smaller goals and Ron's 7 goal sheet questions on one page, sent to their coach with one button.
+// The client always sets/owns the goal (goal_date_aware_nutrition_and_programming_idea.md): what they choose is proposed and the coach confirms it; a goal the coach suggested is
+// already filled in, theirs to keep (that confirms it), change (it goes back to the coach) or say not now to. Answers already saved show filled in. ?edit=1 ("Update my goal",
+// the coach's notice) opens the same page.
 export default async function GoalPage(props: { params: Promise<{ groupId: string }>; searchParams?: Promise<{ edit?: string }> }) {
   const params = await props.params;
-  // ?edit=1: "Update my goal" and the coach's goal sheet notice open the sheet for writing (audit C4 / C12, Nov 21).
-  const startEditing = (await props.searchParams)?.edit === "1";
+  await props.searchParams;
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -42,119 +39,87 @@ export default async function GoalPage(props: { params: Promise<{ groupId: strin
 
   // A coach in their OWN personal space sets their own goal there.
   if (membership?.role !== "athlete" && !(await inOwnPersonalSpace(supabase, params.groupId, user.id))) {
-    return (
-      <NoAccess>This page is for clients to set their own goal.</NoAccess>
-    );
+    return <NoAccess>This page is for clients to set their own goals.</NoAccess>;
   }
 
-  const { data: goals } = await supabase
-    .from("client_goals")
-    .select("id, goal_type, custom_label, target_date, priority_note, status, created_by, created_at")
-    .eq("athlete_id", user.id)
-    .eq("group_id", params.groupId)
-    .order("created_at", { ascending: false });
-
-  const { data: subGoalRows } = await supabase
-    .from("client_sub_goals")
-    .select("id, title, target_date, proposed_by, status")
-    .eq("athlete_id", user.id)
-    .eq("group_id", params.groupId)
-    .order("created_at", { ascending: true });
+  const [{ data: goals }, { data: subGoalRows }, { data: goalSheetRow }, { data: coachRows }] = await Promise.all([
+    supabase
+      .from("client_goals")
+      .select("id, goal_type, custom_label, target_date, priority_note, status, created_by, created_at, event_type, event_priority, weight_class_flag")
+      .eq("athlete_id", user.id)
+      .eq("group_id", params.groupId)
+      .order("created_at", { ascending: false }),
+    supabase.from("client_sub_goals").select("id, title, target_date, proposed_by, status").eq("athlete_id", user.id).eq("group_id", params.groupId).order("created_at", { ascending: true }),
+    // before step 197 there is no such table: read as none, and the questions show empty
+    supabase.from("client_goal_sheets").select(GOAL_SHEET_COLUMNS).eq("athlete_id", user.id).eq("group_id", params.groupId).maybeSingle(),
+    supabase.from("group_memberships").select("profile_id, profiles ( full_name )").eq("group_id", params.groupId).eq("role", "coach"),
+  ]);
   const subGoals: SubGoalView[] = ((subGoalRows ?? []) as any[]).map((r: any) => ({ id: r.id as string, title: r.title as string, targetDate: (r.target_date as string | null) ?? null, proposedBy: r.proposed_by as string, status: r.status as SubGoalStatus }));
+  const sheet = (goalSheetRow as GoalSheetRow | null) ?? null;
 
-  // The goal sheet (before step 197 there is no such table: read as none, and the section shows empty)
-  const { data: goalSheetRow } = await supabase.from("client_goal_sheets").select(GOAL_SHEET_COLUMNS).eq("athlete_id", user.id).eq("group_id", params.groupId).maybeSingle();
-  // The sheet goes first while it has no answers yet (CL19).
-  const sheetFirst = !goalSheetHasAnswers((goalSheetRow as GoalSheetRow | null) ?? null);
+  // The coach the button sends to: the one who sent the goals, else the group's first coach.
+  const coaches = ((coachRows ?? []) as any[]).map((c: any) => ({ id: c.profile_id as string, name: ((Array.isArray(c.profiles) ? c.profiles[0]?.full_name : c.profiles?.full_name) as string | null) ?? "" }));
+  const coach = coaches.find((c) => c.id === sheet?.requested_by) ?? coaches.find((c) => c.id !== user.id) ?? null;
+  const coachFirst = coach?.name.trim().split(/\s+/)[0] || "your coach";
 
   const current = (goals ?? [])[0] ?? null;
-  // A goal their coach suggested and the client has not answered yet.
-  const suggested = current && current.status === "proposed" && current.created_by !== user.id ? current : null;
-  const { data: coachRows } = suggested
-    ? await supabase.from("group_memberships").select("profile_id").eq("group_id", params.groupId).eq("role", "coach")
-    : { data: [] as { profile_id: string }[] };
   const history = (goals ?? []).slice(1);
-
-  function labelFor(goalType: string, customLabel: string | null) {
-    return goalType === "custom" && customLabel ? customLabel : GOAL_TYPE_LABELS[goalType as GoalType] ?? goalType;
-  }
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
-        <Link
-          href={`/groups/${params.groupId}/more`}
-          className="min-h-11 inline-flex items-center font-body text-xs text-steel uppercase tracking-wide"
-        >
+        <Link href={`/groups/${params.groupId}/more`} className="min-h-11 inline-flex items-center font-body text-xs text-steel uppercase tracking-wide">
           &larr; More
         </Link>
-        <h1 className="font-display font-bold text-3xl leading-none mt-3 uppercase">My Goal</h1>
+        <h1 className="font-display font-bold text-3xl leading-none mt-3 uppercase">Your goals</h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[60ch]">
-          Set what you&apos;re actually working toward — your coach sees it and confirms it before it changes
+          Your main goal, any smaller goals, and a few questions about you. {coachFirst === "your coach" ? "Your coach" : coachFirst} sees it and confirms your goal before it changes
           anything.
         </p>
+        {goalSheetWaitingOnClient(sheet) && <p className="font-body text-sm text-rust-ink mt-2">{coachFirst === "your coach" ? "Your coach" : coachFirst} asked you to fill this in.</p>}
       </header>
 
-      <section className="px-5 pt-6">
-      {/* Not filled in yet: the goal sheet first, the thing the client usually came for ("Fill out your goal sheet"; CL19, Nov 21). */}
-      {sheetFirst && <GoalSheetSection groupId={params.groupId} athleteId={user.id} sheet={(goalSheetRow as GoalSheetRow | null) ?? null} viewer="client" startEditing={startEditing} />}
-      {suggested && (
-        <GoalAnswerControl
-          goal={{
-            id: suggested.id,
-            goalType: suggested.goal_type,
-            customLabel: suggested.custom_label,
-            targetDate: suggested.target_date,
-            priorityNote: suggested.priority_note,
-          }}
+      <section id="goal-sheet" className="px-5 pt-6 max-w-xl scroll-mt-4">
+        <GoalsForm
           groupId={params.groupId}
-          coachIds={(coachRows ?? []).map((c: { profile_id: string }) => c.profile_id)}
+          athleteId={user.id}
+          viewer="client"
+          viewerId={user.id}
+          otherFirstName={coachFirst}
+          goal={
+            current
+              ? {
+                  id: current.id as string,
+                  goalType: current.goal_type as string,
+                  customLabel: (current.custom_label as string | null) ?? null,
+                  targetDate: (current.target_date as string | null) ?? null,
+                  eventType: (current.event_type as string | null) ?? null,
+                  eventPriority: (current.event_priority as string | null) ?? null,
+                  weightClassFlag: !!current.weight_class_flag,
+                  status: current.status as string,
+                  createdBy: (current.created_by as string | null) ?? null,
+                }
+              : null
+          }
+          subGoals={subGoals}
+          sheet={sheet ? sheetAnswers(sheet) : EMPTY_GOAL_SHEET}
         />
-      )}
 
-      {current && !suggested && (
-        <div className="border border-steel/20 p-4 mb-6">
-          <p className="font-body text-xs text-steel uppercase tracking-wide font-bold mb-1">
-            {current.status === "confirmed" ? "Current goal" : goalStatusWords(current.status)}
-          </p>
-          <p className="font-body text-lg">{labelFor(current.goal_type, current.custom_label)}</p>
-          {current.target_date && (
-            <p className="font-body text-sm text-steel mt-1">Target date: {current.target_date}</p>
-          )}
-          {current.priority_note && <p className="font-body text-sm text-steel mt-1">{current.priority_note}</p>}
-        </div>
-      )}
-
-      <SubGoalsSection groupId={params.groupId} athleteId={user.id} viewerId={user.id} otherName="your coach" items={subGoals} />
-
-      {!sheetFirst && <GoalSheetSection groupId={params.groupId} athleteId={user.id} sheet={(goalSheetRow as GoalSheetRow | null) ?? null} viewer="client" startEditing={startEditing} />}
-
-      {/* Changing the goal is a tap away, closed until asked for (CL19); with no goal yet it is open, as "Set your goal". */}
-      <details className="group border border-steel/20 p-4 mb-6" open={!current} data-goal-propose>
-        <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden min-h-11 flex items-center justify-between font-display uppercase text-sm tracking-wide text-steel">
-          {current ? "Propose a change" : "Set your goal"}
-          <span aria-hidden="true" className="text-steel group-open:rotate-90 transition-transform">&#9656;</span>
-        </summary>
-        <div className="mt-3">
-          <GoalProposalForm athleteId={user.id} groupId={params.groupId} />
-        </div>
-      </details>
-
-      {history.length > 0 && (
-        <div>
-          <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">History</h2>
-          <div className="divide-y divide-steel/15">
-            {history.map((g) => (
-              <div key={g.id} className="py-2">
-                <p className="font-body text-sm">{labelFor(g.goal_type, g.custom_label)}</p>
-                <p className="font-body text-xs text-steel">
-                  {goalStatusWords(g.status) || g.status} · {new Date(g.created_at).toLocaleDateString()}
-                </p>
-              </div>
-            ))}
+        {history.length > 0 && (
+          <div className="mt-10">
+            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">Earlier goals</h2>
+            <div className="divide-y divide-steel/15">
+              {history.map((g) => (
+                <div key={g.id as string} className="py-2">
+                  <p className="font-body text-sm">{goalLabel(g.goal_type as string, g.custom_label as string | null)}</p>
+                  <p className="font-body text-xs text-steel">
+                    {goalStatusWords(g.status as string) || (g.status as string)} · {new Date(g.created_at as string).toLocaleDateString()}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
       </section>
 
       <BottomTabBar groupId={params.groupId} activeOverride="settings" />

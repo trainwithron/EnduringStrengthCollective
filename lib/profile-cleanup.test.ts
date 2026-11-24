@@ -71,16 +71,16 @@ describe("the message box", () => {
 });
 
 describe("one Goals section", () => {
-  it("the coach's view is titled Goals and one button offers a smaller goal or their main goal, with the existing forms", () => {
-    expect(page).toContain('heading="Goals"');
-    expect(page).toContain("mainGoalForm={latestGoalRow?.status !== \"proposed\" ? <GoalProposalForm");
+  it("the coach's view is ONE Goals card (goals, all in one, Nov 23); the main goal is suggested with the send, not by a separate button", () => {
+    expect(page).toContain("<GoalsCard");
+    expect(page).not.toContain('heading="Goals"');
+    expect(page).not.toContain("mainGoalForm=");
     const section = read("components/shared/sub-goals-section.tsx");
-    expect(section).toContain("Add or suggest a goal");
-    expect(section).toContain("A smaller goal");
-    expect(section).toContain("Suggest their main goal");
-    // the client's own page keeps its title and button
+    expect(section).not.toContain("Suggest their main goal");
+    expect(section).toContain("bare?: boolean;");
     expect(section).toContain("heading = SUB_GOALS_HEADING");
-    expect(section).toContain('"Add a smaller goal"');
+    expect(section).toContain("Add a smaller goal");
+    expect(read("components/coach/goals-card.tsx")).toContain("Suggest a main goal (optional)");
   });
   it("the separate Suggest a goal block is gone for a coach (their own profile keeps Set a goal)", () => {
     expect(page).toContain("{selfView && latestGoalRow?.status !== \"proposed\" && (");
