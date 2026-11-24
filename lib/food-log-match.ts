@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadFoodDetail, type FoodHit } from "@/lib/food-search";
 import { runFoodSearch, type FoodSearchResult } from "@/lib/food-search-run";
 import { GRAMS_PER_OUNCE, type FoodPortion, type NutrientMap } from "@/lib/food-serving";
-import type { PackagedHit } from "@/lib/packaged-foods";
+import { packagedTitle, type PackagedHit } from "@/lib/packaged-foods";
 import { clampMealMacros } from "@/lib/ai-nutrition-clamp";
 import { FOOD_DATABASE_SOURCE, FOOD_ESTIMATE_SOURCE, type QuickLogFoodSource } from "@/lib/food-estimate-source";
 
@@ -120,20 +120,76 @@ function packagedPortions(hit: PackagedHit): FoodPortion[] {
     : [];
 }
 
-// One item: the first everyday USDA food the search finds, else the first packaged one; its numbers scaled to the amount. The estimate when nothing is found or a read fails.
+// How a food is cooked or cut, and the little words: not what the food IS, so a USDA name need not repeat them ("grilled chicken" is "Chicken, baked, broiled, or roasted").
+const NOT_THE_FOOD = new Set([
+  "a", "an", "the", "of", "and", "with", "some", "my", "on", "in", "plain", "fresh", "homemade", "cooked", "raw", "grilled", "baked", "fried", "roasted", "boiled",
+  "steamed", "scrambled", "poached", "sliced", "chopped", "diced", "small", "medium", "large", "big", "piece", "pieces", "serving", "bowl", "plate",
+  // what USDA adds to a name that is not the food either ("Cheese, NFS", "Coffee, brewed"), and package sizes ("CHEERIOS 12 OZ BOX")
+  "nfs", "ns", "brewed", "regular", "oz", "lb", "fl", "ct", "pk", "pack", "box", "bag", "can", "bottle", "jar",
+]);
+
+// The words that say what something IS ("whole milk" → whole, milk; "2 grilled chicken breasts" → chicken, breast; "Boiled egg" → egg).
+export function foodWords(food: string): string[] {
+  return food.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 1 && !NOT_THE_FOOD.has(w) && !/^\d+$/.test(w)).map(singular);
+}
+
+export interface HitNames {
+  // every name of the food: each word of the item must be in one of them
+  names: (string | null | undefined)[];
+  // what the food IS (the plain name's or USDA's first part, the packaged product without its brand): one of them must be nothing BUT the item's words
+  identities: (string | null | undefined)[];
+}
+
+// A found food is that item only both ways (Nov 23, review): every word of the item is in its name, AND what the food is says nothing the item does not. So "whole milk" is
+// "Milk, whole", but a vague "sauce" or "stir fry" is not "Spaghetti with meat sauce" or "Beef and vegetables, stir-fried" (those keep the estimate). When the search read a
+// misspelling the likely way ("Showing results for ..."), those words count.
+export function hitIsTheItem(food: string, hit: HitNames, correctedTo: string | null = null): boolean {
+  const want = foodWords(correctedTo ?? food);
+  if (want.length === 0) return false;
+  const have = new Set(hit.names.flatMap((n) => (n ? foodWords(n) : [])));
+  if (!want.every((w) => have.has(w))) return false;
+  const wanted = new Set(want);
+  return hit.identities.some((id) => {
+    const words = id ? foodWords(id) : [];
+    return words.length > 0 && words.every((w) => wanted.has(w));
+  });
+}
+
+const firstPart = (name: string | null | undefined): string | null => (name ? name.split(",")[0] : null);
+
+// What a packaged product is, without its brand ("General Mills Cheerios" → "Cheerios").
+function productWithoutBrand(hit: PackagedHit): string {
+  const brand = new Set(foodWords(hit.brand ?? ""));
+  return foodWords(hit.description)
+    .filter((w) => !brand.has(w))
+    .join(" ");
+}
+
+const HITS_LOOKED_AT = 5;
+
+// One item: among the first few everyday USDA foods the search finds, the first that is that item; else the first such packaged one; its numbers scaled to the amount. The
+// estimate when nothing found is the item, or a read fails.
 export async function matchFoodItem(supabase: SupabaseClient, item: ParsedFoodItem, search: Search = runFoodSearch, detail: Detail = loadFoodDetail): Promise<MatchedFoodItem> {
   const text = itemText(item);
   const estimate: MatchedFoodItem = { text, calories: whole(item.calories), proteinG: whole(item.proteinG), carbsG: whole(item.carbsG), fatG: whole(item.fatG), matched: false };
   try {
     const found = await search(supabase, item.food);
-    const everyday: FoodHit | undefined = (found.hits ?? []).find((h) => typeof h.per100g.kcal === "number");
+    const everyday: FoodHit | undefined = (found.hits ?? [])
+      .slice(0, HITS_LOOKED_AT)
+      .find(
+        (h) =>
+          typeof h.per100g.kcal === "number" &&
+          hitIsTheItem(item.food, { names: [h.plainName, h.description], identities: [firstPart(h.plainName), firstPart(h.description)] }, found.correctedTo)
+      );
     if (everyday) {
       const d = await detail(supabase, everyday.fdcId);
       const per100g = d && typeof d.per100g.kcal === "number" ? d.per100g : everyday.per100g;
       const m = macrosForGrams(per100g, gramsForItem(item, d?.portions ?? []));
       if (m) return { text, ...m, matched: true };
     }
-    const packaged = found.packaged.find((h) => typeof h.per100g.kcal === "number");
+    const packaged = found.packaged
+      .slice(0, HITS_LOOKED_AT)
+      .find((h) => typeof h.per100g.kcal === "number" && hitIsTheItem(item.food, { names: [packagedTitle(h)], identities: [productWithoutBrand(h)] }, found.correctedTo));
     if (packaged) {
       const m = macrosForGrams(packaged.per100g, gramsForItem(item, packagedPortions(packaged)));
       if (m) return { text, ...m, matched: true };

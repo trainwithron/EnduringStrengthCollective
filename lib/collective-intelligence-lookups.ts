@@ -20,6 +20,8 @@ import { detectMatchedLoadTrend, type ExerciseSessionPoint } from "./matched-loa
 import { computeQuietTier } from "./quiet-client-tier";
 import { GOAL_TYPE_LABELS } from "./goal-types";
 import { isImportedFood } from "./imported-food";
+import { lastDayKeys, loggedDateKeys } from "./food-log-adherence";
+import { dateKeyInZone, getGroupCoachTimezone } from "./timezone";
 
 // Any description embedding an ISO date ("2026-09-09") must also feed the
 // date's own digit groups into numericValues — the numeral guard's regex
@@ -535,15 +537,40 @@ export interface FoodSummaryEntry {
   fat_g: number | null;
 }
 
-// The numbers of the food summary (pure, tested): the days logged in the window and the average per logged day. History brought in from another app and skipped meals do
-// not count (the same rule as the weekly check-in, lib/food-log-adherence.ts).
-export function summarizeFoodLog(entries: FoodSummaryEntry[]): { daysLogged: number; avg: { calories: number; protein: number; carbs: number; fat: number } | null } {
-  const counted = entries.filter((e) => e.status !== "skipped" && !!e.log_date && !isImportedFood(e));
-  const days = new Set(counted.map((e) => e.log_date.slice(0, 10)));
-  if (days.size === 0) return { daysLogged: 0, avg: null };
-  const sum = (k: "calories" | "protein_g" | "carbs_g" | "fat_g") => counted.reduce((s, e) => s + (Number(e[k]) || 0), 0);
-  const per = (n: number) => Math.round(n / days.size);
-  return { daysLogged: days.size, avg: { calories: per(sum("calories")), protein: per(sum("protein_g")), carbs: per(sum("carbs_g")), fat: per(sum("fat_g")) } };
+// The numbers of the food summary (pure, tested), over the client's own last 7 days (`todayKey` is today in their time zone):
+//  * the days logged: lib/food-log-adherence.ts loggedDateKeys, the same rule as the weekly check-in and the client page's "Food logged X/7" (anything not skipped, never
+//    history brought in from another app);
+//  * the average: only over the days with calories written down (a day logged as "coffee" with no numbers still counts as logged, but does not pull the average down).
+export function summarizeFoodLog(
+  entries: FoodSummaryEntry[],
+  todayKey: string
+): { daysLogged: number; daysWithNumbers: number; avg: { calories: number; protein: number; carbs: number; fat: number } | null } {
+  const window = new Set(lastDayKeys(todayKey, FOOD_SUMMARY_DAYS));
+  const daysLogged = new Set(loggedDateKeys(entries).filter((k) => window.has(k))).size;
+  const withNumbers = entries.filter(
+    (e) => e.status !== "skipped" && !!e.log_date && !isImportedFood(e) && window.has(e.log_date.slice(0, 10)) && e.calories != null && Number.isFinite(Number(e.calories))
+  );
+  const numberDays = new Set(withNumbers.map((e) => e.log_date.slice(0, 10)));
+  if (numberDays.size === 0) return { daysLogged, daysWithNumbers: 0, avg: null };
+  const sum = (k: "calories" | "protein_g" | "carbs_g" | "fat_g") => withNumbers.reduce((s, e) => s + (Number(e[k]) || 0), 0);
+  const per = (n: number) => Math.round(n / numberDays.size);
+  return {
+    daysLogged,
+    daysWithNumbers: numberDays.size,
+    avg: { calories: per(sum("calories")), protein: per(sum("protein_g")), carbs: per(sum("carbs_g")), fat: per(sum("fat_g")) },
+  };
+}
+
+// The client's own time zone when it is a real one, else the business's (the same order as the client page's "Food logged X/7").
+export function clientZone(profileZone: string | null | undefined, businessZone: string): string {
+  const z = (profileZone ?? "").trim();
+  if (!z) return businessZone;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: z });
+    return z;
+  } catch {
+    return businessZone;
+  }
 }
 
 // 8. The food log over the last 7 days (Nov 23, Spotters keep up): how many days the client logged and their average calories and macros on those days, against the target the
@@ -552,22 +579,26 @@ export async function getFoodLogSummary(
   supabase: SupabaseClient,
   athlete: ResolvedAthlete
 ): Promise<LookupResult | null> {
-  const [{ data: rows }, { data: target }] = await Promise.all([
+  const [{ data: rows }, { data: target }, { data: profile }, businessZone] = await Promise.all([
     supabase
       .from("food_log_entries")
       .select("log_date, status, food_source, calories, protein_g, carbs_g, fat_g")
       .eq("athlete_id", athlete.athleteId)
       .eq("group_id", athlete.groupId)
-      .gte("log_date", daysAgoKey(FOOD_SUMMARY_DAYS - 1))
-      .limit(500),
+      // a little more than a week of dates, so the client's own last 7 days are inside it whatever their time zone (the days are picked below)
+      .gte("log_date", daysAgoKey(FOOD_SUMMARY_DAYS + 1))
+      .limit(1000),
     supabase
       .from("client_macro_targets")
       .select("calories, protein_g, carbs_g, fat_g")
       .eq("athlete_id", athlete.athleteId)
       .eq("group_id", athlete.groupId)
       .maybeSingle(),
+    supabase.from("profiles").select("timezone").eq("id", athlete.athleteId).maybeSingle(),
+    getGroupCoachTimezone(supabase, athlete.groupId),
   ]);
-  const { daysLogged, avg } = summarizeFoodLog((rows ?? []) as FoodSummaryEntry[]);
+  const todayKey = dateKeyInZone(clientZone((profile as { timezone?: string | null } | null)?.timezone, businessZone));
+  const { daysLogged, daysWithNumbers, avg } = summarizeFoodLog((rows ?? []) as FoodSummaryEntry[], todayKey);
   const numbers: number[] = [daysLogged, FOOD_SUMMARY_DAYS];
   const t = target as { calories: number | null; protein_g: number | null; carbs_g: number | null; fat_g: number | null } | null;
   const hasTarget = !!t && t.calories != null;
@@ -577,14 +608,18 @@ export async function getFoodLogSummary(
   if (hasTarget) numbers.push(Number(t!.calories), Number(t!.protein_g ?? 0), Number(t!.carbs_g ?? 0), Number(t!.fat_g ?? 0));
   if (!avg) {
     return {
-      description: `${athlete.fullName} logged food on 0 of the last ${FOOD_SUMMARY_DAYS} days.${targetText}`,
+      description:
+        daysLogged === 0
+          ? `${athlete.fullName} logged food on 0 of the last ${FOOD_SUMMARY_DAYS} days.${targetText}`
+          : `${athlete.fullName} logged food on ${daysLogged} of the last ${FOOD_SUMMARY_DAYS} days, with no calories written down on those days.${targetText}`,
       numericValues: [0, ...numbers],
       athleteNamesReferenced: [athlete.fullName],
     };
   }
-  numbers.push(avg.calories, avg.protein, avg.carbs, avg.fat);
+  numbers.push(avg.calories, avg.protein, avg.carbs, avg.fat, daysWithNumbers);
+  const over = daysWithNumbers === daysLogged ? "on the days logged" : `on the ${daysWithNumbers} day${daysWithNumbers === 1 ? "" : "s"} with calories written down`;
   return {
-    description: `${athlete.fullName} logged food on ${daysLogged} of the last ${FOOD_SUMMARY_DAYS} days, averaging ${avg.calories} kcal, ${avg.protein} g protein, ${avg.carbs} g carbs and ${avg.fat} g fat on the days logged.${targetText}`,
+    description: `${athlete.fullName} logged food on ${daysLogged} of the last ${FOOD_SUMMARY_DAYS} days, averaging ${avg.calories} kcal, ${avg.protein} g protein, ${avg.carbs} g carbs and ${avg.fat} g fat ${over}.${targetText}`,
     numericValues: numbers,
     athleteNamesReferenced: [athlete.fullName],
   };
