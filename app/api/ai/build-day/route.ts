@@ -1,4 +1,5 @@
 import { readHealthAnswers, HEALTH_READ_FAILED_MESSAGE } from "@/lib/health-answers";
+import { loadClientPlanBlock } from "@/lib/client-plan-context";
 import { freeTierUseOrRefuse } from "@/lib/free-tier-server";
 import { NextResponse } from "next/server";
 import { isBadExerciseName, cleanExerciseName, exerciseNameProblem } from "@/lib/exercise-name-guard";
@@ -157,7 +158,8 @@ export async function POST(request: Request) {
   // What the coach has taught the AI that fits THIS client (the client's notes, level and age band decide which rules reach it).
   const taughtRules = await loadApplicableRules(supabase, user.id, athleteId);
   const taught = learnedBlock(linesFor(taughtRules));
-  const notes = await loadNotesBlock(supabase, user.id, athleteId);
+  // The client's own notes for the AI, then what they said about the plan on their goal sheet (lib/client-plan-context.ts).
+  const notes = [await loadNotesBlock(supabase, user.id, athleteId), await loadClientPlanBlock(supabase, athleteId, groupId)].filter(Boolean).join("\n\n") || null;
   const referenceId = typeof body.referenceClientId === "string" && /^[0-9a-f-]{36}$/i.test(body.referenceClientId) ? body.referenceClientId : null;
   const reference = await loadReferenceBlock(supabase, user.id, referenceId, groupId);
   const [{ data: libraryRows }, { data: aliasRows }] = await Promise.all([

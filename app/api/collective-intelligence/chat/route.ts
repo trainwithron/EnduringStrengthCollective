@@ -6,14 +6,17 @@ import { AiRateLimitedError, aiInputTooLong } from "@/lib/ai-usage";
 import { validateNoHallucinatedNumbers, validateNoNumbers } from "@/lib/coach-briefing-numeral-guard";
 import { validateNoUnresolvedAthleteNames } from "@/lib/coach-chat-name-guard";
 import {
-  resolveAthleteByName,
-  getRosterFullNames,
+  getCoachRoster,
+  matchAthleteInRoster,
   getLastSessionSummary,
   getExerciseTrend,
   getReadinessHistory,
   getLoggingConsistency,
   getRosterLoggingThisWeek,
   getGoalAndNutritionPhaseStatus,
+  getGoalSheetAndSubGoals,
+  getFoodLogSummary,
+  latestHistory,
   type LookupResult,
 } from "@/lib/collective-intelligence-lookups";
 
@@ -34,6 +37,8 @@ const LOOKUP_NAMES = [
   "logging_consistency",
   "roster_logging_this_week",
   "goal_and_nutrition_phase",
+  "goal_sheet_and_sub_goals",
+  "food_log_summary",
 ] as const;
 type LookupName = (typeof LOOKUP_NAMES)[number];
 
@@ -52,6 +57,8 @@ const ROUTER_SYSTEM_PROMPT = `You are the routing layer for Ask Spot, a strength
 - logging_consistency(athleteName): how recently/consistently that athlete has been logging workouts.
 - roster_logging_this_week(): how many of the coach's own clients have logged a workout in the last 7 days.
 - goal_and_nutrition_phase(athleteName): that athlete's current confirmed goal and nutrition phase.
+- goal_sheet_and_sub_goals(athleteName): that athlete's main goal, smaller goals and goal sheet answers (why it matters, success in 90 days, what got in the way before, days a week they can train, how bad they want it and why, how hard they will work).
+- food_log_summary(athleteName): how many of the last 7 days that athlete logged food, and their average calories, protein, carbs and fat on those days against their target.
 
 Rules:
 - Return at most ${MAX_LOOKUPS_PER_TURN} lookups.
@@ -118,17 +125,20 @@ export async function POST(request: Request) {
     threadId = newThread.id;
   }
 
+  // The LATEST messages of the thread, oldest first (Nov 23: it read the first 20 ever, so a long chat lost what was just said).
   const { data: priorMessages } = await supabase
     .from("coach_chat_messages")
     .select("role, body")
     .eq("thread_id", threadId)
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: false })
     .limit(MAX_HISTORY_MESSAGES);
-  const history = priorMessages ?? [];
+  const history = latestHistory(priorMessages);
 
   // Ask Spot answers about the organization the coach is in (the one they chose), never every organization they run.
   const activeAnchor = await getActiveAnchor(supabase, user.id);
   const orgGroupIds = activeAnchor && !activeAnchor.needsChoice ? activeAnchor.groups.filter((g) => g.orgId === activeAnchor.orgId).map((g) => g.id) : [];
+  // The coach's roster in that organization, read once for this turn: every name match, the weekly count and the name guard use it.
+  const roster = await getCoachRoster(supabase, user.id, orgGroupIds);
 
   // Step 1 — router. Decides WHAT to look up; never states a fact itself.
   let requestedLookups: RouterLookupRequest[] = [];
@@ -158,13 +168,13 @@ export async function POST(request: Request) {
     const name = req.name as LookupName;
 
     if (name === "roster_logging_this_week") {
-      const result = await getRosterLoggingThisWeek(supabase, user.id, orgGroupIds);
+      const result = await getRosterLoggingThisWeek(supabase, user.id, orgGroupIds, roster);
       if (result) results.push(result);
       continue;
     }
 
     if (!req.athleteName) continue;
-    const resolution = await resolveAthleteByName(supabase, { coachId: user.id, name: req.athleteName, scopeGroupIds: orgGroupIds });
+    const resolution = matchAthleteInRoster(roster, req.athleteName);
     if (resolution === "not_found") {
       results.push({
         description: `No client matching "${req.athleteName}" was found on this coach's roster.`,
@@ -191,6 +201,8 @@ export async function POST(request: Request) {
       result = await getReadinessHistory(supabase, resolution, req.windowDays ?? 30);
     else if (name === "logging_consistency") result = await getLoggingConsistency(supabase, resolution);
     else if (name === "goal_and_nutrition_phase") result = await getGoalAndNutritionPhaseStatus(supabase, resolution);
+    else if (name === "goal_sheet_and_sub_goals") result = await getGoalSheetAndSubGoals(supabase, resolution);
+    else if (name === "food_log_summary") result = await getFoodLogSummary(supabase, resolution);
 
     if (result) results.push(result);
   }
@@ -199,7 +211,7 @@ export async function POST(request: Request) {
   // carried forward from earlier turns (the guard must never quietly stop
   // checking anything meaningful by turn ten of a conversation).
   const allowedNumbers = results.flatMap((r) => r.numericValues);
-  const rosterFullNames = await getRosterFullNames(supabase, user.id, orgGroupIds);
+  const rosterFullNames = roster.map((a) => a.fullName);
   const referenceableNames = [...new Set(results.flatMap((r) => r.athleteNamesReferenced))];
 
   const factsText =

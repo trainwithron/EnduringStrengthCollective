@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { FOOD_ESTIMATE_SOURCE } from "@/lib/food-estimate-source";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { defaultMealSlot } from "@/lib/food-entry";
 import type { FoodLogEntry } from "./meal-checkoff-list";
@@ -112,6 +113,8 @@ export function PhotoLogFoodButton({
         protein_g: estimate.proteinG,
         carbs_g: estimate.carbsG,
         fat_g: estimate.fatG,
+        // a photo is always an estimate (lib/food-estimate-source.ts; never shown to the client)
+        food_source: FOOD_ESTIMATE_SOURCE,
       })
       .select("id")
       .single();

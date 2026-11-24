@@ -44,7 +44,7 @@ export async function gatherSchedulingSpotterFlags(
       .eq("status", "confirmed")
       .gte("start_at", new Date(now.getTime() - LOOKBACK_DAYS_FOR_GAPS * 86400000).toISOString())
       .lte("start_at", now.toISOString()),
-    supabase.from("spotter_recommendation_feedback").select("dismissal_key, action, created_at, edit_detail").eq("coach_id", coachId).eq("spotter_kind", "calendar").order("created_at", { ascending: false }),
+    supabase.from("spotter_recommendation_feedback").select("dismissal_key, action, created_at, edit_detail").eq("coach_id", coachId).eq("spotter_kind", "calendar").order("created_at", { ascending: false }).limit(300), // the newest 300, like calendar-spotter-gather.ts (Nov 23: it read every row ever)
   ]);
 
   const dismissedKeys = new Set<string>();

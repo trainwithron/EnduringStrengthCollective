@@ -99,10 +99,11 @@ describe("meal and recipe numbers from the AI are believable", () => {
     const none: any = { from: () => ({ select: () => ({ eq: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }) }) }) };
     expect(await userBelongsToAGroup(withGroup, "u")).toBe(true);
     expect(await userBelongsToAGroup(none, "u")).toBe(false);
-    for (const p of ["app/api/ai/parse-food-log/route.ts", "app/api/ai/parse-food-photo/route.ts"]) {
-      expect(src(p), p).toContain("clampMealMacros(parsed)");
-      expect(src(p), p).toContain("userBelongsToAGroup");
-    }
+    for (const p of ["app/api/ai/parse-food-log/route.ts", "app/api/ai/parse-food-photo/route.ts"]) expect(src(p), p).toContain("userBelongsToAGroup");
+    expect(src("app/api/ai/parse-food-photo/route.ts")).toContain("clampMealMacros(parsed)");
+    // the typed quick-log (Nov 23): the foods are looked up, and the entry's totals are clamped where they are added up
+    expect(src("app/api/ai/parse-food-log/route.ts")).toContain("combineItems(matched)");
+    expect(src("lib/food-log-match.ts")).toContain("...clampMealMacros(total)");
     expect(src("app/api/ai/parse-inbody-scan/route.ts")).toContain("userBelongsToAGroup");
     expect(src("app/api/ai/parse-recipe/route.ts")).toContain("clampPer100g(");
     expect(src("app/api/ai/parse-session-nl/route.ts")).toContain("clampAiRow(");

@@ -1,4 +1,5 @@
 import { readHealthAnswers, HEALTH_READ_FAILED_MESSAGE } from "@/lib/health-answers";
+import { loadClientPlanBlock } from "@/lib/client-plan-context";
 import { freeTierUseOrRefuse } from "@/lib/free-tier-server";
 import { safeErrorDetail } from "@/lib/safe-error";
 import { NextResponse } from "next/server";
@@ -211,6 +212,8 @@ export async function POST(request: Request) {
   // group (never take an arbitrary id at face value for a coach-only
   // action like this).
   let injuryContextText: string | null = null;
+  // What this client said about the plan (goal sheet + goals, lib/client-plan-context.ts): only for a real client of this group.
+  let clientPlanText: string | null = null;
   let isYouth = false;
   let ageStatus: "minor" | "adult" | "unknown" = "adult";
   if (typeof athleteId === "string" && athleteId) {
@@ -221,10 +224,12 @@ export async function POST(request: Request) {
       .eq("profile_id", athleteId)
       .maybeSingle();
     if (athleteMembership?.role === "athlete") {
-      const [parQ, { data: noteRow }] = await Promise.all([
+      const [parQ, { data: noteRow }, planText] = await Promise.all([
         readHealthAnswers(supabase, athleteId),
         supabase.from("athlete_notes").select("body").eq("athlete_id", athleteId).eq("group_id", groupId).maybeSingle(),
+        loadClientPlanBlock(supabase, athleteId, groupId),
       ]);
+      clientPlanText = planText;
       // Under 18, or no birthdate on file: the youth protections apply (an unknown age is never treated as an adult).
       ageStatus = effectiveAgeStatus(await athleteAgeStatus(supabase, athleteId), athleteId === user.id);
       isYouth = ageStatus !== "adult";
@@ -390,6 +395,7 @@ export async function POST(request: Request) {
         `This coach's standing preferences, learned from past corrections:\n${preferencesText}\n\n` +
         `Real current training maxes for this roster (RPE-estimated from actual logged sets — only use one of these if the description names that specific athlete or is clearly for them):\n${trainingMaxesText}\n\n` +
         (injuryContextText ? `Athlete injury/health context:\n${injuryContextText}\n\n` : "") +
+        (clientPlanText ? `${clientPlanText}\n\n` : "") +
         `Program description: ${prompt.trim()}`,
       // 8192 truncated mid-JSON on a routine request (8 weeks x 3 days,
       // ~130+ exercise rows) — a program's row count scales with

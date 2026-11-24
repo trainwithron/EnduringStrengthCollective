@@ -18,6 +18,7 @@ function fakeDb(tables: Record<string, any[]>) {
         lte: () => chain,
         not: () => chain,
         order: () => chain,
+        limit: () => chain,
         then: (resolve: any) => resolve({ data: tables[table] ?? [], error: null }),
       };
       return chain;

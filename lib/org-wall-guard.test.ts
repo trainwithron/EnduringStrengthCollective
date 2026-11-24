@@ -132,9 +132,12 @@ describe("Ask Spot, the group switcher, the group dashboard and the View-as-Clie
   it("Ask Spot's roster, name matching and weekly count use only the active organization's groups", () => {
     const route = read("app/api/collective-intelligence/chat/route.ts");
     expect(route).toContain("getActiveAnchor(supabase, user.id)");
-    expect(route).toContain("scopeGroupIds: orgGroupIds");
-    expect(route).toContain("getRosterLoggingThisWeek(supabase, user.id, orgGroupIds)");
-    expect(route).toContain("getRosterFullNames(supabase, user.id, orgGroupIds)");
+    // the roster is read once per turn, for the organization only, and every match, the weekly count and the name guard use it (Nov 23)
+    expect(route).toContain("const roster = await getCoachRoster(supabase, user.id, orgGroupIds)");
+    expect(route).toContain("matchAthleteInRoster(roster, req.athleteName)");
+    expect(route).toContain("getRosterLoggingThisWeek(supabase, user.id, orgGroupIds, roster)");
+    expect(route).toContain("const rosterFullNames = roster.map((a) => a.fullName)");
+    expect(route).not.toContain("resolveAthleteByName(");
     expect(read("lib/collective-intelligence-lookups.ts")).toContain("filter((id) => !scopeGroupIds || scopeGroupIds.includes(id))");
   });
   it("the group switcher lists only the open organization's groups; the picker lists only its clients", () => {

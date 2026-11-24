@@ -19,6 +19,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { detectMatchedLoadTrend, type ExerciseSessionPoint } from "./matched-load-trend";
 import { computeQuietTier } from "./quiet-client-tier";
 import { GOAL_TYPE_LABELS } from "./goal-types";
+import { isImportedFood } from "./imported-food";
 
 // Any description embedding an ISO date ("2026-09-09") must also feed the
 // date's own digit groups into numericValues — the numeral guard's regex
@@ -47,7 +48,8 @@ export interface LookupResult {
 }
 
 // `scopeGroupIds`: the groups of the organization the coach is in. Ask Spot answers about THAT organization's clients only (never another organization's), so the roster is limited to them.
-async function getCoachRoster(
+// The chat reads it ONCE per turn and passes it to every name match and the roster count (Nov 23, Spotters keep up: it used to be read again for every lookup and for the name guard).
+export async function getCoachRoster(
   supabase: SupabaseClient,
   coachId: string,
   scopeGroupIds?: string[]
@@ -85,8 +87,12 @@ export async function resolveAthleteByName(
   supabase: SupabaseClient,
   params: { coachId: string; name: string; scopeGroupIds?: string[] }
 ): Promise<AthleteResolution> {
-  const roster = await getCoachRoster(supabase, params.coachId, params.scopeGroupIds);
-  const needle = params.name.trim().toLowerCase();
+  return matchAthleteInRoster(await getCoachRoster(supabase, params.coachId, params.scopeGroupIds), params.name);
+}
+
+// The same match on a roster already read this turn.
+export function matchAthleteInRoster(roster: ResolvedAthlete[], name: string): AthleteResolution {
+  const needle = name.trim().toLowerCase();
   if (!needle) return "not_found";
 
   const exact = roster.filter((a) => a.fullName.toLowerCase() === needle);
@@ -109,6 +115,11 @@ export async function getRosterFullNames(
 ): Promise<string[]> {
   const roster = await getCoachRoster(supabase, coachId, scopeGroupIds);
   return roster.map((a) => a.fullName);
+}
+
+// The chat history: read newest first (so the limit keeps the latest), shown oldest first (route.ts).
+export function latestHistory<T>(newestFirst: T[] | null | undefined): T[] {
+  return [...(newestFirst ?? [])].reverse();
 }
 
 function daysAgoKey(days: number): string {
@@ -150,6 +161,8 @@ export async function getLastSessionSummary(
   };
 }
 
+export const EXERCISE_TREND_DAYS = 180;
+
 // 2. The direct fix for "I don't have a signal for that yet" — reports the
 // real recent history for one exercise even when it falls short of the
 // daily briefing's stricter 3-session-streak threshold, so the chat can
@@ -175,6 +188,8 @@ export async function getExerciseTrend(
     .not("rpe", "is", null)
     .eq("session_exercises.exercise_name", exerciseName)
     .eq("session_exercises.athlete_sessions.athlete_id", athlete.athleteId)
+    // the last 180 days only (Nov 23: it read every set ever logged on the exercise; the answer shows the last 5 sessions and the trend needs a few)
+    .gte("completed_at", new Date(Date.now() - EXERCISE_TREND_DAYS * 86400000).toISOString())
     .order("completed_at", { ascending: true });
 
   const topSetBySession = new Map<
@@ -334,9 +349,10 @@ export async function getLoggingConsistency(
 export async function getRosterLoggingThisWeek(
   supabase: SupabaseClient,
   coachId: string,
-  scopeGroupIds?: string[]
+  scopeGroupIds?: string[],
+  rosterReadThisTurn?: ResolvedAthlete[]
 ): Promise<LookupResult | null> {
-  const roster = await getCoachRoster(supabase, coachId, scopeGroupIds);
+  const roster = rosterReadThisTurn ?? (await getCoachRoster(supabase, coachId, scopeGroupIds));
   if (roster.length === 0) {
     return {
       description: "This coach has no athletes on their roster yet.",
@@ -373,6 +389,8 @@ export async function getGoalAndNutritionPhaseStatus(
       .from("client_goals")
       .select("goal_type, status, confirmed_at")
       .eq("athlete_id", athlete.athleteId)
+      // the goal in this client's group, never one from another group (a client can be in two groups with two coaches)
+      .eq("group_id", athlete.groupId)
       .eq("status", "confirmed")
       .order("confirmed_at", { ascending: false })
       .limit(1)
@@ -381,6 +399,7 @@ export async function getGoalAndNutritionPhaseStatus(
       .from("nutrition_checkins")
       .select("phase, created_at")
       .eq("athlete_id", athlete.athleteId)
+      .eq("group_id", athlete.groupId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -403,6 +422,170 @@ export async function getGoalAndNutritionPhaseStatus(
   return {
     description: `${athlete.fullName}'s ${parts.join(", ")}.`,
     numericValues: [],
+    athleteNamesReferenced: [athlete.fullName],
+  };
+}
+
+// Every number written into a description, so the numeral guard lets an answer repeat what the client wrote ("lose 20 lbs by June").
+export function numbersInText(...texts: (string | null | undefined)[]): number[] {
+  return texts.flatMap((t) => (t ? (t.match(/\d+(\.\d+)?/g) ?? []).map(Number) : []));
+}
+
+// Quoted, on one line, at most 300 characters: a client's own words in a description.
+function quoteAnswer(text: string | null | undefined): string | null {
+  const t = (text ?? "").replace(/\s+/g, " ").trim();
+  return t ? `"${t.length > 300 ? `${t.slice(0, 297)}...` : t}"` : null;
+}
+
+// 7. The goal sheet and the smaller goals (Nov 23, Spotters keep up): the main goal, the smaller goals that are not declined, and the client's answers on the goal sheet. The
+// 3-day food recall stays out (it is the nutrition view's).
+export async function getGoalSheetAndSubGoals(
+  supabase: SupabaseClient,
+  athlete: ResolvedAthlete
+): Promise<LookupResult | null> {
+  const [{ data: goal }, { data: subGoals }, { data: sheet }] = await Promise.all([
+    supabase
+      .from("client_goals")
+      .select("goal_type, custom_label, target_date, status")
+      .eq("athlete_id", athlete.athleteId)
+      .eq("group_id", athlete.groupId)
+      .in("status", ["confirmed", "proposed"])
+      // a confirmed goal before a proposed one (alphabetical), then the newest
+      .order("status", { ascending: true })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("client_sub_goals")
+      .select("title, status, target_date")
+      .eq("athlete_id", athlete.athleteId)
+      .eq("group_id", athlete.groupId)
+      .neq("status", "declined")
+      .order("created_at", { ascending: true })
+      .limit(20),
+    supabase
+      .from("client_goal_sheets")
+      .select("why_matters, success_90_days, obstacles, days_per_week, want_score, want_why, work_willing")
+      .eq("athlete_id", athlete.athleteId)
+      .eq("group_id", athlete.groupId)
+      .maybeSingle(),
+  ]);
+
+  const parts: string[] = [];
+  const numbers: number[] = [];
+  if (goal) {
+    const label = goal.goal_type === "custom" && goal.custom_label ? goal.custom_label : GOAL_TYPE_LABELS[goal.goal_type as keyof typeof GOAL_TYPE_LABELS] ?? goal.goal_type;
+    const by = goal.target_date ? ` by ${String(goal.target_date).slice(0, 10)}` : "";
+    parts.push(`main goal (${goal.status === "confirmed" ? "confirmed" : "proposed, not yet confirmed"}): ${label}${by}`);
+    numbers.push(...numbersInText(label));
+    if (goal.target_date) numbers.push(...dateAllowedNumbers(String(goal.target_date)));
+  }
+  const subs = (subGoals ?? []) as { title: string; status: string; target_date: string | null }[];
+  if (subs.length > 0) {
+    const listed = subs.map((s) => `${s.title}${s.status === "done" ? " (done)" : s.status === "proposed" ? " (proposed)" : ""}${s.target_date ? ` by ${s.target_date.slice(0, 10)}` : ""}`);
+    parts.push(`smaller goals: ${listed.join("; ")}`);
+    for (const s of subs) {
+      numbers.push(...numbersInText(s.title));
+      if (s.target_date) numbers.push(...dateAllowedNumbers(s.target_date));
+    }
+  }
+  if (sheet) {
+    const answers: string[] = [];
+    const add = (label: string, text: string | null | undefined) => {
+      const q = quoteAnswer(text);
+      if (q) {
+        answers.push(`${label} ${q}`);
+        numbers.push(...numbersInText(text));
+      }
+    };
+    add("why it matters:", sheet.why_matters);
+    add("success in 90 days:", sheet.success_90_days);
+    add("what got in the way before:", sheet.obstacles);
+    if (sheet.days_per_week != null) {
+      answers.push(`can realistically train ${sheet.days_per_week} days a week`);
+      numbers.push(sheet.days_per_week, 7);
+    }
+    if (sheet.want_score != null) {
+      answers.push(`how bad they want it: ${sheet.want_score} out of 10`);
+      numbers.push(sheet.want_score, 10);
+    }
+    add("why that number:", sheet.want_why);
+    add("how hard they will work:", sheet.work_willing);
+    if (answers.length > 0) {
+      parts.push(`goal sheet answers: ${answers.join("; ")}`);
+      numbers.push(90);
+    }
+  }
+
+  if (parts.length === 0) {
+    return { description: `${athlete.fullName} has no goal, smaller goals or goal sheet answers on file.`, numericValues: [], athleteNamesReferenced: [athlete.fullName] };
+  }
+  return { description: `${athlete.fullName}'s ${parts.join(". ")}.`, numericValues: numbers, athleteNamesReferenced: [athlete.fullName] };
+}
+
+export const FOOD_SUMMARY_DAYS = 7;
+
+export interface FoodSummaryEntry {
+  log_date: string;
+  status: string | null;
+  food_source: string | null;
+  calories: number | null;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
+}
+
+// The numbers of the food summary (pure, tested): the days logged in the window and the average per logged day. History brought in from another app and skipped meals do
+// not count (the same rule as the weekly check-in, lib/food-log-adherence.ts).
+export function summarizeFoodLog(entries: FoodSummaryEntry[]): { daysLogged: number; avg: { calories: number; protein: number; carbs: number; fat: number } | null } {
+  const counted = entries.filter((e) => e.status !== "skipped" && !!e.log_date && !isImportedFood(e));
+  const days = new Set(counted.map((e) => e.log_date.slice(0, 10)));
+  if (days.size === 0) return { daysLogged: 0, avg: null };
+  const sum = (k: "calories" | "protein_g" | "carbs_g" | "fat_g") => counted.reduce((s, e) => s + (Number(e[k]) || 0), 0);
+  const per = (n: number) => Math.round(n / days.size);
+  return { daysLogged: days.size, avg: { calories: per(sum("calories")), protein: per(sum("protein_g")), carbs: per(sum("carbs_g")), fat: per(sum("fat_g")) } };
+}
+
+// 8. The food log over the last 7 days (Nov 23, Spotters keep up): how many days the client logged and their average calories and macros on those days, against the target the
+// coach set.
+export async function getFoodLogSummary(
+  supabase: SupabaseClient,
+  athlete: ResolvedAthlete
+): Promise<LookupResult | null> {
+  const [{ data: rows }, { data: target }] = await Promise.all([
+    supabase
+      .from("food_log_entries")
+      .select("log_date, status, food_source, calories, protein_g, carbs_g, fat_g")
+      .eq("athlete_id", athlete.athleteId)
+      .eq("group_id", athlete.groupId)
+      .gte("log_date", daysAgoKey(FOOD_SUMMARY_DAYS - 1))
+      .limit(500),
+    supabase
+      .from("client_macro_targets")
+      .select("calories, protein_g, carbs_g, fat_g")
+      .eq("athlete_id", athlete.athleteId)
+      .eq("group_id", athlete.groupId)
+      .maybeSingle(),
+  ]);
+  const { daysLogged, avg } = summarizeFoodLog((rows ?? []) as FoodSummaryEntry[]);
+  const numbers: number[] = [daysLogged, FOOD_SUMMARY_DAYS];
+  const t = target as { calories: number | null; protein_g: number | null; carbs_g: number | null; fat_g: number | null } | null;
+  const hasTarget = !!t && t.calories != null;
+  const targetText = hasTarget
+    ? ` Their target is ${t!.calories} kcal, ${t!.protein_g ?? 0} g protein, ${t!.carbs_g ?? 0} g carbs, ${t!.fat_g ?? 0} g fat.`
+    : " No calorie target is set.";
+  if (hasTarget) numbers.push(Number(t!.calories), Number(t!.protein_g ?? 0), Number(t!.carbs_g ?? 0), Number(t!.fat_g ?? 0));
+  if (!avg) {
+    return {
+      description: `${athlete.fullName} logged food on 0 of the last ${FOOD_SUMMARY_DAYS} days.${targetText}`,
+      numericValues: [0, ...numbers],
+      athleteNamesReferenced: [athlete.fullName],
+    };
+  }
+  numbers.push(avg.calories, avg.protein, avg.carbs, avg.fat);
+  return {
+    description: `${athlete.fullName} logged food on ${daysLogged} of the last ${FOOD_SUMMARY_DAYS} days, averaging ${avg.calories} kcal, ${avg.protein} g protein, ${avg.carbs} g carbs and ${avg.fat} g fat on the days logged.${targetText}`,
+    numericValues: numbers,
     athleteNamesReferenced: [athlete.fullName],
   };
 }

@@ -61,6 +61,7 @@ import { PhaseReviewCard, type PhaseReviewCardProps } from "@/components/coach/n
 import { buildPhaseReview, pathAssessment, reviewWindowStart } from "@/lib/phase-review";
 import { factsFromReview, draftsFor } from "@/lib/phase-review-drafts";
 import { resultLines, stanceLine, verdictLine } from "@/lib/phase-review-view";
+import { FoodRecallNote, type FoodRecall } from "@/components/coach/nutrition/food-recall-note";
 
 const PHASE_TAG_LABEL: Record<MilestonePhaseTag, string> = { reverse_diet: "Reverse diet", cut: "Cut", bulk: "Bulk" };
 
@@ -94,6 +95,10 @@ export async function ClientNutrition({
   // The target in force TODAY (what the editor shows and edits); a target scheduled for a later date is listed separately and is not mistaken for the current one.
   const standingTarget = standingForDate(standingHistory, todayKey);
   const scheduledTargets = standingHistory.filter((r) => r.effective_from > todayKey).map((r) => ({ date: r.effective_from, calories: r.calories }));
+  // The goal sheet's 3-day eating recall: shown under This week only when nothing is logged this week (Nov 23). Read alongside everything below; a failed read shows nothing.
+  const recallRead = Promise.resolve(
+    supabase.from("client_goal_sheets").select("food_day_1, food_day_2, food_day_3, filled_at").eq("athlete_id", athleteId).eq("group_id", groupId).maybeSingle()
+  ).then(({ data }) => (data as FoodRecall | null) ?? null, () => null);
   // The last 30 days of the food log with each food's vitamins and minerals (the day bars), and what the client really burns; read alongside everything below.
   const nutrientReads = Promise.all([fetchNutrientLog(supabase, athleteId, todayKey), fetchAgeAndSex(supabase, athleteId, todayKey)]).catch(() => null);
 
@@ -514,6 +519,7 @@ export async function ClientNutrition({
   // ---- This week at a glance (the top of the page) ----
   const glance = glanceDays(week, fullTargetFor);
   const nutrientData = await nutrientReads;
+  const recall = await recallRead;
   const nutrientsByDay: Record<string, NutrientBar[]> = {};
   if (nutrientData) {
     const [{ entries }, { age, sex }] = nutrientData;
@@ -613,6 +619,7 @@ export async function ClientNutrition({
             burn={burn}
             clientName={firstName}
           />
+          {week.loggedDays === 0 && <FoodRecallNote recall={recall} firstName={firstName} />}
 
           <div id="check-in" className="scroll-mt-24">
             <h3 className="font-display font-bold text-lg uppercase leading-none mb-2">Weekly check-in</h3>

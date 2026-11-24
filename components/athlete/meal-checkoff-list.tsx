@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { GeneratedMeal } from "@/lib/meal-engine";
 import { FavoriteStar } from "./favorite-star";
+import { FOOD_DATABASE_SOURCE, FOOD_ESTIMATE_SOURCE, type QuickLogFoodSource } from "@/lib/food-estimate-source";
 
 export interface FoodLogEntry {
   id: string;
@@ -227,7 +228,10 @@ export function FreeTextFoodLog({
     proteinG: number;
     carbsG: number;
     fatG: number;
+    // USDA's numbers when every food was found, else an estimate (app/api/ai/parse-food-log, Nov 23); saved with the entry, never shown as a word.
+    foodSource?: QuickLogFoodSource;
   } | null>(null);
+  const fromDatabase = estimate?.foodSource === FOOD_DATABASE_SOURCE;
 
   async function handleEstimate() {
     if (!text.trim()) return;
@@ -268,6 +272,7 @@ export function FreeTextFoodLog({
         protein_g: estimate.proteinG,
         carbs_g: estimate.carbsG,
         fat_g: estimate.fatG,
+        food_source: fromDatabase ? FOOD_DATABASE_SOURCE : FOOD_ESTIMATE_SOURCE,
       })
       .select("id")
       .single();
@@ -331,7 +336,9 @@ export function FreeTextFoodLog({
           <p className="font-body text-xs text-steel mt-1">
             ~{estimate.calories} kcal · {estimate.proteinG}p / {estimate.carbsG}c / {estimate.fatG}f
           </p>
-          <p className="font-body text-xs text-steel mt-1">Rough estimate — not lab-precise.</p>
+          <p className="font-body text-xs text-steel mt-1" data-quick-log-basis>
+            {fromDatabase ? "From the USDA food database, for the amounts you gave." : "Rough estimate — not lab-precise."}
+          </p>
           {error && (
             <p className="font-body text-xs text-rust-ink mt-1" role="alert">
               {error}
