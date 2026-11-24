@@ -30,10 +30,14 @@ export function parseBuildRequest(text: string): BuildRequest {
   let daysPerWeek: number | null = null;
   // A named "N-day split / program / week" is the week's shape and wins over an "N days a week" said about part of it (Ron, Nov 23: "5-day split ... 3 days a week full body ...
   // on the days in between ... core, cardio and mobility" is 5 days, not 3).
-  const d = new RegExp(`${word}\\s*[- ]?\\s*days?\\s*(?:program|split|week)\\b`).exec(t) ?? new RegExp(`${word}\\s*(?:days?|x|sessions?|workouts?)\\s*(?:a|per|/|each|every)\\s*(?:week|wk)`).exec(t);
-  if (d) {
-    const n = numberFrom(d[1]);
-    if (n != null && n >= 1 && n <= 7) daysPerWeek = n;
+  // A named "N-day" over 7 is the program's LENGTH ("a 28-day program, 4 days a week"), not its week: then the "N days a week" wording decides.
+  for (const re of [new RegExp(`${word}\\s*[- ]?\\s*days?\\s*(?:program|split|week)\\b`), new RegExp(`${word}\\s*(?:days?|x|sessions?|workouts?)\\s*(?:a|per|/|each|every)\\s*(?:week|wk)`)]) {
+    const d = re.exec(t);
+    const n = d ? numberFrom(d[1]) : null;
+    if (n != null && n >= 1 && n <= 7) {
+      daysPerWeek = n;
+      break;
+    }
   }
   const finishWeek = /\b(?:finish|complete|fill(?:\s+in)?|rest of|do the rest of)\b[^.]{0,20}\b(?:the|this|that|my)\s+week\b/.test(t) || /\bfinish (?:the )?week\b/.test(t);
   return { weeks, daysPerWeek, finishWeek };

@@ -60,3 +60,11 @@ describe("a flag is shown once", () => {
     expect(box).not.toMatch(/\[\.\.\.prev, \.\.\.\w+\.flags\]/);
   });
 });
+
+describe("a named N-day over 7 is the program's length, not its week (Assistant review)", () => {
+  it("the days-a-week wording still decides", () => {
+    expect(parseBuildRequest("a 28-day program, 4 days a week").daysPerWeek).toBe(4);
+    expect(parseBuildRequest("14-day program 3x a week").daysPerWeek).toBe(3);
+    expect(parseBuildRequest("okay 5-day split we're going to do 3 days a week full body").daysPerWeek).toBe(5);
+  });
+});
