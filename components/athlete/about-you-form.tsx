@@ -8,6 +8,7 @@ import { localDateKey } from "@/lib/date-key";
 import { ACTIVITY_LABELS, ACTIVITY_LEVELS, type ActivityKey } from "@/lib/client-body-profile";
 import { ONBOARDING_GOALS, type GoalType } from "@/lib/goal-to-nutrition-phase";
 import { cmToFtIn, displayWeightValue, parseHeightInput, parseWeightInput, type WeightUnit } from "@/lib/units";
+import { HeightPicker } from "@/components/shared/height-picker";
 
 export interface AboutYouInitial {
   unit: WeightUnit;
@@ -61,7 +62,7 @@ export function AboutYouForm({ athleteId, groupId, initial }: { athleteId: strin
     e.preventDefault();
     setError(null);
     const heightCm = height.trim() ? parseHeightInput(height, unit) : null;
-    if (height.trim() && heightCm == null) return setError(unit === "lb" ? "Height looks wrong. Try 5'10 or 178 cm." : "Height looks wrong. Try 178 (centimetres).");
+    if (height.trim() && heightCm == null) return setError(unit === "lb" ? "Height looks wrong. Pick feet and inches." : "Height looks wrong. Try 178 (centimetres).");
     const weightLbs = weight.trim() ? parseWeightInput(weight, unit) : null;
     if (weight.trim() && weightLbs == null) return setError("Weight looks wrong. Check the number and the unit.");
     let bodyFatPct: number | null = null;
@@ -136,9 +137,9 @@ export function AboutYouForm({ athleteId, groupId, initial }: { athleteId: strin
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label htmlFor="ay-height" className={labelClass}>
-            Height {unit === "lb" ? "(5'10)" : "(cm)"}
+            Height {unit === "lb" ? "" : "(cm)"}
           </label>
-          <input id="ay-height" className={fieldClass} value={height} onChange={(e) => setHeight(e.target.value)} inputMode="text" autoComplete="off" />
+          <HeightPicker id="ay-height" unit={unit} value={height} onChange={setHeight} selectClass={`${fieldClass} flex-1`} inputClass={fieldClass} />
         </div>
         <div>
           <label htmlFor="ay-weight" className={labelClass}>

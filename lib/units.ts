@@ -62,7 +62,8 @@ export function formatHeight(cm: number | null | undefined, unit: WeightUnit): s
 
 // Height typed as centimetres ("178"), or feet and inches ("5'10", "5 10", "5ft 10in"), read as centimetres. Null when it is not between 90 and 250 cm.
 export function parseHeightInput(text: string, unit: WeightUnit): number | null {
-  const t = text.trim().toLowerCase().replace(/,/g, ".");
+  // Phones turn ' and " into curly quotes as you type (iPhone "5’2"; Ron, Nov 23): read them as the straight ones.
+  const t = text.trim().toLowerCase().replace(/,/g, ".").replace(/[‘’′´`]/g, "'").replace(/[“”″]/g, '"');
   let cm: number | null = null;
   const ftIn = /^(\d)\s*(?:'|ft|feet|\s)\s*(\d{1,2}(?:\.\d+)?)?\s*(?:"|in|inches)?$/.exec(t);
   if (unit === "lb" && ftIn) cm = ftInToCm(Number(ftIn[1]), ftIn[2] ? Number(ftIn[2]) : 0);

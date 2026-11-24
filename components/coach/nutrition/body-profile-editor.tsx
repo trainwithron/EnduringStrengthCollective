@@ -6,6 +6,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { ACTIVITY_LEVELS, SHORT_ACTIVITY_LABELS, type ActivityKey } from "@/lib/client-body-profile";
 import { shortDateLabel } from "@/lib/apply-from";
 import { cmToFtIn, formatWeight, parseHeightInput, type WeightUnit } from "@/lib/units";
+import { HeightPicker } from "@/components/shared/height-picker";
 
 const selectClass = "h-10 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust";
 const inputClass = "h-10 w-32 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust";
@@ -52,7 +53,7 @@ export function BodyProfileEditor({
     setError(null);
     setMessage(null);
     const heightCm = height.trim() ? parseHeightInput(height, unit) : null;
-    if (height.trim() && heightCm == null) return setError(unit === "lb" ? "Height looks wrong. Try 5'10 or 178 cm." : "Height looks wrong. Try 178 (centimetres).");
+    if (height.trim() && heightCm == null) return setError(unit === "lb" ? "Height looks wrong. Pick feet and inches." : "Height looks wrong. Try 178 (centimetres).");
     let bodyFatPct: number | null = null;
     const clearBodyFat = !bodyFat.trim() && initial.bodyFatPct != null;
     if (bodyFat.trim()) {
@@ -105,14 +106,26 @@ export function BodyProfileEditor({
           <div className="flex flex-wrap gap-4">
             <label className="font-body text-xs text-steel">
               Units
-              <select value={unit} onChange={(e) => setUnit(e.target.value as WeightUnit)} className={`${selectClass} block mt-1`}>
+              <select
+                value={unit}
+                onChange={(e) => {
+                  // The height already given is converted, not lost.
+                  const next = e.target.value as WeightUnit;
+                  const cm = height.trim() ? parseHeightInput(height, unit) : null;
+                  setUnit(next);
+                  if (cm != null) setHeight(heightText(cm, next));
+                }}
+                className={`${selectClass} block mt-1`}
+              >
                 <option value="lb">Pounds, feet and inches</option>
                 <option value="kg">Kilograms, centimetres</option>
               </select>
             </label>
             <label className="font-body text-xs text-steel">
-              Height {unit === "lb" ? "(5'10)" : "(cm)"}
-              <input value={height} onChange={(e) => setHeight(e.target.value)} className={`${inputClass} block mt-1`} />
+              Height {unit === "lb" ? "" : "(cm)"}
+              <span className="block mt-1">
+                <HeightPicker id="bp-height" unit={unit} value={height} onChange={setHeight} selectClass={selectClass} inputClass={inputClass} />
+              </span>
             </label>
             <label className="font-body text-xs text-steel">
               Sex
