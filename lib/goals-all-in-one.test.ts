@@ -220,6 +220,39 @@ describe("one save writes the goal, the smaller goals and the sheet; the coach w
     expect(noticesFor("coach-1").some((n) => /filled in/.test(n.body))).toBe(false);
     expect(store.pushes).toEqual(["coach-1: Robyn Smith set a goal"]);
   });
+  it("the goal alone first, the answers later: two separate bells, the coach's read one is never rewritten, the second is new and unread", async () => {
+    caller = "coach-1";
+    role = "coach";
+    await (await import("@/app/api/goal-sheet/send/route")).POST(post({ groupId: G, athleteId: A }));
+    caller = A;
+    role = "client";
+    await new Promise((r) => setTimeout(r, 5));
+    const { POST } = await import("@/app/api/goals/route");
+    await POST(post({ groupId: G, athleteId: A, goal: { goalType: "weight_loss" }, subGoals: [], answers: {} }));
+    const first = noticesFor("coach-1")[0];
+    expect(first.body).toBe("Robyn Smith set a goal: Weight loss");
+    first.read_at = "2026-11-23T20:00:00Z";
+    // later: the answers, with the goal as it is (no new goal, so the database makes no notice this time)
+    await new Promise((r) => setTimeout(r, 5));
+    await POST(post({ groupId: G, athleteId: A, goal: { goalType: "weight_loss" }, subGoals: [], answers: { ...EMPTY_GOAL_SHEET, why_matters: "Keep up with my kids" } }));
+    const bells = noticesFor("coach-1");
+    expect(bells).toHaveLength(2);
+    expect(bells[0]).toMatchObject({ body: "Robyn Smith set a goal: Weight loss", read_at: "2026-11-23T20:00:00Z" });
+    expect(bells[1].body).toBe("Robyn Smith filled in their goals.");
+    expect(bells[1].read_at).toBeUndefined();
+    expect(read("app/api/goals/route.ts")).toContain('const dbMadeOne = goalMoved === "confirmed" || goalMoved === "changed";');
+  });
+  it("a new goal and the answers in one save: one notice that says both", async () => {
+    caller = "coach-1";
+    role = "coach";
+    await (await import("@/app/api/goal-sheet/send/route")).POST(post({ groupId: G, athleteId: A }));
+    caller = A;
+    role = "client";
+    await new Promise((r) => setTimeout(r, 5));
+    const { POST } = await import("@/app/api/goals/route");
+    await POST(post({ groupId: G, athleteId: A, goal: { goalType: "muscle_gain" }, subGoals: [], answers: { ...EMPTY_GOAL_SHEET, want_score: 8 } }));
+    expect(noticesFor("coach-1").map((n) => n.body)).toEqual(["Robyn Smith filled in their goals. Robyn Smith set a goal: Muscle gain"]);
+  });
   it("the send finds the database's notice by the new goal's own time, never the server's clock; both routes guard a double tap", () => {
     const send = read("app/api/goal-sheet/send/route.ts");
     expect(send).toContain('.select("created_at").single()');

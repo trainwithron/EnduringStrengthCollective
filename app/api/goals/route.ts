@@ -92,19 +92,26 @@ export async function POST(request: Request) {
       // The coach who sent the goals: one notice. The database's notice about the goal (made just now, if the goal moved) becomes that one notice.
       const coachId = before.requested_by as string;
       const filled = goalsFilledNotice(name);
-      const { data: madeNow } = await db
-        .from("notifications")
-        .select("id, body")
-        .eq("profile_id", coachId)
-        .eq("group_id", groupId)
-        .eq("type", "goal_answered")
-        // since the coach sent the goals (the database's own time, never the server's clock): the database's notice about the goal made by this save is the newest one
-        .gte("created_at", before.requested_at as string)
-        .order("created_at", { ascending: false })
-        .limit(1);
+      // Only a notice THIS save made is rewritten: the database makes one when the client confirms or changes the goal (step 0284). Anything older (say the bell for a goal sent
+      // alone earlier, already read) stays as it is, and this one is a new bell (review of cf892bc5).
+      const dbMadeOne = goalMoved === "confirmed" || goalMoved === "changed";
+      const { data: madeNow } = dbMadeOne
+        ? await db
+            .from("notifications")
+            .select("id, body")
+            .eq("profile_id", coachId)
+            .eq("group_id", groupId)
+            .eq("type", "goal_answered")
+            // since the coach sent the goals (the database's own time, never the server's clock): the database's notice made by this save is the newest one
+            .gte("created_at", before.requested_at as string)
+            .order("created_at", { ascending: false })
+            .limit(1)
+        : { data: [] as { id: string; body: string | null }[] };
       const row = ((madeNow ?? []) as { id: string; body: string | null }[])[0];
+      // a goal the client set new in this save is in the same notice (the database makes none for it)
+      const newGoal = goalMoved === "proposed" && goal ? ` ${name} set a goal: ${goalLabel(goal.goalType, goal.customLabel)}` : "";
       if (row) await db.from("notifications").update({ body: `${filled} ${row.body ?? ""}`.trim(), link_path: coachPath }).eq("id", row.id);
-      else await db.from("notifications").insert({ profile_id: coachId, group_id: groupId, type: "goal_answered", body: filled, link_path: coachPath });
+      else await db.from("notifications").insert({ profile_id: coachId, group_id: groupId, type: "goal_answered", body: `${filled}${newGoal}`, link_path: coachPath });
       await sendCoachPush(db, coachId, "client_activity", `${name} filled in their goals`, "Open their page to read them.", coachPath).catch(() => 0);
     } else if (goalMoved && goal) {
       // The goal alone. The database puts a goal the client confirms or changes on the coaches' bells itself (step 0284); a goal the client sets new it does not, so that bell
