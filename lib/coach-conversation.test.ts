@@ -100,8 +100,8 @@ describe("how it is wired", () => {
     expect(read("app/(coach)/programs/page.tsx")).toContain("<ConversationInviteSection");
     expect(read("components/coach/learned-section.tsx")).toContain('<CoachConversation coachId={coachId} invite="none" entry />');
   });
-  it("the mic is in the Build-with-AI box and the program chat", () => {
+  it("the mic is in the Build-with-AI box and the builder chat", () => {
     expect(read("components/coach/desktop/import-wizard.tsx")).toContain("<MicButton onText={(t) => setAiPrompt(");
-    expect(read("components/coach/desktop/program-chat-panel.tsx")).toContain("<MicButton onText=");
+    expect(read("components/coach/desktop/program-builder-chat.tsx")).toMatch(/<MicButton\s+onText=/);
   });
 });

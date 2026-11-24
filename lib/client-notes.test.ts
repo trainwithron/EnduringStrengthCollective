@@ -89,14 +89,14 @@ describe("how it looks and runs", () => {
     expect(ui).toContain("Your recent requests (kept 30 days)");
     expect(ui).toContain("Delete note");
     expect(ui).not.toContain("clause");
-    expect(read("components/coach/desktop/ai-program-builder-box.tsx")).toContain("{athleteId && <PastAiNotes athleteId={athleteId} groupId={groupId} />}");
+    expect(read("components/coach/desktop/program-builder-chat.tsx")).toContain("{athleteId && <PastAiNotes athleteId={athleteId} groupId={groupId} />}");
   });
   it("the summary is one small call after a run, with its own ceiling, coach-only, for the coach's own client", () => {
     const route = read("app/api/learning/notes/route.ts");
     expect(route).toContain('feature: "client_notes_summary"');
     expect(route).toContain("That client isn't yours.");
     expect(route).toContain("if (said.length < 12 || !isAiConfigured())");
-    expect(read("components/coach/desktop/ai-program-builder-box.tsx")).toContain("rememberForClient();");
+    expect(read("components/coach/desktop/program-builder-chat.tsx")).toContain("rememberForClient();");
     expect(read("lib/ai-usage.ts")).toContain("client_notes_summary: { enforce: true, burstLimit: 12, monthlyCeiling: 600 }");
   });
 });

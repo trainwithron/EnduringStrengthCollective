@@ -14,16 +14,26 @@ describe("sending turns the mic off", () => {
     expect(mic).toMatch(/if \(acceptText\.current\) onTextRef\.current\(text\)/);
   });
 
-  it("the builder's Ask and Resume, Ask why's Explain and the program chat's Send all stop it first", () => {
-    const first = (file: string, fn: RegExp) => {
-      const src = read(file);
+  it("the builder chat's Send and every tap that sends or acts stop it first", () => {
+    const src = read("components/coach/desktop/program-builder-chat.tsx").replace(/\r\n/g, "\n");
+    const first = (fn: RegExp) => {
       const at = src.search(fn);
-      expect(at).toBeGreaterThan(-1);
-      expect(src.slice(at, at + 200)).toMatch(/\{\s*stopAllMics\(\);/);
+      expect(at, String(fn)).toBeGreaterThan(-1);
+      expect(src.slice(at, at + 200), String(fn)).toMatch(/\{\n\s+stopAllMics\(\);/);
     };
-    first("components/coach/desktop/ai-program-builder-box.tsx", /function ask\(skipProgramCheck = false\)/);
-    first("components/coach/desktop/ai-program-builder-box.tsx", /async function resume\(\)/);
-    first("components/coach/desktop/ai-run-panel.tsx", /async function explain\(asked\?: string\)/);
-    first("components/coach/desktop/program-chat-panel.tsx", /async function handleSend\(\)/);
+    for (const fn of [
+      /async function send\(textIn\?: string\)/,
+      /function pause\(\)/,
+      /async function resumeButton\(\)/,
+      /function continueInto\(/,
+      /async function goFromPlan\(/,
+      /function pickRange\(/,
+      /async function applyPreview\(/,
+      /function takeChange\(/,
+    ])
+      first(fn);
+    // the plan's Not now and the Import it / Build from it buttons too
+    expect(src).toContain("onNotNow={() => { stopAllMics();");
+    expect(src.split("stopAllMics();\n                          patch(m.id, { done: true });")).toHaveLength(3);
   });
 });

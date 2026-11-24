@@ -52,11 +52,13 @@ describe("a flag is shown once", () => {
     expect(mergeFlags([], ["1", "2", "3", "4", "5", "6", "7"])).toEqual(["2", "3", "4", "5", "6", "7"]);
   });
   it("the builder merges each day's flags and shows them once", () => {
-    const box = read("components/coach/desktop/ai-program-builder-box.tsx");
-    expect(box).toContain("setFlags((prev) => mergeFlags(prev, result.flags))");
-    expect(box).toContain("setFlags((prev) => mergeFlags(prev, fixed.flags))");
-    expect(box).toContain("Worth a look: {mergeFlags([], flags).slice(-3).join(");
-    expect(box).toContain("Worth a look: {mergeFlags([], preview.flags).join(");
+    const box = read("components/coach/desktop/program-builder-chat.tsx");
+    expect(box).toContain("runFlags.current = mergeFlags(runFlags.current, result.flags, 20);");
+    expect(box).toContain("runFlags.current = mergeFlags(runFlags.current, fixed.flags, 20);");
+    // shown once in the conversation: only lines not already shown, as one message
+    expect(box).toContain("const fresh = runFlags.current.filter((f) => !shownFlags.current.includes(f));");
+    expect(box).toContain('push({ kind: "warn", lines: fresh.slice(-3) });');
+    expect(box).toContain("mergeFlags([], data.flags as string[])");
     expect(box).not.toMatch(/\[\.\.\.prev, \.\.\.\w+\.flags\]/);
   });
 });

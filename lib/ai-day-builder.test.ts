@@ -4,19 +4,19 @@ import { join } from "node:path";
 
 const read = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8").replace(/\r\n/g, "\n");
 
-describe("The AI Program Builder box", () => {
-  const box = read("components/coach/desktop/ai-program-builder-box.tsx");
+describe("The builder chat (the AI Program Builder since Nov 24)", () => {
+  const box = read("components/coach/desktop/program-builder-chat.tsx");
   it("says what Ron approved, and never the word draft", () => {
     for (const text of [
-      "AI Program Builder",
-      "Saved as you go. Nothing reaches the client until you assign it.",
-      "Tell it what to build, or say: finish the week using Day 1",
-      ">\n            Ask\n",
+      "Build with AI",
+      "Nothing reaches the client until you assign it.",
+      "I&apos;ll show the plan first.",
+      "Send",
       "Pause",
       "Resume",
-      "Paused. Tell it what to change, then Resume.",
-      "Done. Your days are in the builder.",
-      "Couldn't build that day. Try Resume, or tell it what to change.",
+      "Paused. Tell me what to change, or press Resume.",
+      "Done. It&apos;s in the builder.",
+      "Couldn't build that day. Try again, or say it another way.",
     ]) expect(box, text).toContain(text);
     expect(box.toLowerCase()).not.toContain("draft");
     expect(read("app/api/ai/build-day/route.ts").toLowerCase()).not.toContain("draft");
@@ -26,8 +26,12 @@ describe("The AI Program Builder box", () => {
     expect(box).toContain("await show(result.workoutId);");
     expect(box).toContain("if (pauseRequested.current)");
     expect(box).toContain("queue.current.shift();");
-    // pausing never removes anything: there is no delete anywhere in the box
-    expect(box).not.toContain(".delete(");
+    // pausing never removes anything: the only delete is "rebuild", after its Do it, and never on a program clients are training on
+    expect(box.split(".delete(")).toHaveLength(2);
+    const del = box.indexOf(".delete(");
+    expect(del).toBeGreaterThan(box.indexOf("if (!msg.rebuild) {"));
+    expect(del).toBeGreaterThan(box.indexOf("if (await readProgramIsFollowed(createBrowserClient(), programId)) {"));
+    expect(box.indexOf("if (!msg.rebuild) {")).toBeGreaterThan(box.indexOf("async function goFromPlan("));
   });
   it("a correction is sent with every later day and fixes only the day it points at", () => {
     expect(box).toContain("corrections.current = [...corrections.current, said];");
@@ -37,12 +41,13 @@ describe("The AI Program Builder box", () => {
   });
   it("sits at the top of the full builder, not the small embedded copy, and the builder draws the day it makes", () => {
     const builder = read("components/coach/desktop/program-builder-desktop.tsx");
-    expect(builder).toContain("<AiProgramBuilderBox");
-    expect(builder).toMatch(/\{!embedded && \(\n\s+<AiProgramBuilderBox/);
+    expect(builder).toContain("<ProgramBuilderChat");
+    expect(builder).toMatch(/\{!embedded && \(\n\s+<div[^>]*>\n\s+<ProgramBuilderChat/);
+    for (const gone of ["AiProgramBuilderBox", "ProgramChatPanel", "AiRunPanel"]) expect(builder, gone).not.toContain(gone);
     expect(builder).toContain("function handleAiDay(day: BuilderDay)");
-    // Import program lives inside the AI box now (above the mic and Ask), not as a link in the toolbar
+    // Import program lives in the chat's header (above the thread and the mic), not as a link in the toolbar
     expect(builder).not.toContain("Import a program");
-    expect(read("components/coach/desktop/ai-program-builder-box.tsx")).toContain("<ProgramImportLauncher groupId={groupId} athleteId={athleteId} orgProgram={orgProgram} programId={programId} />");
+    expect(read("components/coach/desktop/program-builder-chat.tsx")).toContain("<ProgramImportLauncher groupId={groupId} athleteId={athleteId} orgProgram={orgProgram} programId={programId} />");
   });
 });
 

@@ -197,7 +197,7 @@ describe("the review screen's name box", () => {
 describe("where it is wired", () => {
   const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
   it("the builder hands its program to both ways of importing (a file, and pasted text); the panel says when a new program will be made", () => {
-    const box = read("components/coach/desktop/ai-program-builder-box.tsx");
+    const box = read("components/coach/desktop/program-builder-chat.tsx");
     expect(box).toContain("<ProgramImportLauncher groupId={groupId} athleteId={athleteId} orgProgram={orgProgram} programId={programId} />");
     expect(box).toContain("<ProgramImportPanel groupId={groupId} athleteId={athleteId} orgProgram={orgProgram} programId={programId} text={importText}");
     const panel = read("components/coach/desktop/program-import-launcher.tsx");

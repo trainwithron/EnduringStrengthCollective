@@ -97,7 +97,7 @@ describe("where the mobility days go: planned up front, never the model's choice
     expect(route).toContain("const role = mobilityPlan ? planRole(day, mobilityPlan) : mobilityRole({ wanted: wantedMobility, builtMobility, daysLeft });");
     expect(route.indexOf("parseBuildRequest(sayings).daysPerWeek ??")).toBeLessThan(route.indexOf("(Number.isInteger(sentDays)"));
     expect(route).toContain('select("id, group_id, athlete_id, name, training_days")');
-    const box = read("components/coach/desktop/ai-program-builder-box.tsx");
+    const box = read("components/coach/desktop/program-builder-chat.tsx");
     expect(box).toContain("daysInWeek: runPlan.current?.daysPerWeek");
     expect(box).toContain("runPlan.current = { weeks: [week], daysPerWeek: weekDaysFor(existing, { daysPerWeek: lastRequest.current.daysPerWeek }, trainingDaysCount) };");
   });
@@ -121,10 +121,10 @@ describe("a new request always builds the whole week, in order (Ron, Nov 24: onl
   it("a run that has built nothing yet is not a fresh start (Resume carries on)", () => {
     expect(isFreshStart(none, [])).toBe(false);
   });
-  it("the box: Resume starts a new run when the run's days are gone, else plans its queue again from the days there now", () => {
-    const box = read("components/coach/desktop/ai-program-builder-box.tsx");
-    expect(box).toContain("if (said && isNewRequest(said)) startRun(said);\n      else startRun(request.current, said ? [said] : []);");
-    expect(box).toContain("if (runPlan.current) queue.current = replanQueue(existingNow, runPlan.current);");
+  it("the chat: Resume starts over (with the plan first) when the run's days are gone, else plans its queue again from the days there now", () => {
+    const box = read("components/coach/desktop/program-builder-chat.tsx");
+    expect(box).toContain("if (said && isNewRequest(said)) planTurn(said);\n      else startRun(request.current, undefined, said ? [said] : []);");
+    expect(box).toContain("if (runPlan.current) queue.current = replanQueue(existing, runPlan.current);");
     expect(box).toContain("builtByRun.current.push(slot);");
     expect(box).toContain("stopAllMics();");
   });

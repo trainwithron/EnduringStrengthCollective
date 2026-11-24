@@ -24,6 +24,6 @@ describe("A slow AI route that the platform cuts off", () => {
   });
   it("every slow AI route has a platform limit set, and the screens read answers through the calm reader", () => {
     for (const r of ["generate-program", "program-chat", "generate-meal-plan", "parse-workout", "coach-conversation"]) expect(read(`app/api/ai/${r}/route.ts`)).toMatch(/export const maxDuration = \d+;/);
-    for (const c of ["components/coach/desktop/import-wizard.tsx", "components/coach/desktop/program-chat-panel.tsx", "components/coach/desktop/meal-plan-generator.tsx"]) expect(read(c)).toContain("readAiJson(");
+    for (const c of ["components/coach/desktop/import-wizard.tsx", "components/coach/desktop/program-builder-chat.tsx", "components/coach/desktop/meal-plan-generator.tsx"]) expect(read(c)).toContain("readAiJson(");
   });
 });

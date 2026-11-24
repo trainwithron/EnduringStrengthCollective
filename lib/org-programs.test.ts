@@ -76,7 +76,7 @@ describe("what is made as an organization program", () => {
   it("an import from the library or an organization program's builder, and a library Duplicate, stay the organization's", () => {
     expect(read("components/coach/desktop/import-wizard.tsx")).toContain("      orgProgram,\n");
     expect(read("lib/write-imported-program.ts")).toContain("...(input.orgProgram && !input.athleteId ? { org_program: true } : {}),");
-    expect(read("components/coach/desktop/ai-program-builder-box.tsx")).toContain("<ProgramImportLauncher groupId={groupId} athleteId={athleteId} orgProgram={orgProgram} programId={programId} />");
+    expect(read("components/coach/desktop/program-builder-chat.tsx")).toContain("<ProgramImportLauncher groupId={groupId} athleteId={athleteId} orgProgram={orgProgram} programId={programId} />");
     expect(read("components/coach/mobile/spot-builder-panel.tsx")).toContain("orgProgram={!athleteId}");
     expect(read("components/coach/desktop/program-card-menu.tsx")).toContain("await keepOrgProgramMark(supabase, programId, result.programId);");
   });

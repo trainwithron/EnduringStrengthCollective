@@ -81,7 +81,12 @@ describe("the AI does not change a program clients are following", () => {
     expect(calls.length).toBe(3);
   });
 
-  it("the builder box shows the server's sentence", () => {
-    expect(src("components/coach/desktop/ai-program-builder-box.tsx")).toContain("(data.error as string | undefined) ?? COULDNT");
+  it("the builder chat shows the server's sentence, and its rebuild checks the same rule before clearing anything", () => {
+    const chat = src("components/coach/desktop/program-builder-chat.tsx");
+    expect(chat).toContain("(data.error as string | undefined) ?? COULDNT");
+    const check = chat.indexOf("if (await readProgramIsFollowed(createBrowserClient(), programId)) {");
+    expect(check).toBeGreaterThan(-1);
+    expect(check).toBeLessThan(chat.indexOf(".delete("));
+    expect(chat.slice(check, check + 160)).toContain("say(FOLLOWED_PROGRAM_MESSAGE, \"error\");\n          return;");
   });
 });
