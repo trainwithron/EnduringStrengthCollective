@@ -66,7 +66,12 @@ export function parseHeightInput(text: string, unit: WeightUnit): number | null 
   const t = text.trim().toLowerCase().replace(/,/g, ".").replace(/[‘’′´`]/g, "'").replace(/[“”″]/g, '"');
   let cm: number | null = null;
   const ftIn = /^(\d)\s*(?:'|ft|feet|\s)\s*(\d{1,2}(?:\.\d+)?)?\s*(?:"|in|inches)?$/.exec(t);
+  // In feet and inches, two more ways people type it (Ron, Nov 23): all in inches ("62", "62 in", "62 inches") and feet.inches ("5.2" meaning 5'2).
+  const inchesOnly = /^(\d{2}(?:\.\d+)?)\s*(?:"|in|inch|inches)?$/.exec(t);
+  const dotted = /^([3-7])\.(\d{1,2})$/.exec(t);
   if (unit === "lb" && ftIn) cm = ftInToCm(Number(ftIn[1]), ftIn[2] ? Number(ftIn[2]) : 0);
+  else if (unit === "lb" && inchesOnly && Number(inchesOnly[1]) >= 36 && Number(inchesOnly[1]) <= 96) cm = ftInToCm(0, Number(inchesOnly[1]));
+  else if (unit === "lb" && dotted && Number(dotted[2]) <= 11) cm = ftInToCm(Number(dotted[1]), Number(dotted[2]));
   else if (/^\d+(\.\d+)?\s*(cm)?$/.test(t)) cm = round(Number(t.replace(/cm/, "").trim()), 1);
   return cm != null && cm >= 90 && cm <= 250 ? cm : null;
 }

@@ -12,6 +12,15 @@ describe("height", () => {
     expect(parseHeightInput("5′2″", "lb")).toBe(straight);
   });
 
+  it("reads 62 inches and 5.2 as 5 feet 2 in pounds mode", () => {
+    const want = parseHeightInput("5'2", "lb");
+    for (const typed of ["62", "62 in", "62 inches", '62"', "5.2"]) expect(parseHeightInput(typed, "lb")).toBe(want);
+    expect(parseHeightInput("157", "lb")).toBe(157); // three digits stays centimetres
+    expect(parseHeightInput("157 cm", "lb")).toBe(157);
+    expect(parseHeightInput("62", "kg")).toBeNull(); // in centimetres 62 is too short, as before
+    expect(parseHeightInput("5.12", "lb")).toBeNull();
+  });
+
   it("drop-down parts round-trip through the text the forms save", () => {
     expect(heightFromParts("5", "2")).toBe("5'2");
     expect(heightFromParts("6", "")).toBe("6'0");
