@@ -14,7 +14,7 @@ import { LearnLine } from "@/components/coach/desktop/learn-line";
 import { appliedLine, type AppliedRule } from "@/lib/learned-for-prompt";
 import { LikeClientSuggestion } from "@/components/coach/desktop/like-client";
 import { PastAiNotes } from "@/components/coach/desktop/past-ai-notes";
-import { fixTargetFrom, isFreshStart, parseBuildRequest, planSlots, replanQueue, scopeLimitFrom, weekDaysFor } from "@/lib/ai-day-request";
+import { fixTargetFrom, isFreshStart, isNewRequest, parseBuildRequest, planSlots, replanQueue, scopeLimitFrom, weekDaysFor } from "@/lib/ai-day-request";
 import { mergeFlags } from "@/lib/constraint-scan";
 import { WHICH_WEEKS_QUESTION, isEditRequest, isYes, parseWeekRange, type PlannedDay, type WeekRange } from "@/lib/ai-week-edit";
 import type { DaySlot } from "@/lib/ai-day-slots";
@@ -282,11 +282,12 @@ export function AiProgramBuilderBox({
   }
 
   // A new request, planned from what the program has now: the days, in order, and the week's size (sent with every day so the mobility days land where they are planned).
-  function startRun(said: string) {
+  // `keep`: changes that go along from the first day (a correction typed into a run whose days were deleted).
+  function startRun(said: string, keep: string[] = []) {
     request.current = said;
-    corrections.current = [];
+    corrections.current = keep;
     setShownRequest(said);
-    setShownCorrections([]);
+    setShownCorrections(keep);
     token.current = null;
     pauseRequested.current = false;
     setFlags([]);
@@ -337,7 +338,9 @@ export function AiProgramBuilderBox({
     // built days 3 to 5). Otherwise the queue is planned again from the days there now, so a day deleted meanwhile is built again, in order.
     const existingNow = daysRef.current.map((d) => ({ week: d.weekNumber, day: d.dayIndex, hasExercises: d.items.some((i) => i.kind === "exercise") }));
     if (isFreshStart(existingNow, builtByRun.current)) {
-      startRun(said || request.current);
+      // a new request in its own right starts from its own words; a change ("less volume") keeps the run's request and goes along with it (review of 54e68c07)
+      if (said && isNewRequest(said)) startRun(said);
+      else startRun(request.current, said ? [said] : []);
       return;
     }
     if (runPlan.current) queue.current = replanQueue(existingNow, runPlan.current);

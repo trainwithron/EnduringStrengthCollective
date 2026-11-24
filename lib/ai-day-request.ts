@@ -81,6 +81,14 @@ export function planSlots(existing: ExistingDay[], request: BuildRequest, traini
 // a correction to the OLD run, which carried on with its queue (days 3 to 5). Two rules:
 //  * nothing the run built is still there (the week was deleted or cleared): what is typed is a NEW request, planned from scratch (`isFreshStart`);
 //  * otherwise the queue is planned again over the run's weeks from what is there NOW, so a day deleted meanwhile is built again, in order (`replanQueue`).
+// Words that are a request in their own right ("5 day split ...", "4 weeks of ...", "build ...", a program or a split), not a change to the one already given ("less volume").
+// A fresh start takes them as the new request; anything else keeps the run's request and goes along as a change (review of 54e68c07).
+export function isNewRequest(text: string): boolean {
+  const parsed = parseBuildRequest(text);
+  if (parsed.daysPerWeek != null || parsed.weeks != null) return true;
+  return /\b(?:build|create|write|make me|program|split|full[\s-]*body (?:days?|workouts?|program))\b/i.test(text);
+}
+
 export function isFreshStart(existing: ExistingDay[], builtByRun: DaySlot[]): boolean {
   if (builtByRun.length === 0) return false;
   return !builtByRun.some((s) => existing.some((d) => d.week === s.week && d.day === s.day && d.hasExercises));

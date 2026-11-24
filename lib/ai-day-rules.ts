@@ -53,7 +53,7 @@ const NUM: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5
 //  * a count reaches "mobility" only across a short gap (20 characters) with no other number, "to"/"too", "split", "program", "week", "full body", comma or "and" in it;
 //  * phones write "two" as "to" or "too": "to mobility days" is 2 (only right before "mobility day(s)/session(s)");
 //  * the count must be LESS than the week's days (`daysInWeek`, when known); otherwise it is not believed (null), unless the words say all / every day mobility.
-const MOBILITY_GAP_STOP = /\d|\b(?:one|two|three|four|five|six|seven|to|too|and)\b|split|program|week|full\s*body|,/;
+const MOBILITY_GAP_STOP = /\d|\b(?:one|two|three|four|five|six|seven|to|too|and|with)\b|split|program|week|full\s*body|,/;
 export function mobilityDaysWanted(text: string, daysInWeek: number | null = null): number | null {
   const t = text.toLowerCase();
   const word = "(\\d|one|two|three|four|five)";
@@ -119,50 +119,78 @@ export function mobilityDayPlan(daysInWeek: number, wanted: number, named: numbe
   return Array.from({ length: d }, (_, i) => i + 1).filter((n) => !mainDays.has(n));
 }
 
-// The weekdays and day numbers the coach tied to mobility ("mobility Tuesday and Thursday", "Tuesday and Thursday are mobility", "mobility on days 2 and 4"), as days of the week's
-// plan (1-based). A weekday is the program's own training day in that position when the program has a schedule (`trainingDays`, 0 = Sunday), else Monday = day 1. Null when none.
+// The weekdays and day numbers the coach made mobility DAYS, as days of the week's plan (1-based). Only wording that makes the day itself a mobility day counts (review of
+// 54e68c07): "mobility Tuesday and Thursday", "Tuesday and Thursday are mobility", "mobility on days 2 and 4", "mobility days are 2 and 4". Mobility inside a day does not:
+// "add mobility on day 1 as a warm-up", "Wednesday push with mobility". The list stops at a comma or any other word. A weekday is the program's own training day in that position
+// when the program has a schedule (`trainingDays`, 0 = Sunday), else Monday = day 1. Null when none.
 const WEEKDAY_WORDS: [RegExp, number][] = [
   [/^sun(day)?s?$/, 0], [/^mon(day)?s?$/, 1], [/^tue(s|sday)?s?$/, 2], [/^wed(nesday)?s?$/, 3], [/^thu(r|rs|rsday)?s?$/, 4], [/^fri(day)?s?$/, 5], [/^sat(urday)?s?$/, 6],
 ];
-const NAMED_FILLER = new Set(["and", "&", "on", "the", "are", "is", "be", "will", "for", "as", "work", "days", "day", "sessions", "session", "to", "of", "both", "only", "plus"]);
+// before "mobility": the word makes it mobility work inside a day, not a mobility day
+const MOBILITY_INSIDE_BEFORE = new Set(["add", "adding", "include", "including", "with", "plus", "some", "extra", "also", "light", "and"]);
+// right after the list: the mobility is part of that day ("on day 1 as a warm-up", "on day 2 with ...")
+const MOBILITY_INSIDE_AFTER = new Set(["as", "with", "before", "after", "at", "for", "in", "during", "between", "to"]);
+// the words that link a list to "mobility" on its left: "Tuesday and Thursday are mobility", "... will be mobility", "... for mobility"
+const LINK_LEFT = new Set(["are", "is", "be", "for"]);
 export function namedMobilityDays(text: string, daysInWeek: number, trainingDays: number[] | null = null): number[] | null {
   const order = trainingDays && trainingDays.length > 0 ? [...new Set(trainingDays)].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)) : null;
   const dayOfWeekday = (wd: number): number | null => {
     const n = order ? order.indexOf(wd) + 1 : ((wd + 6) % 7) + 1;
     return n >= 1 && n <= daysInWeek ? n : null;
   };
+  const weekdayOf = (t: string): number | null => WEEKDAY_WORDS.find(([re]) => re.test(t))?.[1] ?? null;
   const out = new Set<number>();
   for (const sentence of text.toLowerCase().split(/[.;!?\n]/)) {
-    const words = sentence.split(/[^a-z0-9&]+/).filter(Boolean);
+    // words, with a comma kept as a word of its own (it ends a list)
+    const words = sentence.replace(/,/g, " , ").split(/[^a-z0-9&,]+/).filter(Boolean);
     words.forEach((w, i) => {
-      if (w !== "mobility") return;
-      const walk = (step: 1 | -1): number[] => {
-        const found: number[] = [];
-        let afterDay = false;
-        for (let j = i + step; j >= 0 && j < words.length; j += step) {
+      if (w !== "mobility" || MOBILITY_INSIDE_BEFORE.has(words[i - 1] ?? "")) return;
+      // the list of days at j (going one way): weekdays, or numbers after "day(s)", joined by "and" / "&"; ends at a comma or any other word
+      const list = (from: number, step: 1 | -1, afterDays = false): { days: number[]; endAt: number } => {
+        const days: number[] = [];
+        let j = from;
+        let numbersOk = afterDays || step === -1;
+        for (; j >= 0 && j < words.length; j += step) {
           const t = words[j];
-          const wd = WEEKDAY_WORDS.find(([re]) => re.test(t));
-          if (wd) {
-            const n = dayOfWeekday(wd[1]);
-            if (n) found.push(n);
+          const wd = weekdayOf(t);
+          if (wd != null) {
+            const n = dayOfWeekday(wd);
+            if (n) days.push(n);
             continue;
           }
-          if (/^\d$/.test(t) && (afterDay || (step === -1 && /^days?$/.test(words[j - 1] ?? "")))) {
+          if (/^\d$/.test(t) && (numbersOk || (step === -1 && /^days?$/.test(words[j - 1] ?? "")))) {
             const n = Number(t);
-            if (n >= 1 && n <= daysInWeek) found.push(n);
+            if (n >= 1 && n <= daysInWeek) days.push(n);
             continue;
           }
-          if (step === 1 && /^days?$/.test(t)) {
-            afterDay = true;
+          if (/^days?$/.test(t)) {
+            numbersOk = true;
             continue;
           }
-          if (NAMED_FILLER.has(t)) continue;
+          if ((t === "and" || t === "&") && days.length > 0) continue;
           break;
         }
-        return found;
+        return { days, endAt: j };
       };
-      const right = walk(1);
-      for (const n of right.length > 0 ? right : walk(-1)) out.add(n);
+      // right: "mobility (on) (days (are)) <list>"
+      let j = i + 1;
+      if (words[j] === "on") j += 1;
+      let afterDays = false;
+      if (/^days?$/.test(words[j] ?? "") && (words[j + 1] === "are" || words[j + 1] === "on")) {
+        j += 2;
+        afterDays = true;
+      }
+      const right = list(j, 1, afterDays);
+      if (right.days.length > 0) {
+        if (!MOBILITY_INSIDE_AFTER.has(words[right.endAt] ?? "")) for (const n of right.days) out.add(n);
+        return;
+      }
+      // left: "<list> are / will be / for mobility"
+      let k = i - 1;
+      if (!LINK_LEFT.has(words[k] ?? "")) return;
+      k -= 1;
+      if (words[k] === "will") k -= 1;
+      for (const n of list(k, -1).days) out.add(n);
     });
   }
   return out.size > 0 ? [...out].sort((a, b) => a - b) : null;

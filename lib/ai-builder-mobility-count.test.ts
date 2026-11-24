@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { mobilityDayPlan, mobilityDaysWanted, mobilityInstruction, mobilityRole, namedMobilityDays, planRole } from "@/lib/ai-day-rules";
-import { isFreshStart, parseBuildRequest, planSlots, replanQueue, weekDaysFor } from "@/lib/ai-day-request";
+import { isFreshStart, isNewRequest, parseBuildRequest, planSlots, replanQueue, weekDaysFor } from "@/lib/ai-day-request";
 
 // Ron, Nov 24 (by voice): every day of a 5-day split came out "Mobility". He meant "2 Mobility days"; the phone wrote "to".
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
@@ -123,9 +123,45 @@ describe("a new request always builds the whole week, in order (Ron, Nov 24: onl
   });
   it("the box: Resume starts a new run when the run's days are gone, else plans its queue again from the days there now", () => {
     const box = read("components/coach/desktop/ai-program-builder-box.tsx");
-    expect(box).toContain("if (isFreshStart(existingNow, builtByRun.current)) {\n      startRun(said || request.current);\n      return;\n    }");
+    expect(box).toContain("if (said && isNewRequest(said)) startRun(said);\n      else startRun(request.current, said ? [said] : []);");
     expect(box).toContain("if (runPlan.current) queue.current = replanQueue(existingNow, runPlan.current);");
     expect(box).toContain("builtByRun.current.push(slot);");
     expect(box).toContain("stopAllMics();");
+  });
+});
+
+describe("review of 54e68c07: only wording that makes the DAY a mobility day names it", () => {
+  it("the good forms give days 2 and 4", () => {
+    expect(namedMobilityDays("mobility Tuesday and Thursday", 5)).toEqual([2, 4]);
+    expect(namedMobilityDays("Tuesday and Thursday are mobility", 5)).toEqual([2, 4]);
+    expect(namedMobilityDays("Tuesday and Thursday will be mobility", 5)).toEqual([2, 4]);
+    expect(namedMobilityDays("mobility on days 2 and 4", 5)).toEqual([2, 4]);
+    expect(namedMobilityDays("mobility days are 2 and 4", 5)).toEqual([2, 4]);
+    expect(namedMobilityDays("5 day split, full body Monday Wednesday Friday, mobility Tuesday and Thursday", 5)).toEqual([2, 4]);
+  });
+  it("mobility work inside a day never makes it a mobility day", () => {
+    expect(namedMobilityDays("add mobility on day 1 as a warm-up", 4)).toBeNull();
+    expect(namedMobilityDays("mobility on day 1 as a warm-up", 4)).toBeNull();
+    expect(namedMobilityDays("mobility on day 2 with the core work", 4)).toBeNull();
+    expect(namedMobilityDays("Monday legs, Wednesday push with mobility, Friday pull", 3, [1, 3, 5])).toBeNull();
+    expect(weekRoles("add mobility on day 1 as a warm-up", { sentDays: 4 })).toEqual(["free", "free", "free", "free"]);
+    expect(weekRoles("Monday legs, Wednesday push with mobility, Friday pull", { trainingDays: [1, 3, 5] })).toEqual(["free", "free", "free"]);
+  });
+  it("a comma ends the list", () => {
+    expect(namedMobilityDays("mobility Tuesday, Thursday pull", 5)).toEqual([2]);
+  });
+  it("\"with\" closes the count gap: \"build 3 days with mobility work at the end\" is no mobility days", () => {
+    expect(mobilityDaysWanted("build 3 days with mobility work at the end")).toBeNull();
+    expect(mobilityDaysWanted("2 days will be mobility")).toBe(2);
+  });
+});
+
+describe("review of 54e68c07: a change typed into a run whose days were deleted keeps the run's request", () => {
+  it("a request in its own right starts over from its words; a change does not", () => {
+    expect(isNewRequest(RON_2)).toBe(true);
+    expect(isNewRequest("4 weeks of upper lower")).toBe(true);
+    expect(isNewRequest("build a push pull legs program")).toBe(true);
+    expect(isNewRequest("less volume")).toBe(false);
+    expect(isNewRequest("swap the squats for leg press")).toBe(false);
   });
 });
