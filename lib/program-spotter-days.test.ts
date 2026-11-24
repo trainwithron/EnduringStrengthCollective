@@ -118,6 +118,6 @@ describe("only in the program Spotter panel: no push, no bell, coach-only", () =
   });
   it("its answers are remembered like every other check's (step 228 allows it in the dismissals)", () => {
     expect(read("supabase/migrations/0472_program_spotter_lifting_days.sql")).toContain("'biomech_redundancy', 'lifting_days'");
-    expect(read("scripts/sql-tests/harness.mjs")).toContain('"0470", "0472"');
+    expect(read("scripts/sql-tests/harness.mjs")).toMatch(/"0470", ("0471", )?"0472"/);
   });
 });
