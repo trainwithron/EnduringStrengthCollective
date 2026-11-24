@@ -49,15 +49,32 @@ export function dedupeDay<T extends { exerciseName: string }>(rows: T[], allowRe
 const NUM: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, a: 1 };
 
 // "2 of the days are mobility", "two mobility days", "make 2 days mobility": how many days a week the coach wants as mobility days, or null.
-export function mobilityDaysWanted(text: string): number | null {
+// Ron, Nov 24 (by voice): "5 day split 3 Days full body to Mobility days in between" built all 5 days as mobility, because "5 day ... mobility" was read as 5. So:
+//  * a count reaches "mobility" only across a short gap (20 characters) with no other number, "to"/"too", "split", "program", "week", "full body", comma or "and" in it;
+//  * phones write "two" as "to" or "too": "to mobility days" is 2 (only right before "mobility day(s)/session(s)");
+//  * the count must be LESS than the week's days (`daysInWeek`, when known); otherwise it is not believed (null), unless the words say all / every day mobility.
+const MOBILITY_GAP_STOP = /\d|\b(?:one|two|three|four|five|six|seven|to|too|and)\b|split|program|week|full\s*body|,/;
+export function mobilityDaysWanted(text: string, daysInWeek: number | null = null): number | null {
   const t = text.toLowerCase();
   const word = "(\\d|one|two|three|four|five)";
-  const a = new RegExp(`${word}\\s+(?:of\\s+(?:the\\s+|my\\s+)?)?(?:days?|sessions?|workouts?)\\b[^.\\n]{0,40}?\\bmobility\\b`).exec(t);
-  const b = new RegExp(`${word}\\s+mobility\\s+(?:days?|sessions?|workouts?)\\b`).exec(t);
-  const m = a ?? b;
-  if (!m) return null;
-  const n = NUM[m[1]] ?? Number(m[1]);
-  return Number.isFinite(n) && n >= 1 && n <= 5 ? n : null;
+  let found: string | null = null;
+  // "2 days a week will be mobility": "a / per / each week" right after the day word belongs to the count, not to the gap
+  for (const m of t.matchAll(new RegExp(`${word}\\s+(?:of\\s+(?:the\\s+|my\\s+)?)?(?:days?|sessions?|workouts?)(?:\\s+(?:a|per|each)\\s+week)?\\b([^.\\n]{0,20}?)\\bmobility\\b`, "g"))) {
+    if (!MOBILITY_GAP_STOP.test(m[2])) {
+      found = m[1];
+      break;
+    }
+  }
+  if (found == null) {
+    const b = new RegExp(`\\b(\\d|one|two|three|four|five|to|too)\\s+mobility\\s+(?:days?|sessions?|workouts?)\\b`).exec(t);
+    if (b) found = b[1] === "to" || b[1] === "too" ? "2" : b[1];
+  }
+  if (found == null) return null;
+  const n = NUM[found] ?? Number(found);
+  if (!Number.isFinite(n) || n < 1 || n > 5) return null;
+  const allMobility = /\ball\b[^.\n]{0,20}\bmobility\b|\bevery\s+day\b[^.\n]{0,20}\bmobility\b|\bmobility\b[^.\n]{0,12}\bevery\s+day\b/.test(t);
+  if (daysInWeek != null && daysInWeek > 0 && n >= daysInWeek && !allMobility) return null;
+  return n;
 }
 
 export type MobilityRole = "must" | "must_not" | "free";
@@ -72,13 +89,100 @@ export function mobilityRole(opts: { wanted: number | null; builtMobility: numbe
   return "free";
 }
 
+// ---- where the mobility days go (Ron, Nov 24: a 5-day split, "3 day a week full body ... 2 days a week will be Mobility" came out Mobility, Mobility, Mobility, Full Body, Full
+// Body, because the early days were left to the model; he wants Full Body, Mobility, Full Body, Mobility, Full Body) ----
+
+// The week's days that are mobility days (1-based), planned up front so every day knows its role, the same every week (Pause, Resume and the next week included).
+// The days the coach named win ("mobility Tuesday and Thursday", "days 2 and 4"). Otherwise the main days go first and last, and the mobility days evenly between them; when there
+// are more mobility days than gaps between main days, the main days are spread out instead.
+export function mobilityDayPlan(daysInWeek: number, wanted: number, named: number[] | null = null): number[] {
+  const d = Math.max(1, Math.min(7, Math.round(daysInWeek)));
+  if (named && named.length > 0) return [...new Set(named.filter((n) => n >= 1 && n <= d))].sort((a, b) => a - b);
+  const m = Math.max(0, Math.min(d, Math.round(wanted)));
+  if (m === 0) return [];
+  if (m >= d) return Array.from({ length: d }, (_, i) => i + 1);
+  const mains = d - m;
+  if (mains >= m + 1) {
+    // main days in m + 1 groups (the larger groups first), a mobility day after each group but the last
+    const base = Math.floor(mains / (m + 1));
+    const extra = mains % (m + 1);
+    const out: number[] = [];
+    let at = 0;
+    for (let g = 0; g < m; g++) {
+      at += base + (g < extra ? 1 : 0) + 1;
+      out.push(at);
+    }
+    return out;
+  }
+  // fewer main days than gaps: the main days spread over the week (first and last), mobility everywhere else
+  const mainDays = new Set(mains === 1 ? [Math.ceil(d / 2)] : Array.from({ length: mains }, (_, i) => Math.round((i * (d - 1)) / (mains - 1)) + 1));
+  return Array.from({ length: d }, (_, i) => i + 1).filter((n) => !mainDays.has(n));
+}
+
+// The weekdays and day numbers the coach tied to mobility ("mobility Tuesday and Thursday", "Tuesday and Thursday are mobility", "mobility on days 2 and 4"), as days of the week's
+// plan (1-based). A weekday is the program's own training day in that position when the program has a schedule (`trainingDays`, 0 = Sunday), else Monday = day 1. Null when none.
+const WEEKDAY_WORDS: [RegExp, number][] = [
+  [/^sun(day)?s?$/, 0], [/^mon(day)?s?$/, 1], [/^tue(s|sday)?s?$/, 2], [/^wed(nesday)?s?$/, 3], [/^thu(r|rs|rsday)?s?$/, 4], [/^fri(day)?s?$/, 5], [/^sat(urday)?s?$/, 6],
+];
+const NAMED_FILLER = new Set(["and", "&", "on", "the", "are", "is", "be", "will", "for", "as", "work", "days", "day", "sessions", "session", "to", "of", "both", "only", "plus"]);
+export function namedMobilityDays(text: string, daysInWeek: number, trainingDays: number[] | null = null): number[] | null {
+  const order = trainingDays && trainingDays.length > 0 ? [...new Set(trainingDays)].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)) : null;
+  const dayOfWeekday = (wd: number): number | null => {
+    const n = order ? order.indexOf(wd) + 1 : ((wd + 6) % 7) + 1;
+    return n >= 1 && n <= daysInWeek ? n : null;
+  };
+  const out = new Set<number>();
+  for (const sentence of text.toLowerCase().split(/[.;!?\n]/)) {
+    const words = sentence.split(/[^a-z0-9&]+/).filter(Boolean);
+    words.forEach((w, i) => {
+      if (w !== "mobility") return;
+      const walk = (step: 1 | -1): number[] => {
+        const found: number[] = [];
+        let afterDay = false;
+        for (let j = i + step; j >= 0 && j < words.length; j += step) {
+          const t = words[j];
+          const wd = WEEKDAY_WORDS.find(([re]) => re.test(t));
+          if (wd) {
+            const n = dayOfWeekday(wd[1]);
+            if (n) found.push(n);
+            continue;
+          }
+          if (/^\d$/.test(t) && (afterDay || (step === -1 && /^days?$/.test(words[j - 1] ?? "")))) {
+            const n = Number(t);
+            if (n >= 1 && n <= daysInWeek) found.push(n);
+            continue;
+          }
+          if (step === 1 && /^days?$/.test(t)) {
+            afterDay = true;
+            continue;
+          }
+          if (NAMED_FILLER.has(t)) continue;
+          break;
+        }
+        return found;
+      };
+      const right = walk(1);
+      for (const n of right.length > 0 ? right : walk(-1)) out.add(n);
+    });
+  }
+  return out.size > 0 ? [...out].sort((a, b) => a - b) : null;
+}
+
+// The role of one day from the week's plan: a mobility day, or not one. Never "free" once the plan is known.
+export function planRole(day: number, plan: number[]): MobilityRole {
+  return plan.includes(day) ? "must" : "must_not";
+}
+
 export function isMobilityTitle(title: string): boolean {
   return /\bmobility\b/i.test(title);
 }
 
-export function mobilityInstruction(role: MobilityRole, wanted: number | null): string | null {
+// `plan` (the week's planned mobility days) names them, so a main day early in the week is told the truth ("days 2 and 4 are the mobility days"), not "already has its mobility days".
+export function mobilityInstruction(role: MobilityRole, wanted: number | null, plan: number[] | null = null): string | null {
   if (wanted == null || role === "free") return null;
-  if (role === "must") return `This week has ${wanted} mobility day${wanted === 1 ? "" : "s"}, and this is one of them: build a mobility day (mostly mobility, joint-range and stretching work, no heavy lifting) and call it "Mobility".`;
+  const which = plan && plan.length > 0 ? ` (day${plan.length === 1 ? "" : "s"} ${plan.join(" and ")} of the week)` : "";
+  if (role === "must") return `This week has ${wanted} mobility day${wanted === 1 ? "" : "s"}${which}, and this is one of them: build a mobility day (mostly mobility, joint-range and stretching work, no heavy lifting) and call it "Mobility".`;
+  if (plan) return `This week's mobility day${plan.length === 1 ? " is" : "s are"} ${plan.length === 0 ? "none" : `day${plan.length === 1 ? "" : "s"} ${plan.join(" and ")}`}: this is a main training day, NOT a mobility day.`;
   return `This week already has its ${wanted} mobility day${wanted === 1 ? "" : "s"}: this is NOT a mobility day.`;
 }
 

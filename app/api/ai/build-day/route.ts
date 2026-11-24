@@ -13,13 +13,14 @@ import { hasFlaggedMusculoskeletalConcern } from "@/lib/athlete-injury-flag";
 import { athleteAgeStatus, clampYouthRows, effectiveAgeStatus, UNKNOWN_AGE_BANNER_TEXT, YOUTH_PROMPT_BLOCK } from "@/lib/youth-block";
 import { libraryContext, rankLibrary, type LibraryItem } from "@/lib/builder-context";
 import { scanConstraints } from "@/lib/constraint-scan";
+import { parseBuildRequest } from "@/lib/ai-day-request";
 import { parseRestSpan } from "@/lib/rest-time";
 import { DEFAULT_TRACKED_FIELDS } from "@/lib/exercise-fields";
 import type { TrackedField } from "@/lib/exercise-fields";
 import { learnedBlock, linesFor, loadApplicableRules, toApplied } from "@/lib/learned-for-prompt";
 import { loadNotesBlock } from "@/lib/client-notes-server";
 import { loadReferenceBlock } from "@/lib/reference-context";
-import { resolveAiExerciseName, exercisesWanted, allowsRepeats, applyTimedConsistency, dedupeDay, isMobilityTitle, longDayFlag, mobilityDaysWanted, mobilityInstruction, mobilityRole, plainLibraryName, ruleKey } from "@/lib/ai-day-rules";
+import { resolveAiExerciseName, exercisesWanted, allowsRepeats, applyTimedConsistency, dedupeDay, isMobilityTitle, longDayFlag, mobilityDayPlan, mobilityDaysWanted, mobilityInstruction, mobilityRole, namedMobilityDays, planRole, plainLibraryName, ruleKey } from "@/lib/ai-day-rules";
 import { DAY_MAX_TOKENS, TOO_LONG_MESSAGE, TRUNCATED_RETRY_NOTE, buildDaySystemPrompt, buildDayUserText, checkRunToken, issueRunToken, readDayResult, runTokenIsStale, truncatedRetryTimeoutMs, type BuiltDay } from "@/lib/ai-day-run";
 import { FOLLOWED_PROGRAM_MESSAGE, readProgramIsFollowed } from "@/lib/ai-live-program";
 
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing or invalid program, week or day." }, { status: 400 });
   }
 
-  const { data: program } = await supabase.from("programs").select("id, group_id, athlete_id, name").eq("id", programId).maybeSingle();
+  const { data: program } = await supabase.from("programs").select("id, group_id, athlete_id, name, training_days").eq("id", programId).maybeSingle();
   if (!program) return NextResponse.json({ error: "Program not found." }, { status: 404 });
   const groupId = program.group_id as string;
   const { data: membership } = await supabase.from("group_memberships").select("role").eq("group_id", groupId).eq("profile_id", user.id).maybeSingle();
@@ -123,14 +124,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "There is nothing in that day to change yet." }, { status: 409 });
   }
 
-  // How many of this week's days the coach wants as mobility days, and so whether this one must be, must not be, or is free.
+  // How many of this week's days the coach wants as mobility days, and WHICH ones (Ron, Nov 24: Full Body, Mobility, Full Body, Mobility, Full Body, never the model's choice).
   const sayings = `${instruction}. ${corrections.join(". ")}`;
-  const wantedMobility = mobilityDaysWanted(sayings);
   const weekRowsAll = ((workoutRows ?? []) as any[]).filter((w) => w.week_number === week);
+  // The week's days: what the coach said, else the week the builder planned (sent with each day), else the program's training days, else the days this week has.
+  const sentDays = Number(body.daysInWeek);
+  const trainingDays = Array.isArray(program.training_days) ? (program.training_days as number[]) : null;
+  const daysInWeek: number | null =
+    parseBuildRequest(sayings).daysPerWeek ??
+    (Number.isInteger(sentDays) && sentDays >= 1 && sentDays <= 7 ? sentDays : null) ??
+    (trainingDays && trainingDays.length > 0 ? trainingDays.length : null) ??
+    (weekRowsAll.length || null);
+  // a count not less than the week's days is a misheard number, not believed; days the coach named ("mobility Tuesday and Thursday") win, and count when no number was said
+  const namedMobility = daysInWeek ? namedMobilityDays(sayings, daysInWeek, trainingDays) : null;
+  const wantedMobility = mobilityDaysWanted(sayings, daysInWeek) ?? (namedMobility ? namedMobility.length : null);
+  // With the count and the week's size known, the mobility days are planned up front (the main days first and last, mobility between) and every day knows its role; the same
+  // every week and after Pause / Resume. Without them, the old rule (only the days still needed are forced).
+  const mobilityPlan = daysInWeek && wantedMobility != null ? mobilityDayPlan(daysInWeek, wantedMobility, namedMobility) : null;
   const builtMobility = weekRowsAll.filter((w) => !(w.day_index === day) && (w.group_workout_exercises ?? []).length > 0 && isMobilityTitle(w.title ?? "")).length;
   const daysLeft = weekRowsAll.filter((w) => w.day_index !== day && (w.group_workout_exercises ?? []).length === 0).length + 1;
-  const role = mobilityRole({ wanted: wantedMobility, builtMobility, daysLeft });
-  const mobilityNote = mobilityInstruction(role, wantedMobility);
+  const role = mobilityPlan ? planRole(day, mobilityPlan) : mobilityRole({ wanted: wantedMobility, builtMobility, daysLeft });
+  const mobilityNote = mobilityInstruction(role, mobilityPlan ? mobilityPlan.length : wantedMobility, mobilityPlan);
 
   // The client's injury and age context, the same rules the whole-program builder follows.
   let injuryContext: string | null = null;

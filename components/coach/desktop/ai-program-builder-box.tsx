@@ -14,7 +14,7 @@ import { LearnLine } from "@/components/coach/desktop/learn-line";
 import { appliedLine, type AppliedRule } from "@/lib/learned-for-prompt";
 import { LikeClientSuggestion } from "@/components/coach/desktop/like-client";
 import { PastAiNotes } from "@/components/coach/desktop/past-ai-notes";
-import { fixTargetFrom, parseBuildRequest, planSlots, scopeLimitFrom } from "@/lib/ai-day-request";
+import { fixTargetFrom, isFreshStart, parseBuildRequest, planSlots, replanQueue, scopeLimitFrom, weekDaysFor } from "@/lib/ai-day-request";
 import { mergeFlags } from "@/lib/constraint-scan";
 import { WHICH_WEEKS_QUESTION, isEditRequest, isYes, parseWeekRange, type PlannedDay, type WeekRange } from "@/lib/ai-week-edit";
 import type { DaySlot } from "@/lib/ai-day-slots";
@@ -94,13 +94,16 @@ export function AiProgramBuilderBox({
   const lastBuilt = useRef<DaySlot | null>(null);
   const daysRef = useRef(days);
   daysRef.current = days;
+  // The run: its weeks and week size (the same plan on Resume and in the next week) and the days it has built so far.
+  const runPlan = useRef<{ weeks: number[]; daysPerWeek: number } | null>(null);
+  const builtByRun = useRef<DaySlot[]>([]);
 
   async function callDay(mode: "build" | "fix", slot: DaySlot): Promise<{ ok: true; workoutId: string; flags: string[]; applied: AppliedRule[] } | { ok: false; message: string }> {
     try {
       const res = await fetch("/api/ai/build-day", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ programId, week: slot.week, day: slot.day, mode, instruction: request.current, corrections: corrections.current, runToken: token.current ?? undefined, referenceClientId: referenceId.current }),
+        body: JSON.stringify({ programId, week: slot.week, day: slot.day, daysInWeek: runPlan.current?.daysPerWeek, mode, instruction: request.current, corrections: corrections.current, runToken: token.current ?? undefined, referenceClientId: referenceId.current }),
       });
       const data = await readAiJson(res);
       if (!res.ok || !data.workoutId) return { ok: false, message: (data.error as string | undefined) ?? COULDNT };
@@ -151,6 +154,7 @@ export function AiProgramBuilderBox({
       if (result.flags.length > 0) setFlags((prev) => mergeFlags(prev, result.flags));
       if (result.applied.length > 0) setApplied((prev) => [...prev.filter((a) => !result.applied.some((n) => n.id === a.id)), ...result.applied]);
       lastBuilt.current = slot;
+      builtByRun.current.push(slot);
       finishedWeeks.current.add(slot.week);
       queue.current.shift();
     }
@@ -274,6 +278,11 @@ export function AiProgramBuilderBox({
       setText("");
       return;
     }
+    startRun(said);
+  }
+
+  // A new request, planned from what the program has now: the days, in order, and the week's size (sent with every day so the mobility days land where they are planned).
+  function startRun(said: string) {
     request.current = said;
     corrections.current = [];
     setShownRequest(said);
@@ -292,6 +301,8 @@ export function AiProgramBuilderBox({
       setLine("Every day in that range already has exercises. Say how many weeks to add, for example: make it 4 weeks.");
       return;
     }
+    runPlan.current = { weeks: [...new Set(slots.map((s) => s.week))], daysPerWeek: weekDaysFor(existing, parsed, trainingDaysCount) };
+    builtByRun.current = [];
     queue.current = slots;
     lastBuilt.current = null;
     setText("");
@@ -322,6 +333,14 @@ export function AiProgramBuilderBox({
 
   async function resumeNow() {
     let said = text.trim();
+    // Nothing this run built is still there (the week was deleted): what was typed is a new request, built from day 1 (Ron, Nov 24: a new request typed into a paused run only
+    // built days 3 to 5). Otherwise the queue is planned again from the days there now, so a day deleted meanwhile is built again, in order.
+    const existingNow = daysRef.current.map((d) => ({ week: d.weekNumber, day: d.dayIndex, hasExercises: d.items.some((i) => i.kind === "exercise") }));
+    if (isFreshStart(existingNow, builtByRun.current)) {
+      startRun(said || request.current);
+      return;
+    }
+    if (runPlan.current) queue.current = replanQueue(existingNow, runPlan.current);
     // "only one week" / "just week one": stop after that many weeks; the rest of the queue is dropped, and the words are not treated as a change to a day.
     const scope = scopeLimitFrom(said);
     if (scope) {
@@ -370,6 +389,9 @@ export function AiProgramBuilderBox({
       setLine(`Week ${week} already has exercises.`);
       return;
     }
+    // the same week size, so the mobility days land in the same places as the week before
+    runPlan.current = { weeks: [week], daysPerWeek: weekDaysFor(existing, { daysPerWeek: lastRequest.current.daysPerWeek }, trainingDaysCount) };
+    builtByRun.current = [];
     queue.current = slots;
     void runQueue();
   }
