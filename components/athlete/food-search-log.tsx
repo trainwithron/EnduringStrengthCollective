@@ -55,6 +55,8 @@ export function FoodSearchLog({
   const [packagedHits, setPackagedHits] = useState<PackagedHit[]>([]);
   // The words searched instead of the ones typed, when what was typed found nothing and a likely spelling did (step 226): "Showing results for chicken breast".
   const [correctedTo, setCorrectedTo] = useState<string | null>(null);
+  // The likely spelling when what was typed found something anyway (a misspelling printed on a few products): "Did you mean avocado?", a tap searches it.
+  const [suggestion, setSuggestion] = useState<string | null>(null);
   // What was picked: the name shown big (the plain name, or the brand and product), USDA's own name small under it, and, for a packaged food, its code (it is logged as a barcode food).
   const [picked, setPicked] = useState<{ title: string; usdaName: string | null; packaged: { barcode: string | null } | null } | null>(null);
   const seq = useRef(0);
@@ -68,6 +70,7 @@ export function FoodSearchLog({
       setHits(null);
       setPackagedHits([]);
       setCorrectedTo(null);
+      setSuggestion(null);
       setSearching(false);
       return;
     }
@@ -80,6 +83,7 @@ export function FoodSearchLog({
       setHits(found.hits ?? []);
       setPackagedHits(found.packaged);
       setCorrectedTo(found.correctedTo);
+      setSuggestion(found.suggestion);
       setSearching(false);
     }, 250);
     return () => clearTimeout(timer);
@@ -157,6 +161,7 @@ export function FoodSearchLog({
     setHits(null);
     setPackagedHits([]);
     setCorrectedTo(null);
+    setSuggestion(null);
   }
 
   if (!open) {
@@ -211,6 +216,12 @@ export function FoodSearchLog({
             <p className="font-body text-xs text-steel mt-2" data-corrected-query>
               Showing results for <strong className="font-semibold text-chalk">{correctedTo}</strong>
             </p>
+          )}
+          {/* what was typed found something, but a word looks misspelled: the likely spelling, a tap searches it (step 226) */}
+          {!searching && !correctedTo && suggestion && ((hits && hits.length > 0) || packagedHits.length > 0) && (
+            <button type="button" onClick={() => setQuery(suggestion)} className="mt-1 min-h-[44px] text-left font-body text-xs text-steel" data-did-you-mean>
+              Did you mean <strong className="font-semibold text-rust-ink underline underline-offset-2">{suggestion}</strong>?
+            </button>
           )}
           {((hits && hits.length > 0) || packagedHits.length > 0) && (
             <div className="mt-2 border border-steel/15 max-h-80 overflow-y-auto" data-food-results>

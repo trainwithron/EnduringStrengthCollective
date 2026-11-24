@@ -58,32 +58,29 @@ describe("forgiving spelling: a second try only when nothing at all was found", 
     expect(r).toMatchObject({ hits: [], correctedTo: "cheerios" });
     expect(r.packaged[0].description).toBe("Cheerios Cereal");
   });
-  it("what you type is never corrected when it finds anything: everyday or packaged", async () => {
-    const a = fakeDb({ everyday: { "whole milk": [everydayRow("Milk, whole", "Whole milk")] }, correct: () => ["something", "else"] });
-    expect((await runFoodSearch(a.client, "whole milk")).correctedTo).toBeNull();
-    expect(a.calls.some((c) => c.fn === "correct_food_search_words")).toBe(false);
-    const b = fakeDb({ packaged: { "2 milk": [brandedRow("2% MILK")] }, correct: () => ["something"] });
-    expect((await runFoodSearch(b.client, "2% milk")).correctedTo).toBeNull();
-    expect(b.calls.some((c) => c.fn === "correct_food_search_words")).toBe(false);
+  it("the spelling is checked at the same time as the searches (no extra wait)", async () => {
+    const { client, calls } = fakeDb({ everyday: { "whole milk": [everydayRow("Milk, whole", "Whole milk")] } });
+    await runFoodSearch(client, "whole milk");
+    expect(calls.map((c) => c.fn)).toEqual(["search_usda_foods", "search_branded_foods", "correct_food_search_words"]);
   });
   it("gibberish: nothing to swap, so no second search and nothing found", async () => {
     const { client, calls } = fakeDb({ correct: (t) => t });
-    expect(await runFoodSearch(client, "xqzv")).toEqual({ hits: [], packaged: [], correctedTo: null });
+    expect(await runFoodSearch(client, "xqzv")).toEqual({ hits: [], packaged: [], correctedTo: null, suggestion: null });
     expect(calls.filter((c) => c.fn === "search_usda_foods")).toHaveLength(1);
   });
   it("a likely spelling that finds nothing either: says nothing found, with no 'Showing results for'", async () => {
     const { client } = fakeDb({ correct: fixWords });
-    expect(await runFoodSearch(client, "brocoli")).toEqual({ hits: [], packaged: [], correctedTo: null });
+    expect(await runFoodSearch(client, "brocoli")).toEqual({ hits: [], packaged: [], correctedTo: null, suggestion: null });
   });
-  it("a failed everyday search is said as such, never corrected", async () => {
-    const { client, calls } = fakeDb({ everyday: { brocoli: "fail" }, correct: fixWords });
-    expect((await runFoodSearch(client, "brocoli")).hits).toBeNull();
-    expect(calls.some((c) => c.fn === "correct_food_search_words")).toBe(false);
+  it("a failed everyday search is said as such, never corrected or offered", async () => {
+    const { client } = fakeDb({ everyday: { brocoli: "fail" }, packaged: { brocoli: [brandedRow("BROCOLI BITES")] }, correct: fixWords });
+    expect(await runFoodSearch(client, "brocoli")).toMatchObject({ hits: null, correctedTo: null, suggestion: null });
   });
   it("a database without step 226 yet: the correction is skipped quietly", async () => {
-    const { client } = fakeDb({ correctFails: true });
+    const { client } = fakeDb({ correctFails: true, packaged: { avacado: [brandedRow("AVACADO DIP")] } });
     expect(await correctFoodQuery(client, "brocoli")).toBeNull();
-    expect(await runFoodSearch(client, "brocoli")).toEqual({ hits: [], packaged: [], correctedTo: null });
+    expect(await runFoodSearch(client, "brocoli")).toEqual({ hits: [], packaged: [], correctedTo: null, suggestion: null });
+    expect((await runFoodSearch(client, "avacado")).suggestion).toBeNull();
   });
   it("the words go to the database cleaned (the same words the searches get)", async () => {
     const { client, calls } = fakeDb({ correct: fixWords });
@@ -91,6 +88,43 @@ describe("forgiving spelling: a second try only when nothing at all was found", 
     expect(calls[0]).toEqual({ fn: "correct_food_search_words", words: "chiken breast" });
     expect(await correctFoodQuery(client, "   ")).toBeNull();
   });
+});
+
+describe("Did you mean: something was found as typed, but a word looks misspelled", () => {
+  // what the real correct_food_search_words gives for these on live-size data (scripts/sql-tests/food-search-round2.test.mjs checks the same on real rows)
+  const LIVE: Record<string, string> = { avacado: "avocado", tumeric: "turmeric", protien: "protein", yougurt: "yogurt", choclate: "chocolate" };
+  const liveWords = (t: string[]) => t.map((w) => LIVE[w] ?? w);
+  // live, each of these finds a few products misspelled the same way
+  const typedFinds: Record<string, unknown[]> = {
+    avacado: [brandedRow("ORGANIC HUMMUS, AVACADO & CILANTRO")],
+    tumeric: [brandedRow("TUMERIC CHIPS")],
+    "protien bar": [brandedRow("BLUEBERRY PROTIEN BAR")],
+    "greek yougurt": [brandedRow("GREEK YOUGURT")],
+    "choclate milk": [brandedRow("MILK & WHITE CHOCOLATE")],
+  };
+  const OFFERED: [string, string][] = [
+    ["avacado", "avocado"],
+    ["tumeric", "turmeric"],
+    ["protien bar", "protein bar"],
+    ["greek yougurt", "greek yogurt"],
+    ["choclate milk", "chocolate milk"],
+  ];
+  for (const [typed, meant] of OFFERED) {
+    it(`${typed}: the results as typed, and "Did you mean ${meant}?"`, async () => {
+      const { client, calls } = fakeDb({ packaged: typedFinds, correct: liveWords });
+      const r = await runFoodSearch(client, typed);
+      expect(r).toMatchObject({ correctedTo: null, suggestion: meant });
+      expect(r.packaged).toHaveLength(1);
+      // shown as typed: no second search until the line is tapped
+      expect(calls.filter((c) => c.fn === "search_usda_foods").map((c) => c.words)).toEqual([typed.replace(/[^a-z0-9]+/g, " ").trim()]);
+    });
+  }
+  for (const kept of ["whole milk", "2% milk", "chicken breast"]) {
+    it(`${kept}: nothing extra shown`, async () => {
+      const { client } = fakeDb({ everyday: { "whole milk": [everydayRow("Milk, whole", "Whole milk")], "2 milk": [everydayRow("Milk, reduced fat (2%)", "2% milk")], "chicken breast": [everydayRow("Chicken breast, baked", "Chicken breast, cooked (no skin)")] }, correct: liveWords });
+      expect(await runFoodSearch(client, kept)).toMatchObject({ correctedTo: null, suggestion: null });
+    });
+  }
 });
 
 describe("the screen", () => {
@@ -102,7 +136,15 @@ describe("the screen", () => {
   });
   it("the line goes when the search is cleared or a food is added", () => {
     expect(ui.match(/setCorrectedTo\(null\);/g)?.length).toBe(2);
+    expect(ui.match(/setSuggestion\(null\);/g)?.length).toBe(2);
     expect(ui).toContain("setCorrectedTo(found.correctedTo);");
+    expect(ui).toContain("setSuggestion(found.suggestion);");
+  });
+  it("a tappable 'Did you mean avocado?' above the results as typed; a tap searches it", () => {
+    expect(ui).toContain("{!searching && !correctedTo && suggestion && ((hits && hits.length > 0) || packagedHits.length > 0) && (");
+    expect(ui).toContain('<button type="button" onClick={() => setQuery(suggestion)} className="mt-1 min-h-[44px] text-left font-body text-xs text-steel" data-did-you-mean>');
+    expect(ui).toContain("Did you mean <strong");
+    expect(ui.indexOf("data-did-you-mean")).toBeLessThan(ui.indexOf("data-food-results"));
   });
   it("renders closed and open without the line", () => {
     const props = { athleteId: "a", groupId: "g", logDate: "2026-11-23", onLogged: () => {} };

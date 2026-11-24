@@ -124,6 +124,14 @@ expect("brocoli -> broccoli first", (await firstOf("broccoli")) === "Broccoli, r
 expect("bananna -> banana first", (await firstOf("banana")) === "Banana, raw");
 expect("yogrt -> a yogurt first", /yogurt/i.test((await firstOf("yogurt")) ?? ""));
 expect("cheerois -> Cheerios in Packaged foods", (await packaged("cheerios")).some((d) => /cheerios/i.test(d)), JSON.stringify((await packaged("cheerios")).slice(0, 3)));
+// misspellings printed on a few real products (live: avacado, tumeric, protien, yougurt, choclate each on 1 to 11): the search finds those, so the app shows them as typed and
+// offers "Did you mean ...?" with these words
+const OFFERED = { avacado: "avocado", tumeric: "turmeric", "protien bar": "protein bar", "greek yougurt": "greek yogurt", "choclate milk": "chocolate milk" };
+for (const [typed, meant] of Object.entries(OFFERED)) {
+  const word = tokenize(typed).find((w) => !meant.split(" ").includes(w));
+  expect(`"${word}" is on real products (so "${typed}" finds something as typed)`, (await db.query(`select count(*)::int n from public.usda_branded_foods where search @@ to_tsquery('simple', $1)`, [word])).rows[0].n > 0);
+  expect(`"${typed}": Did you mean "${meant}"`, (await correct(typed)) === meant, await correct(typed));
+}
 for (const kept of ["whole milk", "2% milk", "chicken breast", "greek yogurt"]) expect(`"${kept}" is never changed`, (await correct(kept)) === tokenize(kept).join(" "), await correct(kept));
 expect("a number stays a number ('2% milk')", (await correct("2% milk")) === "2 milk");
 expect("gibberish stays as typed (so it still finds nothing)", (await correct("xqzv")) === "xqzv" && (await everydayCount("xqzv")) === 0);
