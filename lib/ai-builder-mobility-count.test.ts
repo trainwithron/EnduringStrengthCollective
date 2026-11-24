@@ -163,5 +163,10 @@ describe("review of 54e68c07: a change typed into a run whose days were deleted 
     expect(isNewRequest("build a push pull legs program")).toBe(true);
     expect(isNewRequest("less volume")).toBe(false);
     expect(isNewRequest("swap the squats for leg press")).toBe(false);
+    // re-check of 3a86f9fd: the bare word "program" or "split" is not a new request
+    expect(isNewRequest("less volume in the program")).toBe(false);
+    expect(isNewRequest("fewer sets, keep the split")).toBe(false);
+    expect(isNewRequest("make me a 4 week program")).toBe(true);
+    expect(isNewRequest("5-day split")).toBe(true);
   });
 });

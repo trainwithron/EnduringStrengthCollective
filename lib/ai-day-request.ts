@@ -86,7 +86,8 @@ export function planSlots(existing: ExistingDay[], request: BuildRequest, traini
 export function isNewRequest(text: string): boolean {
   const parsed = parseBuildRequest(text);
   if (parsed.daysPerWeek != null || parsed.weeks != null) return true;
-  return /\b(?:build|create|write|make me|program|split|full[\s-]*body (?:days?|workouts?|program))\b/i.test(text);
+  // not the bare words "program" or "split": "less volume in the program" is a change (a real one is caught by its days or weeks: "4 week program", "5-day split")
+  return /\b(?:build|create|write|make me|full[\s-]*body (?:days?|workouts?|program))\b/i.test(text);
 }
 
 export function isFreshStart(existing: ExistingDay[], builtByRun: DaySlot[]): boolean {
