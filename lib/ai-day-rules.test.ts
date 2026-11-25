@@ -122,7 +122,9 @@ describe("the day route applies the rules", () => {
   const route = readFileSync(join(__dirname, "..", "app/api/ai/build-day/route.ts"), "utf8").replace(/\r\n/g, "\n");
   const prompt = readFileSync(join(__dirname, "ai-day-run.ts"), "utf8").replace(/\r\n/g, "\n");
   it("retries a day once when it breaks something he said to leave out, and only if there is time", () => {
-    expect(route).toContain("hard.length > 0 && elapsed <= 28_000");
+    // the one retry also carries the Spotter's repair note (spotter-builder cross-check, Nov 24); still only when there is time
+    expect(route).toContain("hard.length > 0 ? `Your last try for this day broke what the coach said to leave out:");
+    expect(route).toContain("if (retryNote && elapsed <= 28_000) {");
     expect(route.match(/await attempt\(/g)?.length).toBe(3); // the first try, the shorter retry after a cut-off, and the retry for a broken rule
     expect(route).toContain("isHard");
   });

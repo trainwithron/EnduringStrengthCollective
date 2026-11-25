@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { assignProgramToClient, isImportRefusal } from "@/lib/program-duplication";
+import { startNewAddress } from "@/lib/client-draft";
 
 // A program started from a client's page belongs to the coach until they assign it. While it is nobody's, one line says so and one button gives that client their own copy (the same
 // assign the client's profile uses; the program stays in the coach's list). Shown only while the program has no client and the client came from the address of a page the coach built it from.
@@ -14,6 +16,7 @@ export function AssignToClientBanner({
   firstName,
   alreadyAssigned,
   aiDraft,
+  reopened = false,
 }: {
   programId: string;
   clientId: string;
@@ -21,6 +24,8 @@ export function AssignToClientBanner({
   firstName: string;
   alreadyAssigned: boolean;
   aiDraft: boolean;
+  // Build program opened this draft instead of making a new one (step 229).
+  reopened?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -60,6 +65,14 @@ export function AssignToClientBanner({
           >
             {busy ? "Assigning…" : `Assign to ${firstName}`}
           </button>
+          {reopened && (
+            <p className="font-body text-sm text-steel w-full">
+              This is the draft you started for {firstName}.{" "}
+              <Link href={startNewAddress({ id: clientId, groupId: clientGroupId })} prefetch={false} className="text-rust-ink underline underline-offset-2">
+                Start a new one instead
+              </Link>
+            </p>
+          )}
         </>
       )}
       {error && (

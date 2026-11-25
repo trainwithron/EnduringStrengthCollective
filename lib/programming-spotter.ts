@@ -264,6 +264,8 @@ export interface BiomechTaggedEntry {
   dayIndex?: number | null;
   // biomech_tags.joint of each prime-mover tag, in the same order (without it, the joint is read from the tag's key: shoulder_extension is the shoulder).
   primeMoverJoints?: (string | null)[];
+  // Mobility and Cardio work is left out, as in the volume and back-to-back checks (three hip drills on a mobility day are the point of the day).
+  category?: SpotterCategory | null;
 }
 
 export interface BiomechRedundancyFlag {
@@ -305,6 +307,7 @@ export function detectBiomechRedundancy(entries: BiomechTaggedEntry[]): BiomechR
   const byDayTag = new Map<string, { tagKey: string; weekNumber: number; dayIndex: number | null; names: Set<string> }>();
   for (const e of entries) {
     if (!isSingleJoint(e)) continue;
+    if (e.category && EXCLUDED_FROM_VOLUME.has(e.category)) continue;
     for (const tagKey of e.primeMoverTagKeys) {
       const key = `${dayKey(e)}::${tagKey}`;
       const group = byDayTag.get(key) ?? { tagKey, weekNumber: e.weekNumber, dayIndex: e.dayIndex ?? null, names: new Set<string>() };

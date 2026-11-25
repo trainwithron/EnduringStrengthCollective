@@ -26,6 +26,7 @@ import { SaveToastChannelContext } from "./save-toast-channel";
 import { createSaveToastChannel } from "@/lib/save-toast";
 import { TrainingIntentSelector } from "../training-intent-selector";
 import { ProgramBuilderChat } from "./program-builder-chat";
+import type { SpotterFlag } from "@/lib/programming-spotter-gather";
 import { REST_TEMPO_SUGGESTIONS, type TrainingIntent } from "@/lib/training-intent";
 import { ProgramDescriptionEditor } from "@/components/coach/program-description-editor";
 import { ClientSwapsNotice } from "./client-swaps-notice";
@@ -54,6 +55,7 @@ export function ProgramBuilderDesktop({
   toolbarExtra,
   aiDraft = false,
   orgProgram = false,
+  spotterNotes = null,
 }: {
   programId: string;
   groupId: string;
@@ -108,6 +110,8 @@ export function ProgramBuilderDesktop({
   aiDraft?: boolean;
   // An organization program: Assign lists the organization's clients and its groups (lib/org-programs.ts).
   orgProgram?: boolean;
+  // The Spotter's notes, shown in the builder chat (a program made in the chat); null when the page shows them as the panel.
+  spotterNotes?: SpotterFlag[] | null;
 }) {
   // Own channel per mount — fixes a real bug (see lib/save-toast.ts's
   // createSaveToastChannel doc comment): the full-page builder and an
@@ -395,6 +399,7 @@ export function ProgramBuilderDesktop({
               exerciseTierByName={exerciseTierByName}
               onDay={handleAiDay}
               orgProgram={orgProgram}
+              spotterNotes={spotterNotes}
             />
           </div>
         )}

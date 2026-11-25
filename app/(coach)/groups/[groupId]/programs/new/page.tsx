@@ -7,6 +7,7 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { CreateAndOpenProgram } from "@/components/coach/create-and-open-program";
 import { newProgramIsOrgProgram } from "@/lib/org-programs";
 import { getCoachedGroups, pickAnchorGroup } from "@/lib/coach-groups";
+import { draftAddress, findClientDraft } from "@/lib/client-draft";
 
 export const metadata = { title: "New" };
 
@@ -15,7 +16,7 @@ export const metadata = { title: "New" };
 export default async function NewProgramPage(
   props: {
     params: Promise<{ groupId: string }>;
-    searchParams: Promise<{ method?: string; athleteId?: string; library?: string }>;
+    searchParams: Promise<{ method?: string; athleteId?: string; library?: string; fresh?: string }>;
   }
 ) {
   const params = await props.params;
@@ -81,6 +82,12 @@ export default async function NewProgramPage(
         forClient = { id: athleteId, groupId: params.groupId };
       }
     }
+  }
+
+  // The client already has a draft started for them (not assigned, hidden or followed): it opens instead of a new one (step 229). "Start a new one instead" comes back with fresh=1.
+  if (forClient && searchParams.fresh !== "1") {
+    const draftId = await findClientDraft(supabase, { coachId: user.id, groupId: targetGroupId, clientId: forClient.id });
+    if (draftId) redirect(draftAddress(targetGroupId, draftId, forClient, true));
   }
 
   return (

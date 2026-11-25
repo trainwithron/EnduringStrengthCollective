@@ -50,11 +50,13 @@ export function CreateAndOpenProgram({
     void (async () => {
       const name = (athleteId || forClient) && athleteFirstName ? `${athleteFirstName}'s program` : "New program";
       const id = await startOnce(JSON.stringify([groupId, createdBy, athleteId, forClient?.id ?? null, orgProgram]), async () => {
-        const { data, error: insertError } = await createBrowserClient()
-          .from("programs")
-          .insert({ group_id: groupId, name, created_by: createdBy, athlete_id: athleteId, is_active: athleteId !== null, training_intent: detectTrainingIntent(name), ...(orgProgram && athleteId === null ? { org_program: true } : {}) })
-          .select("id")
-          .single();
+        const row = { group_id: groupId, name, created_by: createdBy, athlete_id: athleteId, is_active: athleteId !== null, training_intent: detectTrainingIntent(name), ...(orgProgram && athleteId === null ? { org_program: true } : {}) };
+        const supabase = createBrowserClient();
+        // A draft started for a client says which client (step 229), so the next Build program for them opens it instead of making another.
+        const withClient: Record<string, unknown> = forClient ? { ...row, for_client_id: forClient.id } : row;
+        let { data, error: insertError } = await supabase.from("programs").insert(withClient).select("id").single();
+        // before step 229 is pasted the column is not there yet: made as before, without the link
+        if (insertError && forClient && /for_client_id/.test(insertError.message ?? "")) ({ data, error: insertError } = await supabase.from("programs").insert(row).select("id").single());
         return insertError || !data ? null : (data.id as string);
       });
       if (!id) {

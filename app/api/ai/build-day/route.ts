@@ -23,6 +23,8 @@ import { loadReferenceBlock } from "@/lib/reference-context";
 import { resolveAiExerciseName, exercisesWanted, allowsRepeats, applyTimedConsistency, dedupeDay, isMobilityTitle, longDayFlag, mobilityDayPlan, mobilityDaysWanted, mobilityInstruction, mobilityRole, namedMobilityDays, planRole, plainLibraryName, ruleKey } from "@/lib/ai-day-rules";
 import { DAY_MAX_TOKENS, TOO_LONG_MESSAGE, TRUNCATED_RETRY_NOTE, buildDaySystemPrompt, buildDayUserText, checkRunToken, issueRunToken, readDayResult, runTokenIsStale, truncatedRetryTimeoutMs, type BuiltDay } from "@/lib/ai-day-run";
 import { FOLLOWED_PROGRAM_MESSAGE, readProgramIsFollowed } from "@/lib/ai-live-program";
+import { dayNotes, keptLine, repairNote, takeRetry, type DayLookups } from "@/lib/builder-spotter";
+import type { SpotterCategory, SpotterTier } from "@/lib/programming-spotter";
 
 // ONE workout per call (about 10 to 20 seconds), so a long program is many short calls and none of them can hit a time limit.
 export const maxDuration = 60;
@@ -45,6 +47,8 @@ export async function POST(request: Request) {
   const day = Number(body.day);
   const mode = body.mode === "fix" ? "fix" : "build";
   const instruction = typeof body.instruction === "string" ? body.instruction.slice(0, MAX_TEXT_CHARS) : "";
+  // Spotter notes this run already kept on purpose (said once in the chat): not tried again on later days.
+  const keptKeys: string[] = Array.isArray(body.keptKeys) ? body.keptKeys.filter((k: unknown) => typeof k === "string").map((k: string) => k.slice(0, 120)).slice(0, 20) : [];
   const corrections: string[] = Array.isArray(body.corrections) ? body.corrections.filter((c: unknown) => typeof c === "string").map((c: string) => c.slice(0, 500)).slice(0, 20) : [];
   if (!programId || !Number.isInteger(week) || !Number.isInteger(day) || week < 1 || week > 52 || day < 1 || day > 14) {
     return NextResponse.json({ error: "Missing or invalid program, week or day." }, { status: 400 });
@@ -176,10 +180,32 @@ export async function POST(request: Request) {
   const notes = [await loadNotesBlock(supabase, user.id, athleteId), await loadClientPlanBlock(supabase, athleteId, groupId)].filter(Boolean).join("\n\n") || null;
   const referenceId = typeof body.referenceClientId === "string" && /^[0-9a-f-]{36}$/i.test(body.referenceClientId) ? body.referenceClientId : null;
   const reference = await loadReferenceBlock(supabase, user.id, referenceId, groupId);
-  const [{ data: libraryRows }, { data: aliasRows }] = await Promise.all([
+  const [{ data: libraryRows }, { data: aliasRows }, { data: dismissalRows }] = await Promise.all([
     supabase.from("exercise_library").select("name, category").eq("created_by", user.id).order("name").limit(3000),
     supabase.from("exercise_aliases").select("raw_name, exercise_name").eq("coach_id", user.id),
+    // what the coach already said no to in the Spotter on this program is never raised or "fixed" by the builder
+    supabase.from("programming_spotter_dismissals").select("check_kind, pattern_key").eq("program_id", programId),
   ]);
+  const skipNotes = new Set([...((dismissalRows ?? []) as { check_kind: string; pattern_key: string }[]).map((d) => `${d.check_kind}::${d.pattern_key}`), ...keptKeys]);
+  const categoryByName = new Map<string, SpotterCategory | null>(((libraryRows ?? []) as { name: string; category: string | null }[]).map((r) => [r.name, (r.category as SpotterCategory | null) ?? null]));
+  // The Spotter's facts for the day's exercises: the coach's movement pattern and tier, and the prime-mover tags. A failed read just means no notes (the day is still built).
+  async function lookups(names: string[]): Promise<DayLookups> {
+    const info: DayLookups = { patternByName: new Map(), tagsByName: new Map(), categoryByName };
+    if (names.length === 0) return info;
+    const [{ data: patternRows }, { data: tagRows }] = await Promise.all([
+      supabase.from("movement_pattern_exercises").select("exercise_name, movement_pattern_id, tier, movement_patterns!inner ( created_by )").eq("movement_patterns.created_by", user!.id).in("exercise_name", names),
+      supabase.from("exercise_biomech_tags").select("exercise_name, biomech_tags!inner ( key, joint )").eq("role", "prime_mover").in("exercise_name", names),
+    ]);
+    for (const r of (patternRows ?? []) as any[]) if (!info.patternByName.has(r.exercise_name)) info.patternByName.set(r.exercise_name, { id: r.movement_pattern_id as string, tier: (r.tier ?? null) as SpotterTier | null });
+    for (const r of (tagRows ?? []) as any[]) {
+      if (!r.biomech_tags?.key) continue;
+      const t = info.tagsByName.get(r.exercise_name) ?? { keys: [], joints: [] };
+      t.keys.push(r.biomech_tags.key as string);
+      t.joints.push((r.biomech_tags.joint as string | null) ?? null);
+      info.tagsByName.set(r.exercise_name, t);
+    }
+    return info;
+  }
   const libraryItems: LibraryItem[] = (libraryRows ?? []).filter((r: any) => !isBadExerciseName(r.name as string)).map((r: any) => ({ name: r.name as string, category: (r.category as string | null) ?? null, pattern: null, tier: null }));
   const shown = rankLibrary(libraryItems, `${instruction} ${corrections.join(" ")}`);
   const libraryText = libraryContext(shown, libraryItems.length);
@@ -214,7 +240,10 @@ export async function POST(request: Request) {
     const tidy = youthPass.rows;
     // The coach's own named exercises are never flagged or replaced by the "worth a look" checks.
     const scan = scanConstraints(sayings, tidy.filter((r) => !r.coachNamed).map((r) => ({ week: `Week ${week}`, day: `Day ${day}`, exerciseName: r.exerciseName, sets: r.sets, reps: r.reps, weight: r.weight, rpe: r.rpe, rest: r.rest, timeSeconds: r.timeSeconds }) as never), { weekCount: false });
-    return { result: { ...parsed, exercises: tidy }, rows: tidy, scan, youthFlags: youthPass.flags };
+    // The Spotter's checks on this day as written (never on a mobility day: several drills for one joint are the point of it).
+    const mobilityDay = role === "must" || isMobilityTitle(parsed.title);
+    const spotter = mobilityDay ? [] : dayNotes(tidy, await lookups([...new Set(tidy.map((r) => r.exerciseName))]).catch(() => ({ patternByName: new Map(), tagsByName: new Map(), categoryByName })), skipNotes);
+    return { result: { ...parsed, exercises: tidy }, rows: tidy, scan, youthFlags: youthPass.flags, spotter };
   }
   // A flag that says a chosen exercise breaks something the coach said to leave out (not the softer "check this" notes).
   const isHard = (flag: string) => /conflicts with "no |which your description said to leave out/.test(flag);
@@ -231,13 +260,14 @@ export async function POST(request: Request) {
       first = await attempt(TRUNCATED_RETRY_NOTE, retryTimeout);
     }
     if (!first) return NextResponse.json({ error: "Couldn't build that day. Try Resume, or tell it what to change." }, { status: 502 });
-    // One automatic retry when the day breaks something the coach said to leave out, if there is time left in this request.
+    // One automatic retry when the day breaks something the coach said to leave out, or stacks work the Spotter would question (the one repair try), if there is time left in this request.
     const hard = first.scan.filter(isHard);
     const elapsed = Date.now() - startedAt;
-    if (hard.length > 0 && elapsed <= 28_000) {
+    const retryNote = [hard.length > 0 ? `Your last try for this day broke what the coach said to leave out: ${hard.join(" ")} Write the day again without those.` : null, repairNote(first.spotter)].filter(Boolean).join(" ");
+    if (retryNote && elapsed <= 28_000) {
       try {
-        const second = await attempt(`Your last try for this day broke what the coach said to leave out: ${hard.join(" ")} Write the day again without those.`, Math.max(15_000, 55_000 - elapsed - 4_000));
-        if (second && second.scan.filter(isHard).length <= hard.length) first = second;
+        const second = await attempt(retryNote, Math.max(15_000, 55_000 - elapsed - 4_000));
+        if (second && takeRetry({ hard: hard.length, notes: first.spotter.length }, { hard: second.scan.filter(isHard).length, notes: second.spotter.length })) first = second;
       } catch {
         // the first try stands, with its notes
       }
@@ -342,6 +372,8 @@ export async function POST(request: Request) {
       flags,
       // The rules used for this day, shown to the coach with their reason and an Undo.
       applied: toApplied(taughtRules),
+      // What the Spotter would still question in this day after the one repair try: why it was kept, or that it is worth a look (one line each, coach-only, shown in the builder chat).
+      kept: first.spotter.map((n) => ({ key: n.key, line: keptLine(n, { week, day }, result.kept ?? null) })),
       runToken: issueRunToken(user.id, programId, (run.ok ? run.days : 0) + 1, Date.now(), run.ok ? run.issuedAt : startedAt),
     });
   } catch (err) {

@@ -18,7 +18,8 @@ import type { SpotterFlag } from "@/lib/programming-spotter-gather";
 // mechanism this panel already had). A flag that's been denied/edited 3
 // of the last 5 times it fired gets a one-tap "stop suggesting this"
 // card instead of the normal three actions.
-export function ProgrammingSpotterPanel({ programId, flags }: { programId: string; flags: SpotterFlag[] }) {
+// variant "chat" (Nov 24): on a program made in the builder chat the same notes, with the same Confirm / Edit / Deny, sit at the end of the chat instead of as the panel above the builder.
+export function ProgrammingSpotterPanel({ programId, flags, variant = "panel" }: { programId: string; flags: SpotterFlag[]; variant?: "panel" | "chat" }) {
   const router = useRouter();
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [handled, setHandled] = useState<Set<string>>(new Set());
@@ -91,10 +92,10 @@ export function ProgrammingSpotterPanel({ programId, flags }: { programId: strin
   }
 
   return (
-    <div className="border border-rust/40 bg-rust/5 px-4 py-3 mb-4">
+    <div className={variant === "chat" ? "self-stretch border-l-2 border-rust/40 pl-3" : "border border-rust/40 bg-rust/5 px-4 py-3 mb-4"} data-spotter-notes={variant}>
       <div className="flex items-center justify-between mb-2">
         <p className="font-body text-xs text-rust-ink uppercase tracking-wide font-bold">
-          Programming Spotter
+          {variant === "chat" ? "Spotter notes" : "Programming Spotter"}
         </p>
         {visible.length > 1 && (
           <div className="flex items-center gap-4">

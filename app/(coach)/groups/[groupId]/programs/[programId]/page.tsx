@@ -50,7 +50,7 @@ export default async function ProgramDetailPage(
     // always landed back at the top and had to manually find and expand
     // that week themselves. `?week=N` lets the mini-view jump straight
     // to the right week already open.
-    searchParams: Promise<{ week?: string; forClient?: string; clientGroup?: string; edit?: string; templateNote?: string; swap?: string }>;
+    searchParams: Promise<{ week?: string; forClient?: string; clientGroup?: string; edit?: string; templateNote?: string; swap?: string; reopened?: string }>;
   }
 ) {
   const params = await props.params;
@@ -134,6 +134,7 @@ export default async function ProgramDetailPage(
         requestedWeek={requestedWeek}
         forClientId={searchParams.forClient ?? null}
         clientGroupId={searchParams.clientGroup ?? null}
+        reopened={searchParams.reopened === "1"}
         templateNote={typeof searchParams.templateNote === "string" && searchParams.templateNote.length <= 400 ? searchParams.templateNote : null}
       />
     );
@@ -309,6 +310,7 @@ async function CoachProgramBuilder({
   requestedWeek,
   forClientId,
   clientGroupId,
+  reopened,
   templateNote = null,
 }: {
   groupId: string;
@@ -317,6 +319,8 @@ async function CoachProgramBuilder({
   requestedWeek: number | null;
   forClientId: string | null;
   clientGroupId: string | null;
+  // Build program opened the client's draft instead of a new one (step 229): the banner offers "Start a new one instead".
+  reopened: boolean;
   // Just made with Make a template: the line saying which exercises became slots.
   templateNote?: string | null;
 }) {
@@ -368,7 +372,7 @@ async function CoachProgramBuilder({
 
   return (
     <CoachDesktopShell groupId={groupId} groupName={programPlace({ orgProgram: data.orgProgram, athleteName: null, groupName: data.groupName })} programLibrary={data.orgProgram} active="programs" wide>
-      {assignTo && <AssignToClientBanner programId={programId} clientId={assignTo.id} clientGroupId={assignTo.groupId} firstName={assignTo.firstName} alreadyAssigned={assignTo.assigned} aiDraft={isAiDraft} />}
+      {assignTo && <AssignToClientBanner programId={programId} clientId={assignTo.id} clientGroupId={assignTo.groupId} firstName={assignTo.firstName} alreadyAssigned={assignTo.assigned} aiDraft={isAiDraft} reopened={reopened} />}
       {/* The "Day N of M, you've moved X lbs" strip is for the client's own view of a program, not the coach's builder. */}
       {isAiDraft && <AiDraftBanner programId={programId} programName={data.programName} />}
       {/* Just made with Make a template: which exercises became slots, and which stayed as they are. */}
@@ -384,7 +388,8 @@ async function CoachProgramBuilder({
         />
       )}
       {data.loadFailed && <ProgramLoadRetry />}
-      {!data.loadFailed && <ProgrammingSpotterPanel programId={programId} flags={data.spotterFlags} />}
+      {/* On a program made in the builder chat, the Spotter's notes are at the end of the chat instead (spotter-builder cross-check, Nov 24). */}
+      {!data.loadFailed && !data.notesInChat && <ProgrammingSpotterPanel programId={programId} flags={data.spotterFlags} />}
       {!data.loadFailed && <BuilderLastTimeProvider value={data.lastTimeByExercise}><ProgramBuilderDesktop
         programId={programId}
         groupId={groupId}
@@ -416,6 +421,7 @@ async function CoachProgramBuilder({
         initialTrainingIntent={data.initialTrainingIntent}
         initialProgressions={(progressionRules ?? []) as { exercise_name: string; model: string; config: unknown }[]}
         initialExpandedWeek={requestedWeek}
+        spotterNotes={data.notesInChat ? data.spotterFlags : null}
       /></BuilderLastTimeProvider>}
     </CoachDesktopShell>
   );

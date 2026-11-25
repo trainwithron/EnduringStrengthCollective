@@ -182,6 +182,7 @@ export async function gatherProgrammingSpotterFlags(
       dayIndex: dayByWorkoutId.get(e.workout_id) ?? null,
       primeMoverTagKeys: primeMoverTagsByName.get(e.exercise_name)?.keys ?? [],
       primeMoverJoints: primeMoverTagsByName.get(e.exercise_name)?.joints ?? [],
+      category,
     });
   }
 

@@ -56,6 +56,8 @@ export interface ProgramBuilderData {
   dayProgress: { dayNumber: number; totalDays: number } | null;
   totalVolumeLbs: number;
   spotterFlags: SpotterFlag[];
+  // The program has a builder chat conversation: the Spotter's notes show in the chat instead of the panel (spotter-builder cross-check, Nov 24).
+  notesInChat: boolean;
   // The program's days could not be read just now (the read itself failed). The page then says so and offers a retry instead of drawing an empty program.
   loadFailed: boolean;
   // On a client's own program (athleteId set): the client's last weight and reps on each exercise, by name (B6). Empty otherwise.
@@ -98,6 +100,7 @@ export async function getProgramBuilderData(
     linkedIds,
     lastTimeByExercise,
     headerIds,
+    { data: chatThread },
   ] = await Promise.all([
     supabase.from("groups").select("name").eq("id", groupId).single(),
     supabase
@@ -139,6 +142,8 @@ export async function getProgramBuilderData(
     program.athlete_id ? recentLastTimes(supabase, program.athlete_id as string) : Promise.resolve({} as Record<string, { weight: number; reps: number }>),
     // Section headers (B3): which day notes are headers. Read on their own like the links.
     headerNotesOfProgram(supabase, programId),
+    // The program was made in the builder chat (this coach has its conversation): the Spotter's notes then show in the chat, not as the panel above the builder.
+    supabase.from("coach_chat_threads").select("id").eq("coach_id", coachId).eq("program_id", programId).limit(1).maybeSingle(),
   ]);
 
   // The coach's own demos first, then the Spotlight ones (the builder card says when a Spotlight demo is the one showing).
@@ -257,6 +262,7 @@ export async function getProgramBuilderData(
     dayProgress,
     totalVolumeLbs,
     spotterFlags,
+    notesInChat: !!chatThread,
     loadFailed: !!workoutsError,
     lastTimeByExercise,
   };

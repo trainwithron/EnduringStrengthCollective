@@ -6,6 +6,7 @@ export const RUN_TTL_MS = 2 * 60 * 60 * 1000;
 import { MAX_DAYS_PER_RUN, daysPerWeekOf, type DaySlot } from "@/lib/ai-day-slots";
 import { clampAiRow } from "@/lib/ai-row-clamps";
 import { PAIN_MONITORING_GUIDANCE } from "@/lib/pain-guidance";
+import { readKept } from "@/lib/builder-spotter";
 
 export { MAX_DAYS_PER_RUN, daysPerWeekOf };
 export type { DaySlot };
@@ -185,6 +186,7 @@ export interface DayExercise {
 export interface DayResult {
   title: string;
   exercises: DayExercise[];
+  kept?: string;
 }
 
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
@@ -212,7 +214,9 @@ export function readDayResult(parsed: unknown, fallbackTitle: string): DayResult
     }));
   }
   const title = typeof p.title === "string" && p.title.trim() ? p.title.trim().slice(0, 60) : fallbackTitle;
-  return { title, exercises };
+  // after the Spotter's repair note (lib/builder-spotter.ts): why the day keeps stacked work on purpose, in a few words
+  const kept = readKept((parsed as { kept?: unknown }).kept);
+  return kept ? { title, exercises, kept } : { title, exercises };
 }
 
 // ---- a day that is too long to write -------------------------------------------------------------

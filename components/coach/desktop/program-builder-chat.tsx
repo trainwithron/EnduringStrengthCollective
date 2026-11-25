@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { readAiJson } from "@/lib/ai-fetch";
 import { checked } from "@/lib/checked-write";
@@ -13,6 +14,9 @@ import { TemplateSuggestion } from "@/components/coach/desktop/template-suggesti
 import { LearnLine } from "@/components/coach/desktop/learn-line";
 import { LikeClientSuggestion } from "@/components/coach/desktop/like-client";
 import { PastAiNotes } from "@/components/coach/desktop/past-ai-notes";
+import { ProgrammingSpotterPanel } from "@/components/coach/desktop/programming-spotter-panel";
+import type { SpotterFlag } from "@/lib/programming-spotter-gather";
+import { MAX_KEPT_LINES } from "@/lib/builder-spotter";
 import { appliedLine, type AppliedRule } from "@/lib/learned-for-prompt";
 import { isFreshStart, isNewRequest, parseBuildRequest, planSlots, replanQueue, scopeLimitFrom, fixTargetFrom, weekDaysFor } from "@/lib/ai-day-request";
 import { mergeFlags } from "@/lib/constraint-scan";
@@ -69,6 +73,7 @@ export function ProgramBuilderChat({
   exerciseTierByName,
   onDay,
   orgProgram = false,
+  spotterNotes = null,
 }: {
   programId: string;
   groupId: string;
@@ -79,7 +84,10 @@ export function ProgramBuilderChat({
   exerciseTierByName: Record<string, "A" | "B" | "C" | null>;
   onDay: (day: BuilderDay) => void;
   orgProgram?: boolean;
+  // The Spotter's notes on this program, when they show here instead of the panel (the program was made in this chat); null when the panel shows them.
+  spotterNotes?: SpotterFlag[] | null;
 }) {
+  const router = useRouter();
   const trainingDaysCount = trainingDays && trainingDays.length > 0 ? trainingDays.length : null;
   const [msgs, setMsgs] = useState<ChatMsg[]>([]);
   const [composer, setComposer] = useState("");
@@ -211,6 +219,9 @@ export function ProgramBuilderChat({
   const progressItems = useRef<ProgressItem[]>([]);
   const shownFlags = useRef<string[]>([]);
   const runFlags = useRef<string[]>([]);
+  // The builder's own Spotter check (Nov 24): notes it kept on purpose this run, said once each (by the Spotter's key), at most 3 lines when the run stops.
+  const keptKeys = useRef<string[]>([]);
+  const keptLines = useRef<string[]>([]);
   const notesSent = useRef("");
   const whyThread = useRef<Exchange[]>([]);
   const pendingPlan = useRef<{ id: string; request: string } | null>(null);
@@ -233,11 +244,16 @@ export function ProgramBuilderChat({
       const res = await fetch("/api/ai/build-day", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ programId, week: slot.week, day: slot.day, daysInWeek: runPlan.current?.daysPerWeek, mode, instruction: request.current, corrections: corrections.current, runToken: token.current ?? undefined, referenceClientId: referenceId.current }),
+        body: JSON.stringify({ programId, week: slot.week, day: slot.day, daysInWeek: runPlan.current?.daysPerWeek, mode, instruction: request.current, corrections: corrections.current, runToken: token.current ?? undefined, referenceClientId: referenceId.current, keptKeys: keptKeys.current }),
       });
       const data = await readAiJson(res);
       if (!res.ok || !data.workoutId) return { ok: false, message: (data.error as string | undefined) ?? COULDNT };
       if (typeof data.runToken === "string") token.current = data.runToken;
+      for (const k of Array.isArray(data.kept) ? (data.kept as { key?: unknown; line?: unknown }[]) : []) {
+        if (typeof k?.key !== "string" || typeof k.line !== "string" || keptKeys.current.includes(k.key)) continue;
+        keptKeys.current = [...keptKeys.current, k.key];
+        keptLines.current = [...keptLines.current, k.line];
+      }
       return { ok: true, workoutId: data.workoutId as string, flags: Array.isArray(data.flags) ? (data.flags as string[]) : [], applied: Array.isArray(data.applied) ? (data.applied as AppliedRule[]) : [] };
     } catch {
       return { ok: false, message: COULDNT };
@@ -254,6 +270,13 @@ export function ProgramBuilderChat({
     return day.title || null;
   }
 
+  // What the builder kept on purpose after its own Spotter check: one message, at most 3 lines; then the Spotter's notes below the chat are read again for the new days.
+  function sayKept() {
+    const lines = keptLines.current.slice(0, MAX_KEPT_LINES);
+    keptLines.current = [];
+    if (lines.length > 0) say(lines.join("\n"));
+    router.refresh();
+  }
   function setProgress(items: ProgressItem[], ended: "done" | "paused" | null) {
     progressItems.current = items;
     const said = request.current;
@@ -262,6 +285,7 @@ export function ProgramBuilderChat({
     if (ended) {
       const id = progressId.current;
       keep({ id, kind: "progress", items, ended, request: said });
+      sayKept();
     }
   }
 
@@ -317,6 +341,8 @@ export function ProgramBuilderChat({
   // `keep`: changes that go along from the first day (a correction typed into a run whose days were deleted).
   function startRun(said: string, slots?: DaySlot[], keep: string[] = []) {
     request.current = said;
+    keptKeys.current = [];
+    keptLines.current = [];
     corrections.current = keep;
     token.current = null;
     pauseRequested.current = false;
@@ -846,6 +872,7 @@ export function ProgramBuilderChat({
             </div>
           );
         })}
+        {spotterNotes && spotterNotes.length > 0 && !building && <ProgrammingSpotterPanel programId={programId} flags={spotterNotes} variant="chat" />}
         {busy === "why" && <p className="font-body text-sm text-steel">Thinking…</p>}
         {busy === "preview" && <p className="font-body text-sm text-steel">Working out the changes…</p>}
         {importText !== null && <ProgramImportPanel groupId={groupId} athleteId={athleteId} orgProgram={orgProgram} programId={programId} text={importText} onClose={() => setImportText(null)} />}
