@@ -172,6 +172,7 @@ describe("detectBiomechRedundancy", () => {
       {
         tagKey: "shoulder_external_rotation",
         weekNumber: 2,
+        dayIndex: null,
         exerciseNames: ["Banded External Rotation", "DB External Rotation", "Overhead Y-Raise"],
       },
     ]);
@@ -226,15 +227,16 @@ describe("detectBiomechRedundancy", () => {
     expect(flags.map((f) => f.tagKey).sort()).toEqual(["hip_extension", "knee_extension"]);
   });
 
-  it("counts an exercise with multiple prime-mover tags toward each tag's own group", () => {
+  it("a compound (prime movers on two or more joints) does not count toward a joint action with single-joint work (Nov 24)", () => {
     const entries: BiomechTaggedEntry[] = [
       biomechEntry({ exerciseName: "Compound Lift", primeMoverTagKeys: ["hip_extension", "knee_extension"] }),
       biomechEntry({ exerciseName: "B", primeMoverTagKeys: ["hip_extension"] }),
       biomechEntry({ exerciseName: "C", primeMoverTagKeys: ["hip_extension"] }),
     ];
-    const flags = detectBiomechRedundancy(entries);
-    expect(flags).toEqual([
-      { tagKey: "hip_extension", weekNumber: 1, exerciseNames: ["B", "C", "Compound Lift"] },
+    expect(detectBiomechRedundancy(entries)).toEqual([]);
+    // a third single-joint one does
+    expect(detectBiomechRedundancy([...entries, biomechEntry({ exerciseName: "D", primeMoverTagKeys: ["hip_extension"] })])).toEqual([
+      { tagKey: "hip_extension", weekNumber: 1, dayIndex: null, exerciseNames: ["B", "C", "D"] },
     ]);
   });
 });

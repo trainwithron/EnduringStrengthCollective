@@ -11,6 +11,9 @@ import {
   detectMissingPatternCoverage,
   detectBiomechRedundancy,
   detectTooManyLiftingDays,
+  dayLabel,
+  firstOfEach,
+  pickSamePatternAlternative,
   type ProgramDayEntry,
   type SpotterExerciseEntry,
   type SpotterCategory,
@@ -33,12 +36,8 @@ export interface SpotterFlag {
   promptStopSuggesting: boolean;
 }
 
-// A > B > C > untiered, for the biomech-redundancy check's alternative-
-// exercise selection (biomechanical_redundancy_consolidation_spotter_
-// idea.md, Q2) — same ordering the ladder-picker's own tier field
-// already carries meaning for, just reused as a plain sort weight here
-// rather than a ranked ladder.
-const TIER_RANK: Record<string, number> = { A: 3, B: 2, C: 1 };
+// " (and 2 more days)": the same thing on other days of the program, counted rather than shown again.
+const alsoOn = (moreDays: number) => (moreDays > 0 ? ` (and ${moreDays} more day${moreDays === 1 ? "" : "s"})` : "");
 
 const CATEGORY_LABELS: Record<string, string> = {
   Push: "Push",
@@ -58,7 +57,7 @@ export async function gatherProgrammingSpotterFlags(
 
   // The program's days and its dismissals do not depend on each other: read together (the dismissals are simply unused if there are no days).
   const [{ data: workouts }, { data: dismissalRows }, { data: programRow }] = await Promise.all([
-    supabase.from("workouts").select("id, week_number").eq("program_id", programId),
+    supabase.from("workouts").select("id, week_number, day_index").eq("program_id", programId),
     supabase.from("programming_spotter_dismissals").select("check_kind, pattern_key, dismissed_count").eq("program_id", programId),
     // whose program it is: the lifting-days check is for a program of ONE client
     supabase.from("programs").select("athlete_id, group_id").eq("id", programId).maybeSingle(),
@@ -66,6 +65,8 @@ export async function gatherProgrammingSpotterFlags(
   if (!workouts || workouts.length === 0) return [];
 
   const weekByWorkoutId = new Map(workouts.map((w) => [w.id, w.week_number as number]));
+  const dayByWorkoutId = new Map(workouts.map((w) => [w.id, (w as { day_index?: number | null }).day_index ?? null]));
+  const multiWeek = new Set(workouts.map((w) => w.week_number as number)).size > 1;
   const workoutIds = workouts.map((w) => w.id);
 
   const { data: exerciseRows } = await supabase
@@ -93,26 +94,30 @@ export async function gatherProgrammingSpotterFlags(
     // shared exercise name is still real biomechanical fact.
     supabase
       .from("exercise_biomech_tags")
-      .select("exercise_name, biomech_tags!inner ( key )")
+      .select("exercise_name, biomech_tags!inner ( key, joint )")
       .eq("role", "prime_mover")
       .in("exercise_name", exerciseNames),
   ]);
 
-  const primeMoverTagsByName = new Map<string, string[]>();
+  const primeMoverTagsByName = new Map<string, { keys: string[]; joints: (string | null)[] }>();
   for (const row of (biomechTagRows ?? []) as any[]) {
     const tagKey = row.biomech_tags?.key;
     if (!tagKey) continue;
-    const list = primeMoverTagsByName.get(row.exercise_name) ?? [];
-    list.push(tagKey);
-    primeMoverTagsByName.set(row.exercise_name, list);
+    const tags = primeMoverTagsByName.get(row.exercise_name) ?? { keys: [], joints: [] };
+    tags.keys.push(tagKey);
+    tags.joints.push(row.biomech_tags?.joint ?? null);
+    primeMoverTagsByName.set(row.exercise_name, tags);
   }
 
   const categoryByName = new Map((libraryRows ?? []).map((r) => [r.name as string, r.category as SpotterCategory | null]));
   const tierByName = new Map<string, { movementPatternId: string; tier: SpotterTier | null }>();
+  // every pattern each exercise is in (the suggested swap must share one with the flagged exercises)
+  const patternIdsByName = new Map<string, string[]>();
   for (const row of (tierRows ?? []) as any[]) {
     if (!tierByName.has(row.exercise_name)) {
       tierByName.set(row.exercise_name, { movementPatternId: row.movement_pattern_id, tier: row.tier });
     }
+    patternIdsByName.set(row.exercise_name, [...(patternIdsByName.get(row.exercise_name) ?? []), row.movement_pattern_id as string]);
   }
 
   // Slot counts per workout, for the session-position suppressor.
@@ -143,6 +148,8 @@ export async function gatherProgrammingSpotterFlags(
       slotIndex: e.exercise_order,
       slotCountInSession: slotCountByWorkout.get(e.workout_id) ?? 1,
       weekNumber: week,
+      workoutId: e.workout_id,
+      dayIndex: dayByWorkoutId.get(e.workout_id) ?? null,
     });
 
     // Fingerprint every tracked field the builder supports, not just
@@ -171,7 +178,10 @@ export async function gatherProgrammingSpotterFlags(
     biomechEntries.push({
       exerciseName: e.exercise_name,
       weekNumber: week,
-      primeMoverTagKeys: primeMoverTagsByName.get(e.exercise_name) ?? [],
+      workoutId: e.workout_id,
+      dayIndex: dayByWorkoutId.get(e.workout_id) ?? null,
+      primeMoverTagKeys: primeMoverTagsByName.get(e.exercise_name)?.keys ?? [],
+      primeMoverJoints: primeMoverTagsByName.get(e.exercise_name)?.joints ?? [],
     });
   }
 
@@ -194,12 +204,12 @@ export async function gatherProgrammingSpotterFlags(
     });
   }
 
-  for (const f of detectRedundancy(entries)) {
+  for (const { flag: f, moreDays } of firstOfEach(detectRedundancy(entries), (r) => r.movementPatternId)) {
     if (isDismissed("redundancy", f.movementPatternId)) continue;
     flags.push({
       checkKind: "redundancy",
       patternKey: f.movementPatternId,
-      headline: `Week ${f.weekNumber}: ${f.exerciseNames.join(", ")} are stacked back-to-back on the same movement pattern — intentional variety, or would one exercise for the same total sets do the job faster?`,
+      headline: `${dayLabel(f, multiWeek)}${alsoOn(moreDays)}: ${f.exerciseNames.join(", ")} are stacked back-to-back on the same movement pattern — intentional variety, or would one exercise for the same total sets do the job faster?`,
       promptStopSuggesting: false,
     });
   }
@@ -252,11 +262,11 @@ export async function gatherProgrammingSpotterFlags(
     }
   }
 
-  const biomechFlags = detectBiomechRedundancy(biomechEntries).filter(
-    (f) => !isDismissed("biomech_redundancy", f.tagKey)
+  const biomechFlags = firstOfEach(detectBiomechRedundancy(biomechEntries), (f) => f.tagKey).filter(
+    ({ flag: f }) => !isDismissed("biomech_redundancy", f.tagKey)
   );
   if (biomechFlags.length > 0) {
-    const flaggedTagKeys = [...new Set(biomechFlags.map((f) => f.tagKey))];
+    const flaggedTagKeys = [...new Set(biomechFlags.map(({ flag: f }) => f.tagKey))];
 
     // Selection lookup (Q2): among ANY exercise tagged prime_mover with a
     // flagged tag key, narrow to the coach's own exercise_library, then
@@ -288,38 +298,28 @@ export async function gatherProgrammingSpotterFlags(
       supabase.from("exercise_library").select("name").eq("created_by", coachId).in("name", allCandidateNames),
       supabase
         .from("movement_pattern_exercises")
-        .select("exercise_name, tier, movement_patterns!inner ( created_by )")
+        .select("exercise_name, tier, movement_pattern_id, movement_patterns!inner ( created_by )")
         .eq("movement_patterns.created_by", coachId)
         .in("exercise_name", allCandidateNames),
     ]);
 
     const coachOwnCandidateNames = new Set((candidateLibraryRows ?? []).map((r) => r.name as string));
-    const tierByCandidateName = new Map<string, SpotterTier | null>();
-    for (const row of (candidateTierRows ?? []) as any[]) {
-      if (!tierByCandidateName.has(row.exercise_name)) tierByCandidateName.set(row.exercise_name, row.tier);
-    }
+    // one candidate per (exercise, pattern) row, so the tier is the one it has in that pattern
+    const candidateRows = ((candidateTierRows ?? []) as any[]).map((row) => ({ name: row.exercise_name as string, tier: (row.tier ?? null) as SpotterTier | null, patternIds: [row.movement_pattern_id as string] }));
 
-    function pickBestAlternative(tagKey: string, excludeNames: string[]): string | null {
-      const names = [...(candidateNamesByTag.get(tagKey) ?? [])].filter(
-        (n) => coachOwnCandidateNames.has(n) && !excludeNames.includes(n)
+    for (const { flag: f, moreDays } of biomechFlags) {
+      const withTag = candidateNamesByTag.get(f.tagKey) ?? new Set<string>();
+      const alternative = pickSamePatternAlternative(
+        f.exerciseNames,
+        patternIdsByName,
+        candidateRows.filter((c) => withTag.has(c.name) && coachOwnCandidateNames.has(c.name))
       );
-      if (names.length === 0) return null;
-      names.sort((a, b) => {
-        const rankA = TIER_RANK[tierByCandidateName.get(a) ?? ""] ?? 0;
-        const rankB = TIER_RANK[tierByCandidateName.get(b) ?? ""] ?? 0;
-        if (rankA !== rankB) return rankB - rankA;
-        return a.localeCompare(b);
-      });
-      return names[0];
-    }
-
-    for (const f of biomechFlags) {
-      const alternative = pickBestAlternative(f.tagKey, f.exerciseNames);
       const tagLabel = labelByTagKey.get(f.tagKey) ?? f.tagKey.replace(/_/g, " ");
       const exerciseList = f.exerciseNames.join(", ");
+      const where = `${dayLabel(f, multiWeek)}${alsoOn(moreDays)}`;
       const headline = alternative
-        ? `Week ${f.weekNumber}: ${exerciseList} all train ${tagLabel} — intentional specialization, or would ${alternative} for more total load cover the same ground?`
-        : `Week ${f.weekNumber}: ${exerciseList} all train ${tagLabel} — worth consolidating, or intentional?`;
+        ? `${where}: ${exerciseList} all train ${tagLabel} — intentional specialization, or would ${alternative} for more total load cover the same ground?`
+        : `${where}: ${exerciseList} all train ${tagLabel} — worth consolidating, or intentional?`;
       flags.push({ checkKind: "biomech_redundancy", patternKey: f.tagKey, headline, promptStopSuggesting: false });
     }
   }

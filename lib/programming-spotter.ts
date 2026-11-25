@@ -30,6 +30,9 @@ export interface SpotterExerciseEntry {
   slotIndex: number; // order within its session, 0 = first
   slotCountInSession: number; // total exercise slots in that session
   weekNumber: number;
+  // The day (workout) it is in. The back-to-back check runs per day; without it, the week stands in for the day.
+  workoutId?: string | null;
+  dayIndex?: number | null;
 }
 
 // Tier-sensitive per-session concentration ceiling (JTS's real published
@@ -132,20 +135,27 @@ export function detectVolumeConcentration(entries: SpotterExerciseEntry[]): Volu
 export interface RedundancyFlag {
   movementPatternId: string;
   weekNumber: number;
+  dayIndex: number | null;
   exerciseNames: string[];
 }
 
+// The day an entry is in: its workout, or (when the caller has no workout) its week.
+const dayKey = (e: { workoutId?: string | null; weekNumber: number }) => (e.workoutId ? `w:${e.workoutId}` : `week:${e.weekNumber}`);
+
+// Per DAY (Nov 24): it used to put a whole week's exercises in one list sorted by slot, so slot 2 of Monday and slot 2 of Wednesday sat "back to back".
 export function detectRedundancy(entries: SpotterExerciseEntry[]): RedundancyFlag[] {
   const counted = entries.filter((e) => e.category === null || !EXCLUDED_FROM_VOLUME.has(e.category));
-  const byWeek = new Map<number, SpotterExerciseEntry[]>();
+  const byDay = new Map<string, SpotterExerciseEntry[]>();
   for (const e of counted) {
-    const list = byWeek.get(e.weekNumber) ?? [];
+    const list = byDay.get(dayKey(e)) ?? [];
     list.push(e);
-    byWeek.set(e.weekNumber, list);
+    byDay.set(dayKey(e), list);
   }
 
   const flags: RedundancyFlag[] = [];
-  for (const [week, list] of byWeek) {
+  for (const list of byDay.values()) {
+    const week = list[0].weekNumber;
+    const dayIndex = list[0].dayIndex ?? null;
     const sorted = [...list].sort((a, b) => a.slotIndex - b.slotIndex);
     let runStart = 0;
     for (let i = 1; i <= sorted.length; i++) {
@@ -159,6 +169,7 @@ export function detectRedundancy(entries: SpotterExerciseEntry[]): RedundancyFla
           flags.push({
             movementPatternId: sorted[runStart].movementPatternId!,
             weekNumber: week,
+            dayIndex,
             exerciseNames: sorted.slice(runStart, i).map((e) => e.exerciseName),
           });
         }
@@ -238,40 +249,119 @@ export function detectFlatRepeat(entries: FlatRepeatEntry[]): FlatRepeatFlag[] {
 // false-positive constantly). Reuses the redundancy check's own "3, not
 // 2" threshold (Baz-Valle et al. 2019 — no evidence 2 overlapping
 // exercises is itself a problem).
+//
+// Nov 24 (Ron, on Robyn's program: rows "all train Elbow Flexion — would Barbell Curl cover it?"), two rules:
+//  * per DAY, not per week: the same joint action spread over a week's days is normal; three of it in ONE day is the question. Same threshold.
+//  * single-joint work only: an exercise whose prime movers span two or more joints (a row: shoulder, shoulder blade and elbow; a press; a squat: hip and knee) is a compound,
+//    and a compound is not curl or tricep work. Compounds are left to the same-pattern back-to-back check above. The shoulder and shoulder blade count as one joint here, and
+//    the elbow, forearm and wrist as one, so a lateral raise or a curl is still single-joint.
 export interface BiomechTaggedEntry {
   exerciseName: string;
   weekNumber: number;
   primeMoverTagKeys: string[];
+  // The day it is in (without it, the week stands in for the day).
+  workoutId?: string | null;
+  dayIndex?: number | null;
+  // biomech_tags.joint of each prime-mover tag, in the same order (without it, the joint is read from the tag's key: shoulder_extension is the shoulder).
+  primeMoverJoints?: (string | null)[];
 }
 
 export interface BiomechRedundancyFlag {
   tagKey: string;
   weekNumber: number;
+  dayIndex: number | null;
   exerciseNames: string[];
 }
 
 const BIOMECH_REDUNDANCY_THRESHOLD = 3;
 
+const JOINT_REGION: Record<string, string> = {
+  shoulder: "shoulder",
+  scapula: "shoulder",
+  elbow: "arm",
+  forearm: "arm",
+  wrist: "arm",
+  hip: "hip",
+  knee: "knee",
+  ankle: "ankle",
+  thoracic: "spine",
+  lumbar: "spine",
+  cervical: "spine",
+  spine: "spine",
+};
+
+function regionOf(tagKey: string, joint: string | null | undefined): string {
+  const j = (joint ?? tagKey.split("_")[0]).toLowerCase();
+  return JOINT_REGION[j] ?? JOINT_REGION[j.split("_")[0]] ?? j;
+}
+
+// One joint does the work (a curl, a pushdown, a hip thrust, a lateral raise). Two or more = a compound.
+export function isSingleJoint(e: Pick<BiomechTaggedEntry, "primeMoverTagKeys" | "primeMoverJoints">): boolean {
+  if (e.primeMoverTagKeys.length === 0) return false;
+  return new Set(e.primeMoverTagKeys.map((k, i) => regionOf(k, e.primeMoverJoints?.[i]))).size === 1;
+}
+
 export function detectBiomechRedundancy(entries: BiomechTaggedEntry[]): BiomechRedundancyFlag[] {
-  const namesByWeekTag = new Map<string, Set<string>>();
+  const byDayTag = new Map<string, { tagKey: string; weekNumber: number; dayIndex: number | null; names: Set<string> }>();
   for (const e of entries) {
+    if (!isSingleJoint(e)) continue;
     for (const tagKey of e.primeMoverTagKeys) {
-      const key = `${e.weekNumber}::${tagKey}`;
-      const names = namesByWeekTag.get(key) ?? new Set<string>();
-      names.add(e.exerciseName);
-      namesByWeekTag.set(key, names);
+      const key = `${dayKey(e)}::${tagKey}`;
+      const group = byDayTag.get(key) ?? { tagKey, weekNumber: e.weekNumber, dayIndex: e.dayIndex ?? null, names: new Set<string>() };
+      group.names.add(e.exerciseName);
+      byDayTag.set(key, group);
     }
   }
 
   const flags: BiomechRedundancyFlag[] = [];
-  for (const [key, names] of namesByWeekTag) {
-    if (names.size < BIOMECH_REDUNDANCY_THRESHOLD) continue;
-    const separatorIndex = key.indexOf("::");
-    const weekNumber = Number(key.slice(0, separatorIndex));
-    const tagKey = key.slice(separatorIndex + 2);
-    flags.push({ tagKey, weekNumber, exerciseNames: [...names].sort() });
+  for (const g of byDayTag.values()) {
+    if (g.names.size < BIOMECH_REDUNDANCY_THRESHOLD) continue;
+    flags.push({ tagKey: g.tagKey, weekNumber: g.weekNumber, dayIndex: g.dayIndex, exerciseNames: [...g.names].sort() });
   }
   return flags;
+}
+
+// The exercise to suggest instead (Nov 24): only one in the SAME movement pattern as the flagged exercises, so Ab Wheel is never offered for rows or Bench for pushdowns. The
+// pattern is the one most of the flagged exercises are in, and at least two of them must be in it; otherwise there is no suggestion (the headline then just asks). Among the
+// candidates in that pattern (the caller passes only the coach's own exercises with the flagged tag as a prime mover): tier A > B > C > none, then by name.
+export interface AlternativeCandidate {
+  name: string;
+  tier: SpotterTier | null;
+  patternIds: string[];
+}
+
+const TIER_ORDER: Record<string, number> = { A: 3, B: 2, C: 1 };
+
+export function sharedPattern(flaggedNames: string[], patternIdsByName: Map<string, string[]>): string | null {
+  const counts = new Map<string, number>();
+  for (const n of flaggedNames) for (const p of new Set(patternIdsByName.get(n) ?? [])) counts.set(p, (counts.get(p) ?? 0) + 1);
+  const best = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+  return best && best[1] >= 2 ? best[0] : null;
+}
+
+export function pickSamePatternAlternative(flaggedNames: string[], patternIdsByName: Map<string, string[]>, candidates: AlternativeCandidate[]): string | null {
+  const pattern = sharedPattern(flaggedNames, patternIdsByName);
+  if (!pattern) return null;
+  const names = candidates
+    .filter((c) => c.patternIds.includes(pattern) && !flaggedNames.includes(c.name))
+    .sort((a, b) => (TIER_ORDER[b.tier ?? ""] ?? 0) - (TIER_ORDER[a.tier ?? ""] ?? 0) || a.name.localeCompare(b.name));
+  return names[0]?.name ?? null;
+}
+
+// Where a flag is, for its headline: "Day 2", or "Week 3, Day 2" in a program of more than one week, with how many other days have the same thing.
+export function dayLabel(f: { weekNumber: number; dayIndex: number | null }, multiWeek: boolean): string {
+  if (f.dayIndex == null) return `Week ${f.weekNumber}`;
+  return multiWeek ? `Week ${f.weekNumber}, Day ${f.dayIndex}` : `Day ${f.dayIndex}`;
+}
+
+// One flag per thing (its dismissal key), at its first day; the other days with the same thing are counted, not listed again (a 4-week program used to show it 4 times).
+export function firstOfEach<T extends { weekNumber: number; dayIndex: number | null }>(flags: T[], keyOf: (f: T) => string): { flag: T; moreDays: number }[] {
+  const byKey = new Map<string, T[]>();
+  for (const f of flags) byKey.set(keyOf(f), [...(byKey.get(keyOf(f)) ?? []), f]);
+  return [...byKey.values()].map((list) => {
+    const sorted = [...list].sort((a, b) => a.weekNumber - b.weekNumber || (a.dayIndex ?? 0) - (b.dayIndex ?? 0));
+    return { flag: sorted[0], moreDays: sorted.length - 1 };
+  });
 }
 
 // More main lifting days in a week than the client said they can train (Ron, Nov 24: "A lot of times they'll say 3 days a week. And that'll be big lifts, but I'll assign
