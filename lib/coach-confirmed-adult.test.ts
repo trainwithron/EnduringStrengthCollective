@@ -183,8 +183,9 @@ describe("paste 230", () => {
     // platform-wide nothing is confirmed by the migration itself
     expect(mig).not.toContain("insert into public.client_adult_confirmations (athlete_id, confirmed_by)\nselect");
   });
-  it("a confirmation counts only while the coach who made it coaches every live group the client trains in (a second, made-up coach account never counts)", () => {
+  it("a confirmation counts only while the coach who made it coaches every live group the client is in, training or social (a second, made-up coach account never counts)", () => {
     expect(mig).toContain("where c.athlete_id = p_person and c.confirmed_by is not null");
+    expect(mig).toContain("where m.profile_id = p_person and m.role = 'athlete'\n            and not exists");
     expect(mig).toContain("and not exists (select 1 from public.group_memberships cc where cc.group_id = m.group_id and cc.profile_id = c.confirmed_by and cc.role = 'coach')");
     expect(mig).toContain("join public.groups g on g.id = m.group_id and g.archived_at is null");
   });

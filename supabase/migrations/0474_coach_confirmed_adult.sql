@@ -14,8 +14,9 @@ create table if not exists public.client_adult_confirmations (
 alter table public.client_adult_confirmations enable row level security;
 revoke all on public.client_adult_confirmations from anon, authenticated;
 
--- The rule's database half: confirmed by a coach who still coaches EVERY live group the person trains in (so a confirmation made from a second, made-up coach account never counts
--- in a real coach's group, and it lapses when the coach who made it stops coaching them), no date of birth in client_intake, and no profile birthday that says under 18.
+-- The rule's database half: confirmed by a coach who still coaches EVERY live group the person is a member of, training or social (so a confirmation made from a second,
+-- made-up coach account never counts in a real coach's group or feed, and it lapses when the coach who made it stops coaching them), no date of birth in client_intake, and no
+-- profile birthday that says under 18.
 -- Only the database's own functions call it.
 create or replace function public.coach_confirmed_adult(p_person uuid)
 returns boolean
@@ -31,7 +32,7 @@ as $$
           select 1
           from public.group_memberships m
           join public.groups g on g.id = m.group_id and g.archived_at is null
-          where m.profile_id = p_person and m.role = 'athlete' and m.membership_type = 'training'
+          where m.profile_id = p_person and m.role = 'athlete'
             and not exists (select 1 from public.group_memberships cc where cc.group_id = m.group_id and cc.profile_id = c.confirmed_by and cc.role = 'coach')
         )
     )

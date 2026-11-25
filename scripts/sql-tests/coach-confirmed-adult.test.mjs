@@ -138,7 +138,7 @@ expect("and counts again once that is no longer so", (await rule(NO_DOB)) === tr
 await db.exec(`insert into public.group_memberships (group_id, profile_id, role) values ('${G_ARCHIVED}', '${NO_DOB}', 'athlete')`);
 expect("an archived group does not count against it", (await rule(NO_DOB)) === true);
 await db.exec(`insert into public.group_memberships (group_id, profile_id, role, membership_type) values ('${G_OTHER}', '${NO_DOB}', 'athlete', 'social')`);
-expect("nor a group they only belong to socially", (await rule(NO_DOB)) === true);
+expect("a social seat in a group the confirming coach does not coach makes it lapse too", (await rule(NO_DOB)) === false);
 await db.exec(`delete from public.group_memberships where profile_id = '${NO_DOB}' and group_id in ('${G_ARCHIVED}', '${G_OTHER}')`);
 await db.exec(`delete from public.group_memberships where group_id = '${G_RON}' and profile_id = '${RON}' and role = 'coach'`);
 expect("it lapses when the confirming coach stops coaching them", (await rule(NO_DOB)) === false);
