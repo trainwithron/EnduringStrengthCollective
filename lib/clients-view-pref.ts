@@ -4,24 +4,26 @@
 export type ClientsView = "cards" | "list";
 export const CLIENTS_VIEW_KEY = "clients-view";
 export const DEFAULT_CLIENTS_VIEW: ClientsView = "cards";
+// The Nutrition page keeps its own Cards/List choice (Nov 24), so choosing one page's view never changes the other's.
+export const NUTRITION_CLIENTS_VIEW_KEY = "nutrition-clients-view";
 
 interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
 }
 
-export function readClientsView(storage: StorageLike | null | undefined): ClientsView {
+export function readClientsView(storage: StorageLike | null | undefined, key: string = CLIENTS_VIEW_KEY): ClientsView {
   try {
-    const v = storage?.getItem(CLIENTS_VIEW_KEY);
+    const v = storage?.getItem(key);
     return v === "list" || v === "cards" ? v : DEFAULT_CLIENTS_VIEW;
   } catch {
     return DEFAULT_CLIENTS_VIEW;
   }
 }
 
-export function writeClientsView(storage: StorageLike | null | undefined, view: ClientsView): void {
+export function writeClientsView(storage: StorageLike | null | undefined, view: ClientsView, key: string = CLIENTS_VIEW_KEY): void {
   try {
-    storage?.setItem(CLIENTS_VIEW_KEY, view);
+    storage?.setItem(key, view);
   } catch {
     // the choice still applies for this visit; it just is not remembered
   }

@@ -10,6 +10,9 @@ import { FavoriteMealsTab } from "@/components/coach/nutrition/favorite-meals-ta
 import { showFavoritesTab } from "@/lib/starred-meals";
 import { openOwnNutritionSpace } from "@/lib/personal-space";
 import { NutritionClientList } from "@/components/coach/nutrition/nutrition-client-list";
+import { NutritionClientCards, type NutritionCard } from "@/components/coach/nutrition/nutrition-client-cards";
+import { lastLogLine } from "@/lib/nutrition-cards";
+import { shortDateLabel } from "@/lib/apply-from";
 import { loadNutritionWeek, type LoadedWeek } from "@/lib/coach-nutrition-week";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
@@ -61,7 +64,7 @@ export const metadata = { title: "Nutrition" };
 export default async function NutritionPage(
   props: {
     params: Promise<{ groupId: string }>;
-    searchParams: Promise<{ athleteId?: string; tab?: string; day?: string }>;
+    searchParams: Promise<{ athleteId?: string; tab?: string; day?: string; all?: string }>;
   }
 ) {
   const params = await props.params;
@@ -106,7 +109,9 @@ export default async function NutritionPage(
 
     // The bar at the top names the group in the address. In a one-on-one client's own group that is the client, so with nothing picked that client is the one shown (not a blank next to
     // their name), and picking someone else opens THEIR group's address below, so the name on top and the client on the page are always the same person.
-    const ownClient = (group as { group_kind?: string | null } | null)?.group_kind === "one_on_one" ? athletes.find((a) => a.groupId === params.groupId) ?? null : null;
+    // "← All clients" (?all=1) opens the cards even from a one-on-one client's own group.
+    const ownClient =
+      searchParams.all !== "1" && (group as { group_kind?: string | null } | null)?.group_kind === "one_on_one" ? athletes.find((a) => a.groupId === params.groupId) ?? null : null;
     // The coach's OWN row, first in the list (Ron, Nov 21: "I'd like to see myself on the nutrition list, so I can assign myself meal plans"): their nutrition lives in their personal
     // space (the group their own client app uses, /my-space/home), with them as the athlete, so what is set here is what their own Nutrition shows. Only ever the signed-in coach's
     // own row: never in another coach's list, and never in the counts. The space is made the first time it is opened here, exactly as the program assign panel does.
@@ -162,6 +167,68 @@ export default async function NutritionPage(
     const week: LoadedWeek =
       tab === "clients" ? await loadNutritionWeek(supabase, athletes.map((a) => ({ id: a.profileId, groupId: a.groupId, fullName: a.fullName })), coachToday) : { rows: [], total: 0, failed: false };
 
+    // The list and the picked client beside it, as before the cards (the List view, and every picked client).
+    const listLayout = (
+      <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6 md:gap-8 items-start">
+        {/* On a phone the list folds away once a client is open (the client comes first); on a computer it stays beside them. */}
+        <details className="md:hidden border border-steel/20" open={!selected} data-client-list-phone>
+          <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden min-h-11 flex items-center justify-between px-3 font-body text-sm text-chalk">
+            <span>All clients ({athletes.length})</span>
+            <span aria-hidden="true" className="text-steel">▾</span>
+          </summary>
+          <div className="border-t border-steel/15">
+            <NutritionClientList athletes={athletes} week={week} selectedId={selected?.profileId ?? null} self={{ name: myName, href: selfHref }} />
+          </div>
+        </details>
+        <div className="hidden md:block border border-steel/20">
+          <NutritionClientList athletes={athletes} week={week} selectedId={selected?.profileId ?? null} self={{ name: myName, href: selfHref }} />
+        </div>
+
+        <div className="min-w-0">
+          {!selected ? (
+            wantsSelf && selfSpace?.problem ? (
+              <p className="font-body text-sm text-rust-ink" role="alert">
+                {selfSpace.problem}
+              </p>
+            ) : (
+              <p className="font-body text-sm text-steel">Pick a client to see their nutrition.</p>
+            )
+          ) : selectedTier === "group" ? (
+            <ClientFoodLogOnly groupId={selected.groupId} athleteId={selected.profileId} clientName={selected.fullName} />
+          ) : (
+            <ClientNutrition
+              groupId={selected.groupId}
+              athleteId={selected.profileId}
+              coachId={user.id}
+              clientName={selected.fullName}
+              variant="hub"
+            />
+          )}
+        </div>
+      </div>
+    );
+    // One card per client, in the list's order (no logs this week first). A client the week could not be read for is still a card, by name.
+    const yesterday = addDaysToKey(coachToday, -1);
+    const weekByKey = new Map(week.rows.map((r) => [`${r.id}|${r.groupId}`, r]));
+    const athleteKeys = new Set(athletes.map((a) => `${a.profileId}|${a.groupId}`));
+    const cardOrder = [
+      ...week.rows.filter((r) => athleteKeys.has(`${r.id}|${r.groupId}`)).map((r) => ({ profileId: r.id, groupId: r.groupId, fullName: r.fullName })),
+      ...athletes.filter((a) => !weekByKey.has(`${a.profileId}|${a.groupId}`)),
+    ];
+    const cards: NutritionCard[] = cardOrder.map((a) => {
+      const r = weekByKey.get(`${a.profileId}|${a.groupId}`) ?? null;
+      return {
+        id: a.profileId,
+        groupId: a.groupId,
+        fullName: a.fullName,
+        href: `/groups/${a.groupId}/nutrition?athleteId=${a.profileId}`,
+        daysLogged: r ? r.daysLogged : null,
+        lastLine: r ? (r.trackingOff ? "Food tracking off" : lastLogLine(r.lastLogDate, coachToday, yesterday, shortDateLabel)) : null,
+        macros: r ? r.macros : null,
+        flags: { trackingOff: !!r?.trackingOff, macrosOff: !!r?.macrosOff, comparable: r ? r.comparable : true, youth: !!r?.youth },
+      };
+    });
+
     return (
       <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="nutrition">
         <div className="pb-4 border-b border-steel/20 mb-6">
@@ -200,44 +267,16 @@ export default async function NutritionPage(
 
         {tab === "favorites" ? (
           <FavoriteMealsTab userId={user.id} clients={athletes.map((a) => ({ id: a.profileId, groupId: a.groupId, fullName: a.fullName }))} todayKey={coachToday} />
+        ) : !selected && !wantsSelf ? (
+          // Nothing picked: the client cards (Ron, Nov 24), or the list as before when the coach chooses List.
+          <NutritionClientCards cards={cards} self={{ name: myName, href: selfHref }} failed={week.failed} list={listLayout} />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6 md:gap-8 items-start">
-            {/* On a phone the list folds away once a client is open (the client comes first); on a computer it stays beside them. */}
-            <details className="md:hidden border border-steel/20" open={!selected} data-client-list-phone>
-              <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden min-h-11 flex items-center justify-between px-3 font-body text-sm text-chalk">
-                <span>All clients ({athletes.length})</span>
-                <span aria-hidden="true" className="text-steel">▾</span>
-              </summary>
-              <div className="border-t border-steel/15">
-                <NutritionClientList athletes={athletes} week={week} selectedId={selected?.profileId ?? null} self={{ name: myName, href: selfHref }} />
-              </div>
-            </details>
-            <div className="hidden md:block border border-steel/20">
-              <NutritionClientList athletes={athletes} week={week} selectedId={selected?.profileId ?? null} self={{ name: myName, href: selfHref }} />
-            </div>
-
-            <div className="min-w-0">
-              {!selected ? (
-                wantsSelf && selfSpace?.problem ? (
-                  <p className="font-body text-sm text-rust-ink" role="alert">
-                    {selfSpace.problem}
-                  </p>
-                ) : (
-                  <p className="font-body text-sm text-steel">Pick a client to see their nutrition.</p>
-                )
-              ) : selectedTier === "group" ? (
-                <ClientFoodLogOnly groupId={selected.groupId} athleteId={selected.profileId} clientName={selected.fullName} />
-              ) : (
-                <ClientNutrition
-                  groupId={selected.groupId}
-                  athleteId={selected.profileId}
-                  coachId={user.id}
-                  clientName={selected.fullName}
-                  variant="hub"
-                />
-              )}
-            </div>
-          </div>
+          <>
+            <Link href={`/groups/${params.groupId}/nutrition?all=1`} className="inline-flex items-center min-h-11 mb-2 font-body text-sm text-steel hover:text-chalk" data-all-clients-link>
+              ← All clients
+            </Link>
+            {listLayout}
+          </>
         )}
       </CoachDesktopShell>
     );

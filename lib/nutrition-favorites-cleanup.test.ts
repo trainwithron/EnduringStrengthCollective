@@ -92,7 +92,7 @@ describe("the coach's own row on Nutrition", () => {
     expect(page).toContain("? { profileId: user.id, fullName: myName, groupId: selfSpace.groupId }");
     expect(page).toContain("const selfHref = `/groups/${params.groupId}/nutrition?athleteId=${user.id}`;");
     // the per-client view gets the space and the coach: every save it makes goes there with athlete = coach
-    expect(page).toContain("groupId={selected.groupId}\n                  athleteId={selected.profileId}");
+    expect(page).toMatch(/groupId=\{selected\.groupId\}\n\s+athleteId=\{selected\.profileId\}/);
     // it stays on this page (the space has no organization to put on the top bar)
     expect(page).toContain("if (selected && !isSelf && selected.groupId !== params.groupId) {");
   });
