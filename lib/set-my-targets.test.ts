@@ -104,7 +104,8 @@ describe("where Set my targets shows", () => {
     expect(page).toContain("const ownSpace = !isActingAsOther || athleteId === user.id;");
   });
   it("no fat-loss goal under 18 or with no date of birth; the calculator uses Mifflin-St Jeor / Katch-McArdle when About you is complete", () => {
-    expect(page).toContain("hideFatLoss: age == null || age < 18,");
+    // (step 230: no date of birth hides it unless a coach confirmed 18 or older)
+    expect(page).toContain("hideFatLoss: age == null ? !(await loadConfirmedAdults(supabase, [athleteId])).has(athleteId) : age < 18,");
     expect(page).toContain("baselineMaintenance: baseline.ok ? baseline.maintenance : null,");
     const calc = read("components/tools/macro-calculator.tsx");
     expect(calc).toContain('const goals = hideFatLoss ? GOAL_OPTIONS.filter((o) => o.value !== "fat_loss") : GOAL_OPTIONS;');

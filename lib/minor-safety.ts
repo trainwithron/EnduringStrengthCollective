@@ -23,7 +23,9 @@ export const AGE_UNKNOWN_NOTE = "No date of birth on file, so age is unknown and
 
 // What a coach is told on a client's Targets about the under-18 rule, or null when it has nothing to say: no date of birth (the rule cannot run), or a minor in a fat-loss
 // phase (a weekly cut is held, which writes no suggestion, so the coach would otherwise wonder why none appeared).
-export function minorSafetyLine(args: { ageYears: number | null | undefined; phase: string | null | undefined; clientName: string }): string | null {
+// confirmedAdult: no birthday on file, and a coach confirmed 18 or older (step 230): nothing to protect, so no "age unknown" line.
+export function minorSafetyLine(args: { ageYears: number | null | undefined; phase: string | null | undefined; clientName: string; confirmedAdult?: boolean }): string | null {
+  if (args.ageYears == null && args.confirmedAdult) return null;
   if (args.ageYears == null) return `${AGE_UNKNOWN_NOTE} Ask ${args.clientName} to fill in About you.`;
   if (isUnder18(args.ageYears) && args.phase === "fat_loss") return YOUTH_NO_AUTO_NOTE;
   return null;

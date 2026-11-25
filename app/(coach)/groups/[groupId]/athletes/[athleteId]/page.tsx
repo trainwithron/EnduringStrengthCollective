@@ -73,6 +73,8 @@ import { asDecision, decisionLine } from "@/lib/par-q-outcome";
 import { parqNoticeNeeded } from "@/lib/parq-notice";
 import { ClientCalendarSection } from "@/components/coach/desktop/client-calendar-section";
 import { GuardianConsentStatus, type GuardianStateInfo } from "@/components/coach/guardian-consent-status";
+import { AdultConfirmToggle } from "@/components/coach/adult-confirm-toggle";
+import { isMinorDob, loadConfirmedAdults } from "@/lib/youth-block";
 import { ageBand } from "@/lib/guardian-consent";
 import { ClientSignInPanel } from "@/components/coach/client-signin-panel";
 import { GetStartedCard } from "@/components/coach/get-started-card";
@@ -701,6 +703,9 @@ export default async function AthleteProfilePage(
   const messageRows = (threadRows ?? []) as { id: string; sender_id: string; recipient_id: string; body: string; created_at: string; read_at: string | null }[];
   const messagePreview = messageRows.slice(0, 4).reverse().map((m) => ({ id: m.id, sender_id: m.sender_id, body: m.body, created_at: m.created_at }));
   const unreadMessages = messageRows.filter((m) => m.sender_id === params.athleteId && m.read_at == null).length;
+  // "18 or older (no birthday on file)" (step 230): for the coach only, while no birthday is on file (and no profile birthday says under 18, which would decide instead).
+  const showAdultConfirm = !selfView && !intake?.date_of_birth && !(profileDetails?.birthday && isMinorDob(profileDetails.birthday));
+  const adultConfirmed = showAdultConfirm ? (await loadConfirmedAdults(supabase, [params.athleteId])).has(params.athleteId) : false;
   const hasAboutInfo = !!(
     profileDetails?.bio ||
     profileDetails?.birthday ||
@@ -1259,6 +1264,7 @@ export default async function AthleteProfilePage(
               defaultExpanded={parqNotice}
             >
               <div className="space-y-4">
+                {showAdultConfirm && <AdultConfirmToggle athleteId={params.athleteId} initial={adultConfirmed} />}
                 {hasAboutInfo && (
                   <div>
                     {profileDetails?.bio && (

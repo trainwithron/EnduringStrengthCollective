@@ -1,5 +1,6 @@
 import { publicDisplayName } from "@/lib/public-name";
 import { resolveShowName } from "@/lib/share-name";
+import { loadConfirmedAdults } from "@/lib/youth-block";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { estimateOneRepMax } from "@/lib/one-rep-max";
 import { parseNumericPaceSecondsPerUnit, formatPaceSecondsToClock } from "@/lib/progression-models";
@@ -83,7 +84,12 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
     const { data: intake } = await supabase.from("client_intake").select("date_of_birth").eq("athlete_id", post.author_id).maybeSingle();
     authorDob = (intake as { date_of_birth?: string | null } | null)?.date_of_birth ?? null;
   }
-  const publicNameHidden = nameColumnThere && !resolveShowName(authorProfile?.show_name_on_share, authorDob);
+  // No birthday but a coach confirmed 18 or older (step 230); asked only when it matters, and only answered for someone allowed to know (otherwise the name stays off).
+  const authorConfirmedAdult =
+    nameColumnThere && !authorDob && (authorProfile?.show_name_on_share === null || authorProfile?.show_name_on_share === undefined || authorProfile?.show_name_on_share === true)
+      ? (await loadConfirmedAdults(supabase, [post.author_id])).has(post.author_id)
+      : false;
+  const publicNameHidden = nameColumnThere && !resolveShowName(authorProfile?.show_name_on_share, authorDob, new Date(), authorConfirmedAdult);
   const nameHidden = !opts.fullName && publicNameHidden;
 
   const broadcastLevel: "full" | "prs_only" | "checkin_only" = post.broadcast_level ?? "full";

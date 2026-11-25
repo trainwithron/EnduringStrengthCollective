@@ -18,6 +18,7 @@ import { chooseBaselinePhase, computeBaseline } from "@/lib/nutrition-baseline";
 import { rowToPreferences } from "@/lib/nutrition-preferences";
 import { ageOnDate } from "@/lib/nutrition-profile";
 import { holdDeficitForMinor, AGE_UNKNOWN_NOTE } from "@/lib/minor-safety";
+import { loadConfirmedAdults } from "@/lib/youth-block";
 
 // Weekly Check-In engine, made proactive (nutrition_checkin_engine_scoping
 // memory) — a coach shouldn't have to remember to open the panel and
@@ -217,6 +218,7 @@ async function handler(request: Request) {
     // No calorie deficit is suggested for anyone under 18: a cut is held at their current calories, which writes no suggestion.
     const dob = readDateOfBirth(body);
     const { result: engineResult, held: heldForAge } = holdDeficitForMinor({ ageYears: dob ? ageOnDate(dob, todayKey) : null, currentCalories: last.new_calories, result: rawResult });
+    const confirmedAdult = !dob && (await loadConfirmedAdults(supabase, [athleteId])).has(athleteId);
 
     // Only a real, actionable recommendation is worth a coach's
     // attention — an "on track, hold steady" week (or a week held for low logging) would just be
@@ -242,7 +244,8 @@ async function handler(request: Request) {
       consecutive_surplus_spikes: engineResult.consecutiveSurplusSpikes,
       new_calories: engineResult.newCalories,
       // With no date of birth on file nothing can protect a minor, and the suggestion says so rather than staying silent.
-      rationale: dob ? engineResult.rationale : `${engineResult.rationale} ${AGE_UNKNOWN_NOTE}`,
+      // (a coach's "18 or older" for a client with no birthday, step 230, is an adult on file)
+      rationale: dob || confirmedAdult ? engineResult.rationale : `${engineResult.rationale} ${AGE_UNKNOWN_NOTE}`,
       protein_g: macros.proteinG,
       carbs_g: macros.carbsG,
       fat_g: macros.fatG,

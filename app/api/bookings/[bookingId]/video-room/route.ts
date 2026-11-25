@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { isDailyConfigured, getVideoRoom, createMeetingToken } from "@/lib/daily-video";
 import { meetsMinimumAge } from "@/lib/coppa";
+import { loadConfirmedAdults } from "@/lib/youth-block";
 
 const VIDEO_CALL_MINIMUM_AGE = 18;
 
@@ -51,7 +52,9 @@ export async function POST(request: Request, props: { params: Promise<{ bookingI
     .select("date_of_birth")
     .eq("athlete_id", booking.athlete_id)
     .maybeSingle();
-  if (!intake?.date_of_birth || !meetsMinimumAge(intake.date_of_birth, VIDEO_CALL_MINIMUM_AGE, new Date())) {
+  // An adult by a birthday on file, or (no birthday on file) confirmed 18 or older by a coach (step 230). A birthday under the age always stops it.
+  const confirmedAdult = !intake?.date_of_birth && (await loadConfirmedAdults(supabase, [booking.athlete_id])).has(booking.athlete_id);
+  if (!confirmedAdult && (!intake?.date_of_birth || !meetsMinimumAge(intake.date_of_birth, VIDEO_CALL_MINIMUM_AGE, new Date()))) {
     return NextResponse.json({ error: "Video calling is only available for clients 18 and older." }, { status: 403 });
   }
 
