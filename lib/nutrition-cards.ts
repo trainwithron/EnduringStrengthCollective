@@ -37,16 +37,20 @@ export const MACRO_ORDER: { key: MacroKey; label: string; unit: string }[] = [
 ];
 
 // Green for 90 to 110 percent, gold under, red over 110 percent. "neutral" is no judgement at all (no target for that number, or calories in Youth/Team mode).
+// From the whole percent the coach is shown, so a bar that reads "90%" or "110%" is always green (the legend's 90–110%).
 export type Band = "hit" | "under" | "over" | "neutral";
-export const HIT_LOW = 0.9;
-export const HIT_HIGH = 1.1;
+export const HIT_LOW = 90;
+export const HIT_HIGH = 110;
 
-export function bandFor(share: number | null): Band {
-  if (share == null) return "neutral";
-  if (share > HIT_HIGH) return "over";
-  if (share >= HIT_LOW) return "hit";
+export function bandFor(percent: number | null): Band {
+  if (percent == null) return "neutral";
+  if (percent > HIT_HIGH) return "over";
+  if (percent >= HIT_LOW) return "hit";
   return "under";
 }
+
+// Said with the numbers for a screen reader (the colour alone says it on screen).
+const BAND_WORD: Record<Band, string | null> = { hit: "on target", under: "under", over: "over", neutral: null };
 
 export interface Bar {
   key: MacroKey;
@@ -69,10 +73,11 @@ export function barFor(key: MacroKey, eaten: number, target: number | null, yout
   const share = hasTarget ? eaten / target : null;
   const percent = share == null ? null : Math.round(share * 100);
   // Youth/Team mode is protein-first with no calorie-deficit framing: calories are never judged there, over or under.
-  const band = youth && key === "calories" ? "neutral" : bandFor(share);
+  const band = youth && key === "calories" ? "neutral" : bandFor(percent);
   const unitWord = meta.unit || "kcal";
+  const word = BAND_WORD[band];
   const ariaLabel = hasTarget
-    ? `${meta.label}: ${fmt(eaten)} of ${fmt(target)} ${unitWord} (${percent}%)`
+    ? `${meta.label}: ${fmt(eaten)} of ${fmt(target)} ${unitWord} (${percent}%${word ? `, ${word}` : ""})`
     : `${meta.label}: ${fmt(eaten)} ${unitWord}, no prescription`;
   return { key, label: meta.label, unit: meta.unit, eaten: Math.round(eaten), target: hasTarget ? Math.round(target) : null, percent, fill: share == null ? 0 : Math.min(share, 1) * 100, band, ariaLabel };
 }
@@ -138,8 +143,9 @@ export function lastLogLine(lastLogDate: string | null, todayKey: string, yester
 }
 
 // The week's per-day numbers put together for one client. `days` are the logged days in the window (oldest first), each with what was eaten and that day's prescription.
-// The average is over the logged days that have numbers, so a skipped day never drags it toward zero; its prescription is the average of those same days' prescriptions
-// (a training day and a rest day can differ), else today's when none of them had one.
+// The average is over the logged days that have numbers, so a skipped day never drags it toward zero, and it leaves today out (today is not over yet: breakfast alone would pull a
+// full week toward gold) unless today is the only day logged. Its prescription is the average of those same days' prescriptions (a training day and a rest day can differ), else
+// today's when none of them had one. A macro missing on a logged entry counts as 0 in the day's total (every live entry carries all four).
 export function cardMacros(args: {
   todayKey: string;
   days: { date: string; eaten: Macros }[];
@@ -148,13 +154,15 @@ export function cardMacros(args: {
   const todayTarget = args.targetFor(args.todayKey);
   const withNumbers = args.days.filter((d) => hasAny(d.eaten));
   const todayDay = withNumbers.find((d) => d.date === args.todayKey) ?? null;
+  const earlier = withNumbers.filter((d) => d.date !== args.todayKey);
+  const averaged = earlier.length > 0 ? earlier : withNumbers;
   const keys = MACRO_ORDER.map((m) => m.key);
   let eatenAvg: Macros | null = null;
   let targetAvg: Macros | null = todayTarget;
-  if (withNumbers.length > 0) {
+  if (averaged.length > 0) {
     eatenAvg = { protein: null, carbs: null, fat: null, calories: null };
-    for (const k of keys) eatenAvg[k] = withNumbers.reduce((s, d) => s + (d.eaten[k] ?? 0), 0) / withNumbers.length;
-    const targets = withNumbers.map((d) => args.targetFor(d.date)).filter(hasAny);
+    for (const k of keys) eatenAvg[k] = averaged.reduce((s, d) => s + (d.eaten[k] ?? 0), 0) / averaged.length;
+    const targets = averaged.map((d) => args.targetFor(d.date)).filter(hasAny);
     if (targets.length > 0) {
       const avg: Macros = { protein: null, carbs: null, fat: null, calories: null };
       for (const k of keys) {
@@ -166,6 +174,6 @@ export function cardMacros(args: {
   }
   return {
     today: { eaten: todayDay ? todayDay.eaten : null, target: todayTarget },
-    average: { eaten: eatenAvg, target: targetAvg, days: withNumbers.length },
+    average: { eaten: eatenAvg, target: targetAvg, days: averaged.length },
   };
 }

@@ -27,23 +27,32 @@ const adults = async () => new Set<string>();
 
 describe("a bar", () => {
   it("green from 90 to 110 percent, gold under, red over 110", () => {
-    expect([0.5, 0.899, 0.9, 1, 1.1, 1.101].map(bandFor)).toEqual(["under", "under", "hit", "hit", "hit", "over"]);
+    expect([50, 89, 90, 100, 110, 111].map(bandFor)).toEqual(["under", "under", "hit", "hit", "hit", "over"]);
     expect(bandFor(null)).toBe("neutral");
+  });
+
+  it("the colour follows the percent the coach reads: 89.6% shows 90% and is green, 110.4% shows 110% and is green", () => {
+    expect(barFor("protein", 89.6, 100, false)).toMatchObject({ percent: 90, band: "hit" });
+    expect(barFor("protein", 110.4, 100, false)).toMatchObject({ percent: 110, band: "hit" });
+    expect(barFor("protein", 89.4, 100, false)).toMatchObject({ percent: 89, band: "under" });
+    expect(barFor("protein", 110.6, 100, false)).toMatchObject({ percent: 111, band: "over" });
   });
 
   it("the fill is what they ate over the prescription, never past the track; the label reads the numbers out", () => {
     const b = barFor("protein", 142, 180, false);
     expect(b).toMatchObject({ eaten: 142, target: 180, percent: 79, band: "under" });
     expect(b.fill).toBeCloseTo(78.9, 1);
-    expect(b.ariaLabel).toBe("Protein: 142 of 180 g (79%)");
+    expect(b.ariaLabel).toBe("Protein: 142 of 180 g (79%, under)");
     const over = barFor("calories", 2600, 2000, false);
     expect(over).toMatchObject({ fill: 100, percent: 130, band: "over" });
-    expect(over.ariaLabel).toBe("Calories: 2,600 of 2,000 kcal (130%)");
+    expect(over.ariaLabel).toBe("Calories: 2,600 of 2,000 kcal (130%, over)");
+    expect(barFor("fat", 70, 70, false).ariaLabel).toBe("Fat: 70 of 70 g (100%, on target)");
   });
 
   it("Youth/Team mode never judges calories (no red, no gold), and still judges protein", () => {
     expect(barFor("calories", 2600, 2000, true).band).toBe("neutral");
     expect(barFor("calories", 1000, 2000, true).band).toBe("neutral");
+    expect(barFor("calories", 2600, 2000, true).ariaLabel).toBe("Calories: 2,600 of 2,000 kcal (130%)");
     expect(barFor("protein", 80, 160, true).band).toBe("under");
   });
 
@@ -97,10 +106,23 @@ describe("the 7-day average", () => {
   });
 
   it("compares with the same days' prescriptions (a training day and a rest day can differ); today with today's", () => {
-    const targets: Record<string, Macros> = { "2026-11-23": m(200, 300, 80, 2700), [TODAY]: m(160, 200, 60, 2100) };
-    const c = cardMacros({ todayKey: TODAY, days: [{ date: "2026-11-23", eaten: m(190, 280, 75, 2600) }, { date: TODAY, eaten: m(80, 100, 30, 1000) }], targetFor: (d) => targets[d] ?? null });
-    expect(c.average.target).toEqual(m(180, 250, 70, 2400));
-    expect(c.today).toEqual({ eaten: m(80, 100, 30, 1000), target: m(160, 200, 60, 2100) });
+    const targets: Record<string, Macros> = { "2026-11-21": m(200, 300, 80, 2700), "2026-11-23": m(160, 200, 60, 2100), [TODAY]: m(150, 150, 50, 1700) };
+    const c = cardMacros({
+      todayKey: TODAY,
+      days: [{ date: "2026-11-21", eaten: m(190, 280, 75, 2600) }, { date: "2026-11-23", eaten: m(150, 200, 55, 2000) }, { date: TODAY, eaten: m(80, 100, 30, 1000) }],
+      targetFor: (d) => targets[d] ?? null,
+    });
+    expect(c.average).toEqual({ eaten: m(170, 240, 65, 2300), target: m(180, 250, 70, 2400), days: 2 });
+    expect(c.today).toEqual({ eaten: m(80, 100, 30, 1000), target: m(150, 150, 50, 1700) });
+  });
+
+  it("leaves today out (it is not over yet: breakfast alone would pull a full week toward gold), unless today is the only day logged", () => {
+    const rx = () => m(150, 200, 60, 2000);
+    const fullDays = ["2026-11-20", "2026-11-21", "2026-11-22", "2026-11-23"].map((date) => ({ date, eaten: m(150, 200, 60, 2000) }));
+    const morning = cardMacros({ todayKey: TODAY, days: [...fullDays, { date: TODAY, eaten: m(30, 40, 10, 400) }], targetFor: rx });
+    expect(morning.average).toEqual({ eaten: m(150, 200, 60, 2000), target: m(150, 200, 60, 2000), days: 4 });
+    const onlyToday = cardMacros({ todayKey: TODAY, days: [{ date: TODAY, eaten: m(30, 40, 10, 400) }], targetFor: rx });
+    expect(onlyToday.average).toEqual({ eaten: m(30, 40, 10, 400), target: m(150, 200, 60, 2000), days: 1 });
   });
 
   it("with no prescription on the logged days, it compares with today's", () => {
@@ -127,7 +149,8 @@ describe("the week's reads feed the cards (no read per card)", () => {
     });
     expect(row.daysLogged).toBe(2);
     expect(row.macros.today).toEqual({ eaten: m(100, 150, 40, 1500), target: m(180, 220, 70, 2300) });
-    expect(row.macros.average).toEqual({ eaten: m(110, 175, 40, 1650), target: m(165, 210, 65, 2150), days: 2 });
+    // today is left out of the average (Nov 22 is the one earlier day)
+    expect(row.macros.average).toEqual({ eaten: m(120, 200, 40, 1800), target: m(150, 200, 60, 2000), days: 1 });
     expect(row).toMatchObject({ macrosOff: false, comparable: true, youth: false });
   });
 

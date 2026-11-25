@@ -38,8 +38,9 @@ describe("the Nutrition client cards", () => {
     expect(html).toContain("Last log today");
     expect(html).toMatch(/>5<span class="text-sm text-steel">\/7<\/span>/);
     expect(html).toContain("days logged");
-    expect(html).toContain('aria-label="Protein: 142 of 180 g (79%)"');
-    expect(html).toContain('aria-label="Calories: 2,320 of 2,350 kcal (99%)"');
+    expect(html).toContain('aria-label="Protein: 142 of 180 g (79%, under)"');
+    expect(html).toContain('aria-label="Calories: 2,320 of 2,350 kcal (99%, on target)"');
+    expect(html).toContain("The 7-day average counts only the days they logged, not today.");
     expect(html).toContain('data-band="under"'); // protein 79%
     expect(html).toContain('data-band="over"'); // fat 116%
     expect(html).toContain('data-band="hit"'); // carbs 93%, calories 99%

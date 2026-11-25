@@ -72,6 +72,7 @@ export function summarizeWeek(args: {
   const from = addDaysToKey(args.todayKey, -(WEEK_DAYS - 1));
   const protein = new Map<string, Map<string, number>>();
   const eatenByDay = new Map<string, Map<string, Macros>>();
+  // A macro missing on a logged entry adds nothing (so it counts as 0 once any entry that day has it); every live entry carries all four.
   const add = (a: number | null, b: number | null | undefined) => (b == null ? a : (a ?? 0) + b);
   for (const f of args.food) {
     if (f.status === "skipped" || f.log_date < from || f.log_date > args.todayKey) continue;

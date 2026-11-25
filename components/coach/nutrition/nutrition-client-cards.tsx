@@ -122,7 +122,7 @@ export function NutritionClientCards({ cards, self, failed, list }: { cards: Nut
             <span className="inline-flex items-center gap-1.5"><i className="inline-block w-4 h-2 rounded-full bg-amber" aria-hidden="true" />Under</span>
             <span className="inline-flex items-center gap-1.5"><i className="inline-block w-4 h-2 rounded-full bg-alert" aria-hidden="true" />Over 110%</span>
           </p>
-          <p className="font-body text-[11px] text-steel mt-1">The 7-day average counts only the days they logged.</p>
+          <p className="font-body text-[11px] text-steel mt-1">The 7-day average counts only the days they logged, not today.</p>
         </div>
       )}
     </div>
