@@ -4,6 +4,7 @@ import { resolveDayMacros, standingForDate, type StandingHistory, type StandingR
 import { loadNameProtectedIds, type ProtectIds } from "@/lib/minor-names";
 import { addDaysToKey } from "@/lib/date-key";
 import { NOT_IMPORTED } from "@/lib/imported-food";
+import { cardMacros, type CardMacros, type Macros } from "@/lib/nutrition-cards";
 
 // The coach's Clients list on Nutrition (Ron, Nov 19 revamp: "This week" folds into the Clients list). Each client gets three plain facts about the last seven days: how many days they
 // logged ("4 of 7"), on how many of those days their logged protein reached that day's protein target, and the date of their last log. Clients with no logs this week come first;
@@ -26,6 +27,12 @@ export interface WeekRow extends WeekClient {
   proteinHitDays: number | null;
   lastLogDate: string | null;
   trackingOff: boolean;
+  // For the client cards (Nov 24): today's and the 7-day average's eaten vs prescription, the coach's "No macros" switch, whether they are compared with a target at all, and
+  // whether their group is in Youth/Team mode.
+  macros: CardMacros;
+  macrosOff: boolean;
+  comparable: boolean;
+  youth: boolean;
 }
 
 export interface FoodRow {
@@ -33,6 +40,9 @@ export interface FoodRow {
   log_date: string;
   status?: string | null;
   protein_g: number | null;
+  calories?: number | null;
+  carbs_g?: number | null;
+  fat_g?: number | null;
 }
 
 const dayKey = (clientId: string, groupId: string, date: string) => `${clientId}|${groupId}|${date}`;
@@ -52,14 +62,27 @@ export function summarizeWeek(args: {
   neutral?: Set<string>;
   // The last day logged BEFORE this week, for a client with nothing logged this week.
   lastLogBefore?: Map<string, string>;
+  // Keyed like dayProteinTargets: a day's whole own target, else its meal plan's (for the cards).
+  dayTargets?: Map<string, Macros>;
+  // "clientId|groupId" with the coach's "No macros" switch on, or on the group tier (no macros there).
+  macrosOff?: Set<string>;
+  // Group ids in Youth/Team mode, or "*" when that could not be read (then every calorie bar stays neutral: never the other way round).
+  youthGroups?: Set<string>;
 }): WeekRow[] {
   const from = addDaysToKey(args.todayKey, -(WEEK_DAYS - 1));
   const protein = new Map<string, Map<string, number>>();
+  const eatenByDay = new Map<string, Map<string, Macros>>();
+  // A macro missing on a logged entry adds nothing (so it counts as 0 once any entry that day has it); every live entry carries all four.
+  const add = (a: number | null, b: number | null | undefined) => (b == null ? a : (a ?? 0) + b);
   for (const f of args.food) {
     if (f.status === "skipped" || f.log_date < from || f.log_date > args.todayKey) continue;
     const perDay = protein.get(f.athlete_id) ?? new Map<string, number>();
     perDay.set(f.log_date, (perDay.get(f.log_date) ?? 0) + (f.protein_g ?? 0));
     protein.set(f.athlete_id, perDay);
+    const eaten = eatenByDay.get(f.athlete_id) ?? new Map<string, Macros>();
+    const day = eaten.get(f.log_date) ?? { protein: null, carbs: null, fat: null, calories: null };
+    eaten.set(f.log_date, { protein: add(day.protein, f.protein_g), carbs: add(day.carbs, f.carbs_g), fat: add(day.fat, f.fat_g), calories: add(day.calories, f.calories) });
+    eatenByDay.set(f.athlete_id, eaten);
   }
   return args.clients.map((c): WeekRow => {
     const perDay = protein.get(c.id) ?? new Map<string, number>();
@@ -82,12 +105,25 @@ export function summarizeWeek(args: {
       }
       proteinHitDays = anyTarget ? hit : null;
     }
+    // A day's prescription for the cards, in the order the client sees it: the day's own target or meal plan, else the standing target in force that day.
+    const history = args.histories?.get(`${c.id}|${c.groupId}`) ?? [];
+    const targetFor = (d: string): Macros | null => {
+      const own = args.dayTargets?.get(dayKey(c.id, c.groupId, d));
+      if (own) return own;
+      const st = standingForDate(history, d);
+      return st ? { protein: st.protein_g, carbs: st.carbs_g, fat: st.fat_g, calories: st.calories } : null;
+    };
+    const eaten = eatenByDay.get(c.id) ?? new Map<string, Macros>();
     return {
       ...c,
       daysLogged: days.length,
       proteinHitDays,
       lastLogDate: days.length > 0 ? days[days.length - 1] : args.lastLogBefore?.get(c.id) ?? null,
       trackingOff,
+      macros: cardMacros({ todayKey: args.todayKey, days: days.map((d) => ({ date: d, eaten: eaten.get(d)! })), targetFor }),
+      macrosOff: !!args.macrosOff?.has(`${c.id}|${c.groupId}`),
+      comparable: !neutral,
+      youth: !!args.youthGroups?.has("*") || !!args.youthGroups?.has(c.groupId),
     };
   });
 }
@@ -138,9 +174,10 @@ export async function loadNutritionWeek(supabase: SupabaseClient, clients: WeekC
   let flagsUnreadable = !!probe.error && !flagsMissing;
 
   // The food read is the client logging in the app: history a coach brought in from another app is left out (lib/imported-food.ts).
-  const [food, memberships, flags, histories, legacy, dayRows, planRows, protectedIds] = await Promise.all([
-    readByIds(ids, (g) => (a, b) => supabase.from("food_log_entries").select("id, athlete_id, log_date, status, protein_g").in("athlete_id", g).gte("log_date", from).lte("log_date", todayKey).or(NOT_IMPORTED).order("id").range(a, b)),
-    readByIds(ids, (g) => (a, b) => supabase.from("group_memberships").select("id, profile_id, group_id, food_tracking_enabled, coach_sets_macros").in("profile_id", g).eq("role", "athlete").order("id").range(a, b)),
+  const groupIds = [...new Set(clients.map((c) => c.groupId))];
+  const [food, memberships, flags, histories, legacy, dayRows, planRows, protectedIds, youthRows] = await Promise.all([
+    readByIds(ids, (g) => (a, b) => supabase.from("food_log_entries").select("id, athlete_id, log_date, status, protein_g, calories, carbs_g, fat_g").in("athlete_id", g).gte("log_date", from).lte("log_date", todayKey).or(NOT_IMPORTED).order("id").range(a, b)),
+    readByIds(ids, (g) => (a, b) => supabase.from("group_memberships").select("id, profile_id, group_id, food_tracking_enabled, coach_sets_macros, client_tier").in("profile_id", g).eq("role", "athlete").order("id").range(a, b)),
     flagsMissing || flagsUnreadable
       ? Promise.resolve({ rows: [], failed: false, truncated: false })
       : readByIds(ids, (g) => (a, b) => supabase.from("client_nutrition_flags").select("profile_id, group_id").eq("auto_off", true).in("profile_id", g).order("profile_id").order("group_id").range(a, b)),
@@ -151,6 +188,8 @@ export async function loadNutritionWeek(supabase: SupabaseClient, clients: WeekC
     readByIds(ids, (g) => (a, b) => supabase.from("daily_macros").select("athlete_id, group_id, log_date, calories, protein_g, carbs_g, fat_g").in("athlete_id", g).gte("log_date", from).lte("log_date", todayKey).order("athlete_id").order("log_date").range(a, b)),
     readByIds(ids, (g) => (a, b) => supabase.from("meal_plans").select("id, athlete_id, group_id, log_date, macros").in("athlete_id", g).gte("log_date", from).lte("log_date", todayKey).order("id").range(a, b)),
     protect(ids),
+    // Youth/Team mode is the group's own setting (the cards keep calories neutral there).
+    readByIds(groupIds, (g) => (a, b) => supabase.from("groups").select("id, nutrition_youth_mode").in("id", g).order("id").range(a, b)),
   ]);
   if ([food, memberships, histories, legacy, dayRows, planRows].some((r) => r.failed || r.truncated)) return { rows: [], total: clients.length, failed: true };
   if (flags.failed || flags.truncated) flagsUnreadable = true;
@@ -168,6 +207,7 @@ export async function loadNutritionWeek(supabase: SupabaseClient, clients: WeekC
 
   // A day's protein target from its own row, else from its meal plan (the standing target is worked out per day in summarizeWeek).
   const dayProteinTargets = new Map<string, number | null>();
+  const dayTargets = new Map<string, Macros>();
   const plans = new Map<string, unknown>();
   for (const p of planRows.rows as { athlete_id: string; group_id: string; log_date: string; macros: unknown }[]) plans.set(dayKey(p.athlete_id, p.group_id, p.log_date), p.macros);
   const own = new Map<string, { calories: number | null; protein_g: number | null; carbs_g: number | null; fat_g: number | null }>();
@@ -175,13 +215,23 @@ export async function loadNutritionWeek(supabase: SupabaseClient, clients: WeekC
   for (const key of new Set([...plans.keys(), ...own.keys()])) {
     const resolved = resolveDayMacros(own.get(key) ?? null, (plans.get(key) ?? null) as Parameters<typeof resolveDayMacros>[1], null, null);
     if (resolved.target?.proteinG != null) dayProteinTargets.set(key, resolved.target.proteinG);
+    const t = resolved.target;
+    if (t && (t.calories != null || t.proteinG != null || t.carbsG != null || t.fatG != null)) dayTargets.set(key, { protein: t.proteinG, carbs: t.carbsG, fat: t.fatG, calories: t.calories });
   }
+  const youthGroups = new Set<string>(youthRows.failed || youthRows.truncated ? ["*"] : []);
+  for (const g of youthRows.rows as { id: string; nutrition_youth_mode: boolean | null }[]) if (g.nutrition_youth_mode) youthGroups.add(g.id);
 
   const trackingOff = new Set<string>();
   const neutral = new Set<string>(flagsUnreadable ? ["*"] : []);
-  for (const m of memberships.rows as { profile_id: string; group_id: string; food_tracking_enabled: boolean | null; coach_sets_macros: boolean | null }[]) {
+  const macrosOff = new Set<string>();
+  for (const m of memberships.rows as { profile_id: string; group_id: string; food_tracking_enabled: boolean | null; coach_sets_macros: boolean | null; client_tier?: string | null }[]) {
     if (m.food_tracking_enabled === false) trackingOff.add(`${m.profile_id}|${m.group_id}`);
-    if (m.coach_sets_macros === false) neutral.add(`${m.profile_id}|${m.group_id}`);
+    if (m.coach_sets_macros === false) {
+      neutral.add(`${m.profile_id}|${m.group_id}`);
+      macrosOff.add(`${m.profile_id}|${m.group_id}`);
+    }
+    // The group tier has no macros (its page is the food log only), so its card says logging only too.
+    if (m.client_tier === "group") macrosOff.add(`${m.profile_id}|${m.group_id}`);
   }
   for (const f of (flagsUnreadable ? [] : flags.rows) as { profile_id: string }[]) neutral.add(f.profile_id);
   for (const id of protectedIds) neutral.add(id);
@@ -204,6 +254,6 @@ export async function loadNutritionWeek(supabase: SupabaseClient, clients: WeekC
   // A last-log date that could not be read is never shown as "No logs yet".
   if (idleFailed) return { rows: [], total: clients.length, failed: true };
 
-  const all = orderForList(summarizeWeek({ clients, food: food.rows as FoodRow[], todayKey, dayProteinTargets, histories: byKey, trackingOff, neutral, lastLogBefore }));
+  const all = orderForList(summarizeWeek({ clients, food: food.rows as FoodRow[], todayKey, dayProteinTargets, dayTargets, histories: byKey, trackingOff, neutral, lastLogBefore, macrosOff, youthGroups }));
   return { rows: all.slice(0, MAX_ROWS), total: all.length, failed: false };
 }
