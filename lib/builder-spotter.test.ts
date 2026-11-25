@@ -103,7 +103,7 @@ describe("the day route runs it", () => {
     expect(route.match(/await attempt\(/g)).toHaveLength(3);
   });
   it("sends back one line per note left, with its key", () => {
-    expect(route).toContain("kept: first.spotter.map((n) => ({ key: n.key, line: keptLine(n, { week, day }, result.kept ?? null) })),");
+    expect(route).toContain("kept: first.spotter.map((n) => ({ key: n.key, line: keptLine(n, { week, day }, result.kept ?? null), onPurpose: !!result.kept })),");
   });
 });
 
@@ -114,7 +114,8 @@ describe("the chat says it, and the Spotter's notes live in the chat on a progra
   const panel = read("components/coach/desktop/programming-spotter-panel.tsx");
   it("the run sends what it kept, says each kept note once, at most 3 lines when it stops, and reads the notes again", () => {
     expect(chat).toContain("keptKeys: keptKeys.current }),");
-    expect(chat).toContain("keptKeys.current.includes(k.key)");
+    expect(chat).toContain("if (k.onPurpose === true && !keptKeys.current.includes(k.key)) keptKeys.current = [...keptKeys.current, k.key];");
+    expect(chat).toContain("if (saidKeys.current.includes(k.key)) continue;");
     expect(chat).toContain("const lines = keptLines.current.slice(0, MAX_KEPT_LINES);");
     expect(chat).toContain('if (lines.length > 0) say(lines.join("\\n"));');
     expect(chat).toContain("      sayKept();\n    }");

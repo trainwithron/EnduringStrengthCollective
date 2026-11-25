@@ -122,7 +122,7 @@ describe("A run token cannot be used again to skip the charge", () => {
   });
   it("the route checks the log before trusting a token, and a new run's token starts counting before its first day is logged", () => {
     const route = read("app/api/ai/build-day/route.ts");
-    expect(route).toContain("if (runTokenIsStale(count ?? 0, run.days)) run = { ok: false };");
+    expect(route).toContain("if (runTokenIsStale(count ?? 0, run.calls)) run = { ok: false };");
     expect(route).toContain('.eq("feature", "program_day")');
     expect(route).toContain('.neq("status", "error")');
     expect(route).toContain("run.ok ? run.issuedAt : startedAt");

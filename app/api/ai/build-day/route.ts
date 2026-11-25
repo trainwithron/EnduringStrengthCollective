@@ -79,7 +79,7 @@ export async function POST(request: Request) {
       // A day that came back cut off was never built, so it is not a day under this token.
       .neq("status", "truncated")
       .gte("created_at", new Date(run.issuedAt).toISOString());
-    if (runTokenIsStale(count ?? 0, run.days)) run = { ok: false };
+    if (runTokenIsStale(count ?? 0, run.calls)) run = { ok: false };
   }
   if (!run.ok) {
     const canRun = await canRunAiAction(supabase, user.id, "program_generation");
@@ -216,6 +216,8 @@ export async function POST(request: Request) {
   const aliases = (aliasRows ?? []).map((a: any) => ({ rawName: a.raw_name as string, exerciseName: a.exercise_name as string }));
   const allowRepeat = allowsRepeats(sayings);
 
+  // The AI calls this request made that the usage log counts (it leaves out errors and cut-off answers): carried on the run token, so a retried day is not "another run".
+  let calls = 0;
   async function attempt(retryNote: string | null, timeoutMs: number) {
     const text = await callClaude({ retryOnTruncation: false,
       meta: { feature: "program_day", userId: user!.id },
@@ -224,6 +226,8 @@ export async function POST(request: Request) {
       maxTokens: DAY_MAX_TOKENS,
       timeoutMs,
     });
+    // the call came back (logged "ok"), whatever is done with its answer
+    calls++;
     const parsed = readDayResult(JSON.parse(extractJson(text)), `Day ${day}`);
     if (!parsed) return null;
     // An exercise the coach named stays exactly as named (the library never renames it); only the ones the AI chose are snapped to the library, and only on a confident match.
@@ -373,8 +377,9 @@ export async function POST(request: Request) {
       // The rules used for this day, shown to the coach with their reason and an Undo.
       applied: toApplied(taughtRules),
       // What the Spotter would still question in this day after the one repair try: why it was kept, or that it is worth a look (one line each, coach-only, shown in the builder chat).
-      kept: first.spotter.map((n) => ({ key: n.key, line: keptLine(n, { week, day }, result.kept ?? null) })),
-      runToken: issueRunToken(user.id, programId, (run.ok ? run.days : 0) + 1, Date.now(), run.ok ? run.issuedAt : startedAt),
+      // onPurpose: kept with a reason (later days of the run leave it alone); a "worth a look" note still gets its one repair try on a later day.
+      kept: first.spotter.map((n) => ({ key: n.key, line: keptLine(n, { week, day }, result.kept ?? null), onPurpose: !!result.kept })),
+      runToken: issueRunToken(user.id, programId, (run.ok ? run.days : 0) + 1, Date.now(), run.ok ? run.issuedAt : startedAt, (run.ok ? run.calls : 0) + calls),
     });
   } catch (err) {
     if (err instanceof AiRateLimitedError) return NextResponse.json({ error: err.message }, { status: 429 });

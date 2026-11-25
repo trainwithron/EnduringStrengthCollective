@@ -66,7 +66,7 @@ describe("The run token", () => {
   const now = 1_800_000_000_000;
   it("is good for the same person and program, for two hours, and only until the day cap", () => {
     const t = issueRunToken("u1", "p1", 3, now);
-    expect(checkRunToken(t, "u1", "p1", now + 1000)).toEqual({ ok: true, days: 3, issuedAt: now });
+    expect(checkRunToken(t, "u1", "p1", now + 1000)).toEqual({ ok: true, days: 3, calls: 3, issuedAt: now });
     expect(checkRunToken(t, "u2", "p1", now + 1000).ok).toBe(false);
     expect(checkRunToken(t, "u1", "p2", now + 1000).ok).toBe(false);
     expect(checkRunToken(t, "u1", "p1", now + RUN_TTL_MS + 1).ok).toBe(false);

@@ -222,6 +222,7 @@ export function ProgramBuilderChat({
   // The builder's own Spotter check (Nov 24): notes it kept on purpose this run, said once each (by the Spotter's key), at most 3 lines when the run stops.
   const keptKeys = useRef<string[]>([]);
   const keptLines = useRef<string[]>([]);
+  const saidKeys = useRef<string[]>([]);
   const notesSent = useRef("");
   const whyThread = useRef<Exchange[]>([]);
   const pendingPlan = useRef<{ id: string; request: string } | null>(null);
@@ -249,9 +250,12 @@ export function ProgramBuilderChat({
       const data = await readAiJson(res);
       if (!res.ok || !data.workoutId) return { ok: false, message: (data.error as string | undefined) ?? COULDNT };
       if (typeof data.runToken === "string") token.current = data.runToken;
-      for (const k of Array.isArray(data.kept) ? (data.kept as { key?: unknown; line?: unknown }[]) : []) {
-        if (typeof k?.key !== "string" || typeof k.line !== "string" || keptKeys.current.includes(k.key)) continue;
-        keptKeys.current = [...keptKeys.current, k.key];
+      for (const k of Array.isArray(data.kept) ? (data.kept as { key?: unknown; line?: unknown; onPurpose?: unknown }[]) : []) {
+        if (typeof k?.key !== "string" || typeof k.line !== "string") continue;
+        // only what was kept on purpose is left alone on later days; every note is said once
+        if (k.onPurpose === true && !keptKeys.current.includes(k.key)) keptKeys.current = [...keptKeys.current, k.key];
+        if (saidKeys.current.includes(k.key)) continue;
+        saidKeys.current = [...saidKeys.current, k.key];
         keptLines.current = [...keptLines.current, k.line];
       }
       return { ok: true, workoutId: data.workoutId as string, flags: Array.isArray(data.flags) ? (data.flags as string[]) : [], applied: Array.isArray(data.applied) ? (data.applied as AppliedRule[]) : [] };
@@ -343,6 +347,7 @@ export function ProgramBuilderChat({
     request.current = said;
     keptKeys.current = [];
     keptLines.current = [];
+    saidKeys.current = [];
     corrections.current = keep;
     token.current = null;
     pauseRequested.current = false;

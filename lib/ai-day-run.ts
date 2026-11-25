@@ -15,7 +15,9 @@ interface RunPayload {
   u: string; // user
   p: string; // program
   t: number; // issued at (ms)
-  d: number; // days built so far in this run
+  d: number; // days built so far in this run (the MAX_DAYS_PER_RUN cap)
+  // AI calls logged under this run so far (review of 6fcc3819): a day written twice (the one retry) logs two, so the stale check counts calls, not days. Older tokens have none: d stands in.
+  c?: number;
 }
 
 // Signs the run token. If no secret is configured at all, it fails closed in production (a token anyone can forge would let a caller skip the one-credit-per-run rule); the fixed fallback exists only for local development.
@@ -30,17 +32,17 @@ function sign(body: string): string {
   return createHmac("sha256", secret()).update(body).digest("base64url");
 }
 
-export function issueRunToken(userId: string, programId: string, days: number, now = Date.now(), issuedAt = now): string {
-  const body = Buffer.from(JSON.stringify({ u: userId, p: programId, t: issuedAt, d: days } satisfies RunPayload)).toString("base64url");
+export function issueRunToken(userId: string, programId: string, days: number, now = Date.now(), issuedAt = now, calls = days): string {
+  const body = Buffer.from(JSON.stringify({ u: userId, p: programId, t: issuedAt, d: days, c: calls } satisfies RunPayload)).toString("base64url");
   return `${body}.${sign(body)}`;
 }
 
-// A token is good for the days it says were built. If the log shows MORE days built under it than that (the same token used again after a newer one was issued), it is stale and the run is charged again.
-export function runTokenIsStale(daysLoggedSinceIssued: number, daysOnToken: number): boolean {
-  return daysLoggedSinceIssued > daysOnToken;
+// A token is good for the AI calls it says were made under it. If the log shows MORE calls than that (the same token used again after a newer one was issued), it is stale and the run is charged again.
+export function runTokenIsStale(callsLoggedSinceIssued: number, callsOnToken: number): boolean {
+  return callsLoggedSinceIssued > callsOnToken;
 }
 
-export type RunCheck = { ok: true; days: number; issuedAt: number } | { ok: false };
+export type RunCheck = { ok: true; days: number; calls: number; issuedAt: number } | { ok: false };
 
 export function checkRunToken(token: string | null | undefined, userId: string, programId: string, now = Date.now()): RunCheck {
   if (!token || typeof token !== "string") return { ok: false };
@@ -59,7 +61,8 @@ export function checkRunToken(token: string | null | undefined, userId: string, 
   if (payload.u !== userId || payload.p !== programId) return { ok: false };
   if (typeof payload.t !== "number" || now - payload.t > RUN_TTL_MS || payload.t > now + 60_000) return { ok: false };
   if (typeof payload.d !== "number" || payload.d >= MAX_DAYS_PER_RUN) return { ok: false };
-  return { ok: true, days: payload.d, issuedAt: payload.t };
+  const calls = typeof payload.c === "number" && Number.isInteger(payload.c) && payload.c >= payload.d ? payload.c : payload.d;
+  return { ok: true, days: payload.d, calls, issuedAt: payload.t };
 }
 
 // ---- which day comes next -------------------------------------------------------------------

@@ -292,15 +292,22 @@ const JOINT_REGION: Record<string, string> = {
   spine: "spine",
 };
 
-function regionOf(tagKey: string, joint: string | null | undefined): string {
-  const j = (joint ?? tagKey.split("_")[0]).toLowerCase();
-  return JOINT_REGION[j] ?? JOINT_REGION[j.split("_")[0]] ?? j;
+// The joint a tag is on: biomech_tags.joint, else the tag's key (shoulder_extension is the shoulder). A tag on no joint (anti_extension, unilateral_loading, closed_kinetic_chain,
+// single_leg_stance: the stabilization kind) is not a joint at all, so it is left out (review of 6fcc3819).
+function regionOf(tagKey: string, joint: string | null | undefined): string | null {
+  for (const j of [joint, tagKey.split("_")[0]]) {
+    if (!j) continue;
+    const low = j.toLowerCase();
+    const region = JOINT_REGION[low] ?? JOINT_REGION[low.split("_")[0]];
+    if (region) return region;
+  }
+  return null;
 }
 
 // One joint does the work (a curl, a pushdown, a hip thrust, a lateral raise). Two or more = a compound.
 export function isSingleJoint(e: Pick<BiomechTaggedEntry, "primeMoverTagKeys" | "primeMoverJoints">): boolean {
-  if (e.primeMoverTagKeys.length === 0) return false;
-  return new Set(e.primeMoverTagKeys.map((k, i) => regionOf(k, e.primeMoverJoints?.[i]))).size === 1;
+  const regions = new Set(e.primeMoverTagKeys.map((k, i) => regionOf(k, e.primeMoverJoints?.[i])).filter((r): r is string => r !== null));
+  return regions.size === 1;
 }
 
 export function detectBiomechRedundancy(entries: BiomechTaggedEntry[]): BiomechRedundancyFlag[] {
@@ -308,7 +315,9 @@ export function detectBiomechRedundancy(entries: BiomechTaggedEntry[]): BiomechR
   for (const e of entries) {
     if (!isSingleJoint(e)) continue;
     if (e.category && EXCLUDED_FROM_VOLUME.has(e.category)) continue;
-    for (const tagKey of e.primeMoverTagKeys) {
+    for (const [i, tagKey] of e.primeMoverTagKeys.entries()) {
+      // a tag on no joint is not a joint action to stack
+      if (regionOf(tagKey, e.primeMoverJoints?.[i]) === null) continue;
       const key = `${dayKey(e)}::${tagKey}`;
       const group = byDayTag.get(key) ?? { tagKey, weekNumber: e.weekNumber, dayIndex: e.dayIndex ?? null, names: new Set<string>() };
       group.names.add(e.exerciseName);
