@@ -25,6 +25,11 @@ const YOUNG_PROFILE = "00000000-0000-0000-0000-00000000000e"; // Ron's client, n
 const STRANGER = "00000000-0000-0000-0000-00000000000f"; // another coach's client, no birthday
 const G_RON = "00000000-0000-0000-0000-0000000000a1";
 const G_OTHER = "00000000-0000-0000-0000-0000000000a2";
+const SELF_COACH = "00000000-0000-0000-0000-0000000000c3"; // a coach with no birthday who trains in their own group (a personal space)
+const G_SELF = "00000000-0000-0000-0000-0000000000a3";
+const FAKE_COACH = "00000000-0000-0000-0000-0000000000c4"; // a second, made-up coach account
+const G_FAKE = "00000000-0000-0000-0000-0000000000a4";
+const G_ARCHIVED = "00000000-0000-0000-0000-0000000000a5";
 
 const LIVE_MD5 = {
   minor_may_write: "4ce90722aeaf6b38d53f56a86f231d9f",
@@ -66,15 +71,18 @@ for (const [name, want] of Object.entries(LIVE_MD5)) expect(`the stand-in ${name
 const years = (n) => `(current_date - interval '${n} years')::date`;
 await db.exec(`
   insert into public.profiles values ('${RON}', 'Coach Ron'), ('${OTHER_COACH}', 'Other Coach'), ('${NO_DOB}', 'Robyn Lane'), ('${NO_DOB_2}', 'Ward Forrest'), ('${TEEN}', 'Sam Teen'),
-    ('${ADULT}', 'Amber Belt'), ('${YOUNG_PROFILE}', 'Pat Young'), ('${STRANGER}', 'Stan Ger');
-  insert into public.groups values ('${G_RON}', null), ('${G_OTHER}', null);
+    ('${ADULT}', 'Amber Belt'), ('${YOUNG_PROFILE}', 'Pat Young'), ('${STRANGER}', 'Stan Ger'), ('${SELF_COACH}', 'Sol Self'), ('${FAKE_COACH}', 'Fake Coach');
+  insert into public.groups values ('${G_RON}', null), ('${G_OTHER}', null), ('${G_SELF}', null), ('${G_FAKE}', null), ('${G_ARCHIVED}', now());
   insert into public.group_memberships (group_id, profile_id, role) values
     ('${G_RON}', '${RON}', 'coach'), ('${G_RON}', '${NO_DOB}', 'athlete'), ('${G_RON}', '${NO_DOB_2}', 'athlete'), ('${G_RON}', '${TEEN}', 'athlete'), ('${G_RON}', '${ADULT}', 'athlete'),
-    ('${G_RON}', '${YOUNG_PROFILE}', 'athlete'), ('${G_OTHER}', '${OTHER_COACH}', 'coach'), ('${G_OTHER}', '${STRANGER}', 'athlete');
+    ('${G_RON}', '${YOUNG_PROFILE}', 'athlete'), ('${G_OTHER}', '${OTHER_COACH}', 'coach'), ('${G_OTHER}', '${STRANGER}', 'athlete'),
+    ('${G_SELF}', '${SELF_COACH}', 'coach'), ('${G_SELF}', '${SELF_COACH}', 'athlete'),
+    ('${G_FAKE}', '${FAKE_COACH}', 'coach'), ('${G_ARCHIVED}', '${OTHER_COACH}', 'coach');
   insert into public.client_intake values ('${TEEN}', ${years(15)}), ('${ADULT}', ${years(30)});
   insert into public.athlete_profile_details values ('${NO_DOB_2}', ${years(40)}), ('${YOUNG_PROFILE}', ${years(16)});
 `);
 
+const idsForOne = async (who, id) => (await as(who, "authenticated", `select count(*)::int n from public.confirmed_adult_ids(array['${id}']::uuid[])`)).rows[0].n > 0;
 async function as(who, role, sql, params = []) {
   await db.exec(`select set_config('request.jwt.claim.sub', '${who ?? ""}', false), set_config('request.jwt.claim.role', '${role ?? ""}', false)`);
   if (role === "authenticated" || role === "anon") await db.exec(`set role ${role}`);
@@ -117,10 +125,36 @@ expect("paste run again: safe, nobody added twice", (await applyAndCheck("paste 
 const rule = async (id) => one(null, null, `select public.coach_confirmed_adult('${id}')`);
 expect("confirmed with no birthday = adult", (await rule(NO_DOB)) === true);
 expect("not confirmed = not an adult", (await rule(STRANGER)) === false);
-await db.exec(`insert into public.client_adult_confirmations (athlete_id) values ('${TEEN}'), ('${YOUNG_PROFILE}')`);
+await db.exec(`insert into public.client_adult_confirmations (athlete_id, confirmed_by) values ('${TEEN}', '${RON}'), ('${YOUNG_PROFILE}', '${RON}')`);
 expect("a birthday under 18 wins over a confirmation", (await rule(TEEN)) === false);
 expect("a profile birthday under 18 wins too", (await rule(YOUNG_PROFILE)) === false);
 await db.exec(`delete from public.client_adult_confirmations where athlete_id in ('${TEEN}', '${YOUNG_PROFILE}')`);
+
+// A confirmation counts only while the coach who made it coaches EVERY live group the client trains in.
+await db.exec(`insert into public.group_memberships (group_id, profile_id, role) values ('${G_OTHER}', '${NO_DOB}', 'athlete')`);
+expect("it lapses once the client also trains in a group the confirming coach does not coach", (await rule(NO_DOB)) === false);
+await db.exec(`delete from public.group_memberships where group_id = '${G_OTHER}' and profile_id = '${NO_DOB}'`);
+expect("and counts again once that is no longer so", (await rule(NO_DOB)) === true);
+await db.exec(`insert into public.group_memberships (group_id, profile_id, role) values ('${G_ARCHIVED}', '${NO_DOB}', 'athlete')`);
+expect("an archived group does not count against it", (await rule(NO_DOB)) === true);
+await db.exec(`insert into public.group_memberships (group_id, profile_id, role, membership_type) values ('${G_OTHER}', '${NO_DOB}', 'athlete', 'social')`);
+expect("nor a group they only belong to socially", (await rule(NO_DOB)) === true);
+await db.exec(`delete from public.group_memberships where profile_id = '${NO_DOB}' and group_id in ('${G_ARCHIVED}', '${G_OTHER}')`);
+await db.exec(`delete from public.group_memberships where group_id = '${G_RON}' and profile_id = '${RON}' and role = 'coach'`);
+expect("it lapses when the confirming coach stops coaching them", (await rule(NO_DOB)) === false);
+await db.exec(`insert into public.group_memberships (group_id, profile_id, role) values ('${G_RON}', '${RON}', 'coach')`);
+expect("and counts again when they coach them again", (await rule(NO_DOB)) === true);
+// A second, made-up coach account puts a real coach's client in its own group and ticks them: it never counts in the real coach's group.
+await db.exec(`insert into public.group_memberships (group_id, profile_id, role) values ('${G_FAKE}', '${STRANGER}', 'athlete')`);
+expect("the made-up coach may tick a client in its own group", (await fails(FAKE_COACH, "authenticated", `select public.set_adult_confirmed('${STRANGER}', true)`)) === null);
+expect("but it does not count: the client trains with a real coach the made-up one does not coach", (await rule(STRANGER)) === false);
+expect("so they still may not write", (await one(STRANGER, "authenticated", `select public.minor_may_write('${STRANGER}')`)) === false);
+expect("and the real coach is not told they are an adult", (await idsForOne(OTHER_COACH, STRANGER)) === false);
+await db.exec(`delete from public.client_adult_confirmations where athlete_id = '${STRANGER}'; delete from public.group_memberships where group_id = '${G_FAKE}' and profile_id = '${STRANGER}'`);
+// A confirmation whose coach account is gone (confirmed_by set to null) does not count.
+await db.exec(`insert into public.client_adult_confirmations (athlete_id, confirmed_by) values ('${STRANGER}', null)`);
+expect("a confirmation with no coach on it does not count", (await rule(STRANGER)) === false);
+await db.exec(`delete from public.client_adult_confirmations where athlete_id = '${STRANGER}'`);
 
 // The four age checks follow it.
 expect("a confirmed client may write", (await one(NO_DOB, "authenticated", `select public.minor_may_write('${NO_DOB}')`)) === true);
@@ -138,6 +172,8 @@ expect("a signed-in person cannot read the table", !!(await fails(RON, "authenti
 expect("nor write it", !!(await fails(RON, "authenticated", `insert into public.client_adult_confirmations (athlete_id) values ('${STRANGER}')`)));
 expect("nor call the rule directly", !!(await fails(RON, "authenticated", `select public.coach_confirmed_adult('${NO_DOB}')`)));
 expect("another coach cannot tick Ron's client", /not authorized/.test((await fails(OTHER_COACH, "authenticated", `select public.set_adult_confirmed('${NO_DOB}', false)`)) ?? ""));
+expect("a coach cannot tick themself, even as a training athlete in their own group", /not authorized/.test((await fails(SELF_COACH, "authenticated", `select public.set_adult_confirmed('${SELF_COACH}', true)`)) ?? ""));
+expect("so nothing is recorded for them", (await rule(SELF_COACH)) === false);
 expect("a client cannot tick themself", /not authorized/.test((await fails(STRANGER, "authenticated", `select public.set_adult_confirmed('${STRANGER}', true)`)) ?? ""));
 expect("a coach cannot tick a client with a birthday on file", /birthday on file/.test((await fails(RON, "authenticated", `select public.set_adult_confirmed('${ADULT}', true)`)) ?? ""));
 expect("the coach can tick their own client", (await fails(OTHER_COACH, "authenticated", `select public.set_adult_confirmed('${STRANGER}', true)`)) === null);

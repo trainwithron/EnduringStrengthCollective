@@ -153,6 +153,15 @@ describe("where the rule is used (and where it is not)", () => {
     expect(src("components/coach/adult-confirm-toggle.tsx")).toContain("18 or older (no birthday on file)");
     expect(src("app/api/clients/adult-confirm/route.ts")).toContain('supabase.rpc("set_adult_confirmed"');
   });
+
+  it("nobody can vouch for their own age: not in the database, not through the route, and the box never shows on your own page", () => {
+    expect(src("supabase/migrations/0474_coach_confirmed_adult.sql")).toContain("if auth.uid() is null or p_athlete = auth.uid() or not exists (");
+    expect(src("app/api/clients/adult-confirm/route.ts")).toContain("if (athleteId === user.id) return NextResponse.json");
+    const page = src("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx");
+    // selfView is the page for your own id
+    expect(page).toContain("const selfView = !!user && params.athleteId === user.id;");
+    expect(page).toContain("const showAdultConfirm = !selfView && ");
+  });
 });
 
 describe("paste 230", () => {
@@ -173,6 +182,11 @@ describe("paste 230", () => {
     expect(apply).toContain("as ron_confirmed");
     // platform-wide nothing is confirmed by the migration itself
     expect(mig).not.toContain("insert into public.client_adult_confirmations (athlete_id, confirmed_by)\nselect");
+  });
+  it("a confirmation counts only while the coach who made it coaches every live group the client trains in (a second, made-up coach account never counts)", () => {
+    expect(mig).toContain("where c.athlete_id = p_person and c.confirmed_by is not null");
+    expect(mig).toContain("and not exists (select 1 from public.group_memberships cc where cc.group_id = m.group_id and cc.profile_id = c.confirmed_by and cc.role = 'coach')");
+    expect(mig).toContain("join public.groups g on g.id = m.group_id and g.archived_at is null");
   });
   it("the undo puts the four age checks back exactly (md5 checked)", () => {
     for (const md5 of ["4ce90722aeaf6b38d53f56a86f231d9f", "d67ec0667c1284d0e24afd70c874a468", "2251b9649248307314e2d07596444258", "23603214443916629981a3cee33125e6"]) {

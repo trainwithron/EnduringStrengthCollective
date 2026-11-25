@@ -14,7 +14,9 @@ create table if not exists public.client_adult_confirmations (
 alter table public.client_adult_confirmations enable row level security;
 revoke all on public.client_adult_confirmations from anon, authenticated;
 
--- The rule's database half: confirmed, no date of birth in client_intake, and no profile birthday that says under 18. Only the database's own functions call it.
+-- The rule's database half: confirmed by a coach who still coaches EVERY live group the person trains in (so a confirmation made from a second, made-up coach account never counts
+-- in a real coach's group, and it lapses when the coach who made it stops coaching them), no date of birth in client_intake, and no profile birthday that says under 18.
+-- Only the database's own functions call it.
 create or replace function public.coach_confirmed_adult(p_person uuid)
 returns boolean
 language sql
@@ -22,7 +24,17 @@ stable
 security definer
 set search_path = public
 as $$
-  select exists (select 1 from public.client_adult_confirmations c where c.athlete_id = p_person)
+  select exists (
+      select 1 from public.client_adult_confirmations c
+      where c.athlete_id = p_person and c.confirmed_by is not null
+        and not exists (
+          select 1
+          from public.group_memberships m
+          join public.groups g on g.id = m.group_id and g.archived_at is null
+          where m.profile_id = p_person and m.role = 'athlete' and m.membership_type = 'training'
+            and not exists (select 1 from public.group_memberships cc where cc.group_id = m.group_id and cc.profile_id = c.confirmed_by and cc.role = 'coach')
+        )
+    )
     and not exists (select 1 from public.client_intake ci where ci.athlete_id = p_person and ci.date_of_birth is not null)
     and not exists (
       select 1 from public.athlete_profile_details d
@@ -58,7 +70,8 @@ $$;
 revoke execute on function public.confirmed_adult_ids(uuid[]) from public, anon;
 grant execute on function public.confirmed_adult_ids(uuid[]) to authenticated, service_role;
 
--- Tick (or untick) "18 or older (no birthday on file)": only a coach of a live group where the client trains, and only while no birthday is on file.
+-- Tick (or untick) "18 or older (no birthday on file)": only a coach of a live group where the client trains, never for themselves (a coach training in their own space
+-- cannot vouch for their own age), and only while no birthday is on file.
 create or replace function public.set_adult_confirmed(p_athlete uuid, p_confirmed boolean)
 returns void
 language plpgsql
@@ -66,7 +79,7 @@ security definer
 set search_path = public
 as $$
 begin
-  if auth.uid() is null or not exists (
+  if auth.uid() is null or p_athlete = auth.uid() or not exists (
     select 1 from public.group_memberships a
     join public.groups g on g.id = a.group_id
     where a.profile_id = p_athlete and a.role = 'athlete' and a.membership_type = 'training' and g.archived_at is null and public.is_group_coach(a.group_id)

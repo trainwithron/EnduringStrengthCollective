@@ -17,6 +17,8 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as { athleteId?: unknown; confirmed?: unknown };
   const athleteId = typeof body.athleteId === "string" ? body.athleteId : "";
   if (!athleteId) return NextResponse.json({ error: "Missing the client." }, { status: 400 });
+  // Never for yourself: a coach training in their own space cannot vouch for their own age (the database refuses it too).
+  if (athleteId === user.id) return NextResponse.json({ error: "Only the client's coach can do that." }, { status: 403 });
 
   const { error } = await supabase.rpc("set_adult_confirmed", { p_athlete: athleteId, p_confirmed: body.confirmed === true });
   if (error) {
