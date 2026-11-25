@@ -53,6 +53,7 @@ import { FOOD_TRACKING_OFF_LINE, canDrawTrend, dailyCaloriesFromLog } from "@/li
 import { addDaysToKey } from "@/lib/date-key";
 import { fetchFoodLogDay } from "@/lib/food-entry";
 import { NOT_IMPORTED } from "@/lib/imported-food";
+import { loadConfirmedAdults } from "@/lib/youth-block";
 import { AiBudgetMeter } from "@/components/coach/ai-budget-meter";
 import { retryState as retryStateFor, type RetryState } from "@/lib/meal-plan-retry";
 import { ClientGroceryList } from "@/components/athlete/client-grocery-list";
@@ -541,7 +542,8 @@ export default async function NutritionPage(
       goal: null,
       baselineMaintenance: baseline.ok ? baseline.maintenance : null,
       // No fat-loss goal for someone under 18, or whose age is not known (nobody reviews a target a client sets for themself).
-      hideFatLoss: age == null || age < 18,
+      // (an age that is not known counts as under 18, unless a coach confirmed 18 or older: step 230)
+      hideFatLoss: age == null ? !(await loadConfirmedAdults(supabase, [athleteId])).has(athleteId) : age < 18,
       showFindMaintenance: own != null || caloriesEatenPoints.length > 0,
       maintenance: estimateRealMaintenance({
         weights: (weightLogs ?? []).map((w) => ({ date: w.logged_date as string, weight: Number(w.weight) })),

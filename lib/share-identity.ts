@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { publicDisplayName } from "@/lib/public-name";
 import { resolveShowName } from "@/lib/share-name";
+import { loadConfirmedAdults } from "@/lib/youth-block";
 import { isMinorDob } from "@/lib/youth-block";
 
 // What a stranger sees of a person on a public celebration card (milestone, transformation): the same promise as the shared workout picture.
@@ -35,7 +36,8 @@ export async function loadShareIdentity(supabase: SupabaseClient, athleteId: str
     stored = row?.show_name_on_share ?? null;
   }
   const dob = (intakeRes.data as { date_of_birth?: string | null } | null)?.date_of_birth ?? null;
-  const hidden = columnThere && !resolveShowName(stored, dob);
+  const confirmedAdult = !dob && (await loadConfirmedAdults(supabase, [athleteId])).has(athleteId);
+  const hidden = columnThere && !resolveShowName(stored, dob, new Date(), confirmedAdult);
 
   const group = groupRes.data as { name?: string | null; organization_id?: string | null; group_kind?: string | null } | null;
   let groupName = group?.name ?? "Spotlight Coaching";

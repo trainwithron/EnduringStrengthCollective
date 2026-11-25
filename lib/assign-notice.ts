@@ -1,18 +1,20 @@
-import { ageStatusFromDob } from "@/lib/youth-block";
+import { ageStatusOf } from "@/lib/youth-block";
 
 // Shown on the Assign screen before a program goes to a client, from what is on file NOW (not what was true when the program was built): a client under 18, a client with no birthdate on file, or a client with a
 // flagged health concern gets a plain note so the coach looks at the program with that in mind before it reaches them. Pure.
 export interface AssignClientFacts {
   name: string;
   dateOfBirth: string | null;
+  // No birthday on file, and a coach confirmed 18 or older (step 230).
+  coachConfirmedAdult?: boolean;
   parqFlagged: boolean;
   // The coach decided "hold until cleared" after the client's health screening.
   onHold?: boolean;
 }
 
 export function assignNotices(clients: AssignClientFacts[], asOf: Date = new Date()): string[] {
-  const minors = clients.filter((c) => ageStatusFromDob(c.dateOfBirth, asOf) === "minor").map((c) => c.name);
-  const unknown = clients.filter((c) => ageStatusFromDob(c.dateOfBirth, asOf) === "unknown").map((c) => c.name);
+  const minors = clients.filter((c) => ageStatusOf(c.dateOfBirth, !!c.coachConfirmedAdult, asOf) === "minor").map((c) => c.name);
+  const unknown = clients.filter((c) => ageStatusOf(c.dateOfBirth, !!c.coachConfirmedAdult, asOf) === "unknown").map((c) => c.name);
   const health = clients.filter((c) => c.parqFlagged).map((c) => c.name);
   const hold = clients.filter((c) => c.onHold).map((c) => c.name);
   const list = (names: string[]) => (names.length <= 3 ? names.join(", ") : names.slice(0, 3).join(", ") + " and " + (names.length - 3) + " more");

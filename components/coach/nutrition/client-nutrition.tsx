@@ -57,6 +57,7 @@ import { BaselinePrompt } from "@/components/coach/nutrition/baseline-prompt";
 import { PhaseOfRecordCard } from "@/components/coach/nutrition/phase-of-record-card";
 import { readDateOfBirth, rowToBodyProfile } from "@/lib/client-body-profile";
 import { minorSafetyLine } from "@/lib/minor-safety";
+import { loadConfirmedAdults } from "@/lib/youth-block";
 import { rowToPhasePlan, resolvePhaseOfRecord, reviewIsDue } from "@/lib/phase-plan";
 import { chooseBaselinePhase, computeBaseline } from "@/lib/nutrition-baseline";
 import { PhaseReviewCard, type PhaseReviewCardProps } from "@/components/coach/nutrition/phase-review-card";
@@ -470,7 +471,9 @@ export async function ClientNutrition({
   });
   const baselineArchetype = prefs.dietType === "keto" ? "keto" : prefs.dietType === "carnivore" ? "carnivore" : "standard";
   const ageYears = readDateOfBirth(bodyProfile) ? ageOnDate(readDateOfBirth(bodyProfile) as string, todayKey) : null;
-  const minorLine = minorSafetyLine({ ageYears, phase: phasePlan?.phase ?? derivedPhase?.phase ?? milestoneTagToNutritionPhase(phaseTag), clientName: firstName });
+  // No birthday on file but a coach confirmed 18 or older (step 230): an adult, so no "age unknown" line.
+  const confirmedAdult = ageYears == null && (await loadConfirmedAdults(supabase, [athleteId])).has(athleteId);
+  const minorLine = minorSafetyLine({ ageYears, phase: phasePlan?.phase ?? derivedPhase?.phase ?? milestoneTagToNutritionPhase(phaseTag), clientName: firstName, confirmedAdult });
   const dobLabel = readDateOfBirth(bodyProfile) ? shortDateLabel(readDateOfBirth(bodyProfile) as string) : null;
 
   // The phase review: on the review date the coach sees what actually happened over the phase. It only raises a prompt; nothing changes until the coach picks a choice.
@@ -729,7 +732,7 @@ export async function ClientNutrition({
                   floorCalories={floorCalories}
                   floorNote={floorNote}
                   clientName={firstName}
-                  ageKnown={ageYears != null}
+                  ageKnown={ageYears != null || confirmedAdult}
                 />
               </>
             }

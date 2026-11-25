@@ -53,6 +53,7 @@ import { getEffectiveAthlete } from "@/lib/acting-as";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { phoneCalendarHref } from "@/lib/phone-coach-routes";
 import { meetsMinimumAge } from "@/lib/coppa";
+import { loadConfirmedAdults } from "@/lib/youth-block";
 import { MarkNoShowToggle } from "@/components/coach/mark-no-show-toggle";
 import { WaitlistJoinButton } from "@/components/athlete/waitlist-join-button";
 import { rescheduleLine } from "@/lib/reschedule-line";
@@ -802,6 +803,8 @@ export default async function CoachDayDetailPage(
         videoEligibleAthleteIds.add(row.athlete_id);
       }
     }
+    // No birthday on file, but a coach confirmed 18 or older (step 230): the same positive confirmation of an adult.
+    for (const id of await loadConfirmedAdults(supabase, bookingAthleteIds)) videoEligibleAthleteIds.add(id);
   }
 
   let selectedClient: { fullName: string; balance: number; booked: number } | null = null;

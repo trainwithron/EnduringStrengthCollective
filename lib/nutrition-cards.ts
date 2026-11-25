@@ -99,7 +99,8 @@ export const TRACKING_OFF_CARD = "Food tracking is off for this client.";
 export const MACROS_OFF_CARD = "Macros off for this client: logging only.";
 export const NO_MACROS_CARD = "No macros set yet.";
 // The rule the Clients list already keeps (Release B3): someone under 18, whose age is not on file, or with "No automatic nutrition suggestions" on is never compared with a target.
-export const DAYS_ONLY_CARD = "Days logged only for this client: under 18, age not on file, or no automatic nutrition suggestions.";
+// (No birthday on file stops being a reason once a coach ticks "18 or older" on the client's page: step 230.)
+export const DAYS_ONLY_CARD = "Days logged only for this client: under 18, no birthday on file (tick 18 or older on their page), or no automatic nutrition suggestions.";
 
 export type CardBody =
   | { kind: "message"; text: string }

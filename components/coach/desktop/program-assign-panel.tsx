@@ -4,6 +4,7 @@ import { readHealthAnswersMany } from "@/lib/health-answers";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { loadConfirmedAdults } from "@/lib/youth-block";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { loadAssignableClients, type AssignClient } from "@/lib/assign-clients";
 import { loadAssignedTo, type AssignedInstance } from "@/lib/program-assigned";
@@ -166,6 +167,9 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
         return;
       }
       const byId = new Map(((data ?? []) as { athlete_id: string; date_of_birth: string | null }[]).map((r) => [r.athlete_id, r]));
+      // No birthday on file but confirmed 18 or older by a coach (step 230): not "no birthdate on file".
+      const confirmedAdults = await loadConfirmedAdults(createBrowserClient(), ids);
+      if (cancelled) return;
       // The coach's own decisions on flagged screenings (best effort: without them the other notes still show).
       const { data: ackRows } = await createBrowserClient().from("athlete_injury_flag_acknowledgements").select("athlete_id, decision").in("athlete_id", ids);
       if (cancelled) return;
@@ -176,6 +180,7 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
           ids.map((id) => ({
             name: names.get(id) ?? "A client",
             dateOfBirth: byId.get(id)?.date_of_birth ?? null,
+            coachConfirmedAdult: confirmedAdults.has(id),
             parqFlagged: hasFlaggedMusculoskeletalConcern((screening.answers.get(id) as ParQAnswer[]) ?? []),
             onHold: holdIds.has(id),
           }))

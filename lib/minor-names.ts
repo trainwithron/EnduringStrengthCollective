@@ -1,5 +1,5 @@
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { ageStatusFromDob } from "@/lib/youth-block";
+import { ageStatusOf, loadConfirmedAdults } from "@/lib/youth-block";
 import { chunk } from "@/lib/chunk";
 
 // A member who is not a confirmed adult is shown to the rest of the group as a first name and a last initial ("Sam R."), never the full name, on the shared boards: the leaderboard, the records board and a
@@ -17,13 +17,15 @@ export const loadNameProtectedIds: ProtectIds = async (profileIds) => {
   try {
     const db = createServiceRoleClient();
     const adults = new Set<string>();
+    // No birthday on file but a coach confirmed 18 or older (step 230): an adult too. A failed read of the confirmations confirms nobody.
+    const confirmed = await loadConfirmedAdults(db, ids);
+    const dobById = new Map<string, string | null>();
     for (const group of chunk(ids, 100)) {
       const { data, error } = await db.from("client_intake").select("athlete_id, date_of_birth").in("athlete_id", group);
       if (error) return new Set(["*"]);
-      for (const row of (data ?? []) as Array<{ athlete_id: string; date_of_birth: string | null }>) {
-        if (ageStatusFromDob(row.date_of_birth) === "adult") adults.add(row.athlete_id);
-      }
+      for (const row of (data ?? []) as Array<{ athlete_id: string; date_of_birth: string | null }>) dobById.set(row.athlete_id, row.date_of_birth);
     }
+    for (const id of ids) if (ageStatusOf(dobById.get(id) ?? null, confirmed.has(id)) === "adult") adults.add(id);
     for (const id of ids) if (!adults.has(id)) out.add(id);
   } catch {
     return new Set(["*"]);

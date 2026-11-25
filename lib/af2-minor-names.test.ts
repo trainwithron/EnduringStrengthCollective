@@ -24,7 +24,8 @@ describe("a minor's name is never on a shared picture, whatever the switch says"
 
   it("the switch is not offered to someone who is not a confirmed adult", () => {
     const settings = src("app/(coach)/groups/[groupId]/settings/page.tsx");
-    expect(settings).toContain('{!isCoach && showNameAvailable && ageStatusFromDob(ownDob) === "adult" && (');
+    // (step 230: a coach-confirmed adult with no birthday counts too)
+    expect(settings).toContain('{!isCoach && showNameAvailable && ageStatusOf(ownDob, ownConfirmedAdult) === "adult" && (');
   });
 });
 

@@ -33,12 +33,43 @@ export function ageStatusFromDob(dateOfBirth: string | null | undefined, asOf: D
   return isMinorDob(dateOfBirth, asOf) ? "minor" : "adult";
 }
 
-// The age of a client for the AI builder: a client with no birthdate on file is "unknown", and unknown gets the youth protections (RPE 8 or lower, moderate reps, technique first) until a birthdate says otherwise.
-// A read that fails is "unknown" too, never "adult".
+// THE adult rule (step 230, Ron Nov 24: "I can vouch for everyone that doesn't have a birthday submitted. They are over 18."): a date of birth that says 18 or over, OR no date of
+// birth and a coach of theirs confirmed 18 or older. A date of birth that says under 18 always wins (a real birthday overrides the confirmation). Every adult-or-not decision goes
+// through this; parent and guardian steps do not (they follow a real date of birth only), and nor does anything that only stops a KNOWN minor (isMinorDob).
+export function ageStatusOf(dateOfBirth: string | null | undefined, coachConfirmedAdult: boolean, asOf: Date = new Date()): AgeStatus {
+  const status = ageStatusFromDob(dateOfBirth, asOf);
+  return status === "unknown" && coachConfirmedAdult ? "adult" : status;
+}
+
+// Which of these clients a coach confirmed 18 or older. The database applies the whole rule (no date of birth in client_intake, no profile birthday under 18) and only answers about
+// the person asking, clients they coach, or for the server, so anyone else is simply left out. A failed read, or a database without step 230 yet, is nobody: never the other way round.
+export async function loadConfirmedAdults(supabase: SupabaseClient, ids: string[]): Promise<Set<string>> {
+  const unique = [...new Set(ids.filter(Boolean))];
+  const out = new Set<string>();
+  try {
+    for (let i = 0; i < unique.length; i += 500) {
+      const { data, error } = await supabase.rpc("confirmed_adult_ids", { p_ids: unique.slice(i, i + 500) });
+      if (error) return new Set();
+      for (const row of (Array.isArray(data) ? data : []) as unknown[]) {
+        const id = typeof row === "string" ? row : (row as { confirmed_adult_ids?: unknown } | null)?.confirmed_adult_ids;
+        if (typeof id === "string") out.add(id);
+      }
+    }
+  } catch {
+    // a read that throws confirms nobody too
+    return new Set();
+  }
+  return out;
+}
+
+// The age of a client for the AI builder: a client with no birthdate on file is "unknown" (unless a coach confirmed 18 or older), and unknown gets the youth protections (RPE 8 or
+// lower, moderate reps, technique first) until a birthdate says otherwise. A read that fails is "unknown" too, never "adult".
 export async function athleteAgeStatus(supabase: SupabaseClient, athleteId: string): Promise<AgeStatus> {
   const { data, error } = await supabase.from("client_intake").select("date_of_birth").eq("athlete_id", athleteId).maybeSingle();
   if (error) return "unknown";
-  return ageStatusFromDob((data as { date_of_birth?: string | null } | null)?.date_of_birth);
+  const dob = (data as { date_of_birth?: string | null } | null)?.date_of_birth;
+  if (ageStatusFromDob(dob) !== "unknown") return ageStatusFromDob(dob);
+  return ageStatusOf(dob, (await loadConfirmedAdults(supabase, [athleteId])).has(athleteId));
 }
 
 // A coach building a program for THEMSELVES (their own personal space) with no birthdate on file is treated as an adult; an unknown age only gets the youth protections for someone else's client. A birthdate that says under 18 still wins.
@@ -53,7 +84,7 @@ export async function isCoachSomewhere(supabase: SupabaseClient, profileId: stri
   return !error && Array.isArray(data) && data.length > 0;
 }
 
-export const UNKNOWN_AGE_BANNER_TEXT = "This client has no birthdate on file, so the program was built with the youth protections (technique first, no max testing, effort at RPE 8 or lower). Add their birthdate to remove them, and review the program with that in mind.";
+export const UNKNOWN_AGE_BANNER_TEXT = "This client has no birthdate on file, so the program was built with the youth protections (technique first, no max testing, effort at RPE 8 or lower). Add their birthdate (or tick 18 or older on their page) to remove them, and review the program with that in mind.";
 
 export const YOUTH_RPE_CAP = 8;
 export const YOUTH_REP_LOW = 6;

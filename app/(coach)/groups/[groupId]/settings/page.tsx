@@ -43,7 +43,7 @@ import { FeedBroadcastSettings } from "@/components/athlete/feed-broadcast-setti
 import { SharedGroupSettings } from "@/components/athlete/shared-group-settings";
 import { loadMySharedGroups } from "@/lib/shared-group-join";
 import { resolveShowName } from "@/lib/share-name";
-import { ageStatusFromDob } from "@/lib/youth-block";
+import { ageStatusOf, loadConfirmedAdults } from "@/lib/youth-block";
 import { ShowNameOnShareToggle } from "@/components/athlete/show-name-on-share-toggle";
 import { DeleteAccountButton } from "@/components/athlete/delete-account-button";
 import { GamificationToggle } from "@/components/coach/gamification-toggle";
@@ -241,7 +241,9 @@ export default async function SettingsPage(
   const showNameAvailable = !shareNameRead.error;
   // With no choice made yet the box shows what the default is for them: off under 18, on for an adult or when no date of birth is on file.
   const ownDob = shareNameRead.error ? null : ((await supabase.from("client_intake").select("date_of_birth").eq("athlete_id", athleteId).maybeSingle()).data as { date_of_birth?: string | null } | null)?.date_of_birth ?? null;
-  const showNameOn = resolveShowName((shareNameRead.data as { show_name_on_share?: boolean | null } | null)?.show_name_on_share, ownDob);
+  // No birthday on file but a coach confirmed 18 or older (step 230): an adult, so the choice is theirs.
+  const ownConfirmedAdult = !shareNameRead.error && !ownDob && (await loadConfirmedAdults(supabase, [athleteId])).has(athleteId);
+  const showNameOn = resolveShowName((shareNameRead.data as { show_name_on_share?: boolean | null } | null)?.show_name_on_share, ownDob, new Date(), ownConfirmedAdult);
 
   let packages: PackageOption[] = [];
   if (!isCoach) {
@@ -584,7 +586,7 @@ export default async function SettingsPage(
           </SettingsGroup>
         ))}
 
-        {!isCoach && showNameAvailable && ageStatusFromDob(ownDob) === "adult" && (
+        {!isCoach && showNameAvailable && ageStatusOf(ownDob, ownConfirmedAdult) === "adult" && (
           <SettingsGroup label="Sharing your workout picture">
             <ShowNameOnShareToggle profileId={athleteId} initialOn={showNameOn} />
           </SettingsGroup>

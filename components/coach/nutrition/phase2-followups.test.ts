@@ -41,12 +41,12 @@ describe("a team coach is not sent one notice per athlete", () => {
 describe("age unknown and a minor's held cut are said out loud", () => {
   it("the weekly job's suggestion text says age is unknown when there is no date of birth", () => {
     expect(cron).toContain("AGE_UNKNOWN_NOTE");
-    expect(cron).toContain("dob ? engineResult.rationale");
+    expect(cron).toContain("dob || confirmedAdult ? engineResult.rationale"); // (step 230: a coach-confirmed adult is an age on file)
   });
   it("the card and the Targets header say it, and a held cut is recorded in the run's result", () => {
     expect(card).toContain("{!ageKnown && !isBaseline");
     expect(list).toContain("ageKnown={ageKnown}");
-    expect(clientNutrition).toContain("ageKnown={ageYears != null}");
+    expect(clientNutrition).toContain("ageKnown={ageYears != null || confirmedAdult}");
     expect(clientNutrition).toContain("minorSafetyLine(");
     expect(cron).toContain("heldForAge");
   });
